@@ -8,3 +8,12 @@
 {"grid":[[null,["a",2,1],["a",1,1,1,1],["a",2,2],["a",3]],[["a",1,3],null,null,null,["a",1]],[null,null,null,null,null],[null,null,null,null,null],[["b",3],["b",2,2,2],["b",1,1,1,1,1],["b",2,1,1],["b",3]]]}
 {"grid":[[null,["a",2,1],["a",1,1,1,1],["a",2,2],null],[["a",1,3],null,null,null,["a",1,3]],[null,null,null,null,null],[null,null,null,null,null],[["b",3],["b",2,2,2],["b",1,1,1,1,1],["b",2,1,1],["b",3]]]}
 {"grid":[[null,["a",2,1],["a",1,1,1],["a",2,2],null],[["a",1,3],null,["a",1],null,["a",1,3]],[null,null,null,null,null],[null,null,null,null,null],[["b",3],["b",2,2,2],["b",1,1,1,1,1],["b",2,1,1],["b",3]]]}
+{"grid":[[null,["a",2,1],["a",1,1,1],["a",2,2],null],[["a",1,3],null,["a",1],null,["a",1,3]],[null,null,null,null,null],[null,null,null,["b",1],null],[["b",3],["b",2,2,2],["b",1,1,1,1,1],["b",2,1],["b",3]]]}
+{"grid":[[null,["a",2,1],["a",1,1,1],["a",2,2],null],[["a",1,3],null,["a",1],null,["a",1,3]],[null,null,null,null,null],[null,null,null,["b",1,2],null],[["b",3],["b",2,2,2],["b",1,1,1,1,1],["b",1],["b",3]]]}
+{"grid":[[null,["a",2,1],["a",1,1,1],["a",2,2],null],[["a",1,3],null,["a",1],null,["a",1,3]],[null,null,null,["b",1],null],[null,null,null,["b",2],null],[["b",3],["b",2,2,2],["b",1,1,1,1,1],["b",1],["b",3]]]}
+{"grid":[[null,["a",2,1],["a",1,1,1],["a",2,2],null],[["a",1,3],null,["a",1],null,["a",1,3]],[null,null,null,["b",1,2],null],[null,null,null,null,null],[["b",3],["b",2,2,2],["b",1,1,1,1,1],["b",1],["b",3]]]}
+{"grid":[[null,["a",2,1],["a",1,1,1],["a",2,2],null],[["a",1,3],null,["a",1],null,["a",1,3]],[null,null,["b",1],["b",2],null],[null,null,null,null,null],[["b",3],["b",2,2,2],["b",1,1,1,1,1],["b",1],["b",3]]]}
+{"grid":[[null,["a",2,1],["a",1,1,1],["a",2,2],null],[["a",1,3],null,["a",1],null,["a",1,3]],[null,null,["b",1,2],null,null],[null,null,null,null,null],[["b",3],["b",2,2,2],["b",1,1,1,1,1],["b",1],["b",3]]]}
+{"grid":[[null,["a",2,1],["a",1,1,1],["a",2,2],null],[["a",1,3],null,["a",1],null,["a",1,3]],[null,null,["b",1,2],null,null],[null,null,["b",1],null,null],[["b",3],["b",2,2,2],["b",1,1,1,1],["b",1],["b",3]]]}
+{"grid":[[null,["a",2,1],["a",1,1,1],["a",2,2],null],[["a",1,3],null,["a",1],null,["a",1,3]],[null,null,["b",1,2,1],null,null],[null,null,null,null,null],[["b",3],["b",2,2,2],["b",1,1,1,1],["b",1],["b",3]]]}
+{"grid":[[null,["a",2,1],["a",1,1,1],["a",2,2],null],[["a",1,3],null,["a",1],null,["a",1,3]],[null,null,["b",1,2,1],null,null],[null,null,["b",1],null,null],[["b",3],["b",2,2,2],["b",1,1,1],["b",1],["b",3]]]}

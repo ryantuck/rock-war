@@ -96,7 +96,25 @@ def main():
     for mv in mvs:
         board = move_piece(board, *mv)
         print(json.dumps(board.dict()))
-    
+
+    # turn 2 - b - aggressive center
+    mvs_2 = [
+        ('b', 1, (4,3),(3,3)), # up
+        ('b', 2, (4,3),(3,3)), # up
+        ('b', 1, (3,3),(2,3)), # up
+        ('b', 2, (3,3),(2,3)), # up
+        ('b', 1, (2,3),(2,2)), # left
+        ('b', 2, (2,3),(2,2)), # left
+
+        ('b', 1, (4,2),(3,2)), # up
+        ('b', 1, (3,2),(2,2)), # up
+
+        ('b', 1, (4,2),(3,2)), # up
+    ]
+    for mv in mvs_2:
+        board = move_piece(board, *mv)
+        print(json.dumps(board.dict()))
+
 
 if __name__ == '__main__':
     main()
