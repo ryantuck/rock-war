@@ -179,14 +179,34 @@ def main():
     board = attack(board, 'b', (1,2), (0,2))
     print(json.dumps(board.dict()))
 
-    # turn 5 - retaliate
+    # turn 5 - a - retaliate
     board = move_piece(board, 'a', 3, (1,3),(0,3))
     print(json.dumps(board.dict()))
 
     board = attack(board, 'a', (0,3), (0,2))
     print(json.dumps(board.dict()))
 
+    # turn 6 - b - control middle
+    mvs_6 = [
 
+        # TODO ('b', pcs=[2,2], from=(4,1), dir='up')
+        ('b', 2, (4,1), (3,1)), # up
+        ('b', 2, (4,1), (3,1)), # up
+
+        ('b', 1, (4,2), (3,2)), # up
+        ('b', 2, (3,1), (3,2)), # right
+
+        ('b', 1, (3,2), (2,2)), # up
+        ('b', 2, (3,2), (2,2)), # up
+
+        ('b', 1, (4,3), (3,3)), # up
+
+        ('b', 1, (4,2), (4,3)), # right        
+    ]
+
+    for mv in mvs_6:
+        board = move_piece(board, *mv)
+        print(json.dumps(board.dict()))
 
 
 if __name__ == '__main__':
