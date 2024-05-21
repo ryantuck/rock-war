@@ -208,6 +208,24 @@ def main():
         board = move_piece(board, *mv)
         print(json.dumps(board.dict()))
 
+    # turn 7 - nope
+    mvs_7 = [
+        ('a', 1, (1,4), (1,3)), # right
+
+        ('a', 1, (1,3), (2,3)), # down
+        ('a', 1, (1,3), (2,3)), # down
+        ('a', 2, (1,3), (2,3)), # down
+    ]
+
+    for mv in mvs_7:
+        board = move_piece(board, *mv)
+        print(json.dumps(board.dict()))
+    board = attack(board, 'a', (2,3), (2,2))
+    print(json.dumps(board.dict()))
+
+
+    
+
 
 if __name__ == '__main__':
     main()
