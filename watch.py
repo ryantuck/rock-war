@@ -20,6 +20,16 @@ if __name__ == '__main__':
             for row in board['grid']
         ]
 
+        
+
+        captured = board['captured']
+        cap_a, cap_b = '--'
+        if captured['a'] != []:
+            cap_a = ''.join(str(pc) for pc in captured['a'])
+        if captured['b'] != []:
+            cap_b = ''.join(str(pc) for pc in captured['b'])
+        print(f'a : {cap_a} | b: {cap_b}')
+
         print(tabulate(str_grid))
 
         turns += 1

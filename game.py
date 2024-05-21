@@ -8,8 +8,9 @@ class GameState(BaseModel):
     board: 'Board'
 
 class Board(BaseModel):
-    grid: list[list]
-    # TODO graph
+    grid: list[list] # TODO graph
+    captured: dict
+
 
 def empty_grid(cols, rows):
     return [[None]*rows]*cols
@@ -37,6 +38,27 @@ def place_initial_pieces(board: Board) -> Board:
 def territory(board, row, col) -> tuple:
     return board.grid[row][col]
 
+def attack(board: Board, army: str, loc_i: tuple, loc_f: tuple) -> Board:
+
+    ri, ci = loc_i
+    rf, cf = loc_f
+    terr_i = board.grid[ri][ci]
+    terr_f = board.grid[rf][cf]
+
+    assert terr_i[0] == army
+    assert terr_f[0] != army
+
+    pcs_attack = terr_i[1:]
+    pcs_defense = terr_f[1:]
+    assert sum(pcs_attack) > sum(pcs_defense)
+
+    board.captured[terr_f[0]] += pcs_defense
+    board.grid[rf][cf] = tuple([army] + list(pcs_attack))
+    board.grid[ri][ci] = None
+
+    return board
+
+
 
 def move_piece(board: Board, army: str, piece: int, loc_i: tuple, loc_f: tuple) -> Board:
 
@@ -46,7 +68,7 @@ def move_piece(board: Board, army: str, piece: int, loc_i: tuple, loc_f: tuple) 
 
     row_f, col_f = loc_f
     territory_end = territory(board, row_f, col_f)
-    #assert territory_end == None # TODO or occupied by us or enemy
+    assert territory_end is None or territory_end[0] == army
 
     # set new t_i
     t_i = list(territory_start)
@@ -81,7 +103,7 @@ def move_piece(board: Board, army: str, piece: int, loc_i: tuple, loc_f: tuple) 
 
 def main():
 
-    board = Board(grid=empty_grid(5,5))
+    board = Board(grid=empty_grid(5,5), captured={'a':[], 'b': []})
     print(json.dumps(board.dict()))
 
     board = place_initial_pieces(board)
@@ -153,6 +175,9 @@ def main():
     for mv in mvs_4:
         board = move_piece(board, *mv)
         print(json.dumps(board.dict()))
+
+    board = attack(board, 'b', (1,2), (0,2))
+    print(json.dumps(board.dict()))
 
 
 
