@@ -84,8 +84,8 @@ def move_piece(board: Board, army: str, piece: int, loc_i: tuple, loc_f: tuple) 
         t_f = (army, piece)
     elif territory_end[0] == army: # friendly
         t_f = tuple(list(territory_end) + [piece])
-    else: # attack, TODO implement
-        raise Exception('Attacking not implemented')
+    else: # moving is only for free-space or friendly territory
+        raise Exception('Use attack() fn')
 
     board.grid[row_f][col_f] = t_f
 
