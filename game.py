@@ -223,8 +223,26 @@ def main():
     board = attack(board, 'a', (2,3), (2,2))
     print(json.dumps(board.dict()))
 
+    # turn 8 - surround?
+    mvs_8 = [
+        ('b', 3, (4,4), (4,3)), # right
 
+        ('b', 1, (3,3), (2,3)), # up
+        ('b', 1, (2,3), (1,3)), # up
+        ('b', 1, (1,3), (1,2)), # up
+        
+        ('b', 1, (4,3), (3,3)), # up
+        ('b', 1, (3,3), (2,3)), # up
+        
+        ('b', 1, (3,1), (2,1)), # up
+        
+        ('b', 1, (4,2), (3,2)), # up
+        ('b', 2, (3,1), (3,2)), # right
+    ]
     
+    for mv in mvs_8:
+        board = move_piece(board, *mv)
+        print(json.dumps(board.dict()))
 
 
 if __name__ == '__main__':
