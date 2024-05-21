@@ -25,7 +25,7 @@ def place_initial_pieces(board: Board) -> Board:
 
     board.grid[-1] = [
         ('b', 3),
-        ('b', 2,2,2),
+        ('b', 2,2),
         ('b', 1,1,1,1,1),
         ('b', 2,1,1),
         ('b', 3),
@@ -66,6 +66,15 @@ def move_piece(board: Board, army: str, piece: int, loc_i: tuple, loc_f: tuple) 
         raise Exception('Attacking not implemented')
 
     board.grid[row_f][col_f] = t_f
+
+    # sort all territories
+    for row_idx, row in enumerate(board.grid):
+        for col_idx, terr in enumerate(row):
+            if terr is None:
+                continue
+            a = terr[0]
+            pcs = sorted(terr[1:], reverse=True)
+            board.grid[row_idx][col_idx] = tuple([a] + pcs)
 
     return board
 
