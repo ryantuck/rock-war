@@ -179,6 +179,13 @@ def main():
     board = attack(board, 'b', (1,2), (0,2))
     print(json.dumps(board.dict()))
 
+    # turn 5 - retaliate
+    board = move_piece(board, 'a', 3, (1,3),(0,3))
+    print(json.dumps(board.dict()))
+
+    board = attack(board, 'a', (0,3), (0,2))
+    print(json.dumps(board.dict()))
+
 
 
 
