@@ -101,6 +101,25 @@ def move_piece(board: Board, army: str, piece: int, loc_i: tuple, loc_f: tuple) 
     return board
 
 
+def loc_final(loc_i, direction):
+    row, col = loc_i
+    if direction == 'up':
+        return (row-1, col)
+    if direction == 'down':
+        return (row+1, col)
+    if direction == 'left':
+        return (row, col-1)
+    if direction == 'right':
+        return (row, col+1)
+
+
+def move_pcs(board, army, pcs, loc_i, direction):
+    loc_f = loc_final(loc_i, direction)
+    for pc in pcs:
+        board = move_piece(board, army, pc, loc_i, loc_f)
+        print(json.dumps(board.dict()))
+    return board
+
 def main():
 
     board = Board(grid=empty_grid(5,5), captured={'a':[], 'b': []})
@@ -274,6 +293,18 @@ def main():
     for mv in mvs_10:
         board = move_piece(board, *mv)
         print(json.dumps(board.dict()))
+
+    # turn 11 - ???
+    mvs_11 = [
+        ('a', [1,1,2], (3,2), 'right'),
+        ('a', [1], (1,1), 'down'),
+    ]
+
+    for mv in mvs_11:
+        board = move_pcs(board, *mv)
+    board = attack(board, 'a', (3,3), (4,3))
+    print(json.dumps(board.dict()))
+
 
 
 if __name__ == '__main__':
