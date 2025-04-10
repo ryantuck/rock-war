@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>7x7 Board Game Grid</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      display: flex;
+      justify-content: center;
+      margin-top: 30px;
+    }
+    .board {
+      display: grid;
+      grid-template-columns: repeat(7, 60px);
+      grid-template-rows: repeat(7, 60px);
+      gap: 2px;
+      position: relative;
+    }
+    .cell {
+      width: 60px;
+      height: 60px;
+      background: #eee;
+      border: 1px solid #ccc;
+    }
+    .piece {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: steelblue;
+      position: absolute;
+      cursor: grab;
+      user-select: none;
+      transition: transform 0.1s;
+    }
+  </style>
+</head>
+<body>
+
+<div class="board" id="board">
+  <!-- Generate grid cells -->
+  <script>
+    for (let i = 0; i < 49; i++) {
+      document.write('<div class="cell"></div>');
+    }
+  </script>
+
+  <!-- Pieces -->
+  <div class="piece" style="left: 10px; top: 10px;"></div>
+  <div class="piece" style="left: 140px; top: 70px;"></div>
+  <div class="piece" style="left: 250px; top: 130px;"></div>
+  <div class="piece" style="left: 320px; top: 190px;"></div>
+  <div class="piece" style="left: 70px; top: 250px;"></div>
+</div>
+
+<script>
+  const cellSize = 60;
+  const board = document.getElementById('board');
+  const pieces = document.querySelectorAll('.piece');
+
+  pieces.forEach(piece => {
+    let offsetX, offsetY;
+
+    piece.addEventListener('mousedown', (e) => {
+      offsetX = e.offsetX;
+      offsetY = e.offsetY;
+      piece.style.zIndex = 1000;
+
+      const moveAt = (pageX, pageY) => {
+        piece.style.left = (pageX - board.offsetLeft - offsetX) + 'px';
+        piece.style.top = (pageY - board.offsetTop - offsetY) + 'px';
+      };
+
+      const onMouseMove = (e) => moveAt(e.pageX, e.pageY);
+
+      document.addEventListener('mousemove', onMouseMove);
+
+      piece.onmouseup = () => {
+        document.removeEventListener('mousemove', onMouseMove);
+        piece.onmouseup = null;
+
+        // Snap to nearest cell
+        const x = Math.round((piece.offsetLeft) / cellSize) * cellSize;
+        const y = Math.round((piece.offsetTop) / cellSize) * cellSize;
+        piece.style.left = x + 'px';
+        piece.style.top = y + 'px';
+        piece.style.zIndex = '';
+      };
+    });
+
+    piece.ondragstart = () => false; // Prevent default drag behavior
+  });
+</script>
+
+</body>
+</html>
