@@ -24,14 +24,22 @@
       border: 1px solid #ccc;
     }
     .piece {
-      width: 50px;
-      height: 50px;
-      border-radius: 50%;
-      background: steelblue;
       position: absolute;
       cursor: grab;
       user-select: none;
       transition: transform 0.1s;
+    }
+    .armyA {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: steelblue;
+    }
+    .armyB {
+      width: 40px;
+      height: 40px;
+      border-radius: 30%;
+      background: magenta;
     }
   </style>
 </head>
@@ -46,11 +54,11 @@
   </script>
 
   <!-- Pieces -->
-  <div class="piece" style="left: 10px; top: 10px;"></div>
-  <div class="piece" style="left: 140px; top: 70px;"></div>
-  <div class="piece" style="left: 250px; top: 130px;"></div>
-  <div class="piece" style="left: 320px; top: 190px;"></div>
-  <div class="piece" style="left: 70px; top: 250px;"></div>
+  <div class="piece armyA" style="left: 10px; top: 10px;"></div>
+  <div class="piece armyA" style="left: 140px; top: 70px;"></div>
+  <div class="piece armyA" style="left: 250px; top: 130px;"></div>
+  <div class="piece armyB" style="left: 320px; top: 190px;"></div>
+  <div class="piece armyB" style="left: 70px; top: 250px;"></div>
 </div>
 
 <script>
