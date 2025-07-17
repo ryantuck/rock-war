@@ -1,10 +1,16 @@
-ROCK WAR [Fibonacci Variant]
+ROCK WAR
 
 Rock War is a simple game designed to be played using an arbitrary map and an arbitrary number of rocks, doodads, or trinkets you have lying around.
 
-Armies wage war in an all-out battle royale via territorial expansion, combat, and the elemental magic of the obelisks.
+Armies wage war in an all-out battle royale throughout the four seasons via expansion, combat, and the elemental magic of the obelisks.
 
-[Removing seasons, transports, scouts as movement engine]
+Spring - The game begins at the Spring equinox, where our budding armies stake out territory and begin to expand turn-by-turn, seeking nourishing energy from the obelisks.
+
+Summer - As armies grow, summer begins, and strategic use of the obelisks will turn nature against your enemy to stymie their territorial goals. 
+
+Fall - As Fall commences at the height of the game, the obelisks power grows, unleashing deadly forces of nature against vast contingents, for a mortal cost.
+
+Winter - As the body count piles up for both armies, Winter begins, and all hope is lost as the obelisks turn hostile and indiscriminately barrage both armies with the greatest catastrophes nature can summon as a winter storm bears down turn-by-turn from the North. Armies offer sacrifices of their power to save their contingents from the onslaught turn-by-turn as they now merely battle for the honor to die last against the epic strength and indifference of Nature to claim yet another battle in the endless Rock War.
 
 ----------------------------------------------
 
@@ -19,7 +25,6 @@ How to Play
 
 Concepts
 
-0. The Fibonacci Sequence
 1. Map
 2. Armies
 3. Obelisks
@@ -33,12 +38,6 @@ Concepts
 
 ----------------------------------------------
 
-0. FIBONACCI SEQUENCE
-
-1, 1, 2, 3, 5, 8, ...
-
-----------------------------------------------
-
 1. MAP
 
 A map is an arbitrary graph of territories. It can be a grid, a honeycomb like Settlers, or a realistic map like Risk.
@@ -46,6 +45,7 @@ A map is an arbitrary graph of territories. It can be a grid, a honeycomb like S
 Map / Territories
 
 - Only one army can occupy any given territory
+- By default, a territory has a maximum capacity of 7 points of pieces
 
 
 Map / Territories / Terrain
@@ -53,10 +53,6 @@ Map / Territories / Terrain
 - Territories can be a certain type of terrain that affects stats and movement of pieces
 - Water
 - (Settlers variant - sheep, wheat, ore, brick, log)
-
-Map / Unknowns
-
-Optimal map size versus army size?
 
 
 ----------------------------------------------
@@ -68,25 +64,10 @@ Each Rock War battle is between two or more armies of the same total strength N.
 
 Armies / Pieces
 
-    - 8x scouts     (1 pt )
-    - 5x soldiers   (2 pts)
-    - 3x chieftains (3 pts)
-    - 2x warlords   (5 pts)
-    - 1x behemoth   (8 pts)
+- Scouts - 1-value pieces core to expanding territory and enabling movement
+- Warriors - 2+ value pieces with unique abilities
+- Transports - Pieces capable of transporting N other non-transport pieces
 
-Armies / Pieces / Evolution
-
-    Pieces evolve into one another according to the Fibonacci sequence
-
-Armies / Pieces / Abilities (?)
-
-    - Scout combos?
-    - Ballistics?
-
-Armies / Obelisk Affinities (?)
-
-    - Smooth army - affinity for water and air
-    - Rough army - affinity for earth and fire
 
 ----------------------------------------------
 
@@ -97,45 +78,88 @@ Armies / Obelisk Affinities (?)
 Obelisks / Basics
 
 - Core abilties engine
+- Evolve with seasons
+- Each army may trigger a return or sacrifice ability exactly once per obelisk
+- Each army can trigger one obelisk per turn (?)
 
 
-Obelisks / Mechanics
+Obelisks / Seasonal Mechanics
 
-Adjacency       All territories immediately adjacent gain benefit
-Return X        
-Sacrifice X     
-Pay X           
-Devolve         
+Spring      Adjacency       Adjacency is nourishing
+Summer      Return X        Abilities are strategic and disruptive
+Fall        Sacrifice X     Abilities are strategic and lethal
+Winter      Pay X Ramp      Avoid destruction by payment alone
 
 
 Obelisks / Mechanics / Adjacency
 
-- Adjacency
+- immediately adjacent vs once removed vs adjacent contingent vs shared territory (???)
+- balance of piece counts
+- spring only vs always (depleting benefits)
+- n territories vs n pieces
+
+
+
+----------------------------------------------
+
+4. SEASONS
+
+Seasons are phases of the game triggered by piece counts on the board and graveyard
+
+
+Seasons / Spring
+
+- Placement occurs at Spring equinox
+- Obelisks provide adjacent territories and contingents with benefits
+
+
+Seasons / Summer
+
+- Summer solstice occurs when 50% of pieces are on the board
+- Obelisks provide the ability to return pieces in exchange for strategic maneuvering of enemy forces
+
+
+Seasons / Fall
+
+- Fall equinox when all of one army is on the board (?)
+- Obelisks abilities turn lethal, with greater costs
+
+
+Seasons / Winter
+
+- Winter solstice triggered when 50% of pieces are in graveyard
+- Storm from North
+- Obelisks turn hostile, pay ramp costs to avoid destruction and survive long enough to win
 
 ----------------------------------------------
 
 5. PLACEMENT
 
 - At the beginning of the game, each army places two scouts anywhere on the board, in snake style
+- Scouts cannot initially be placed next to obelisks
+
+----------------------------------------------
+
+6. CONTINGENTS
+
+- A contingent is a connected set of territories occupied by the same army
+- A contingent has X to spend each turn on ramp, abilities, movement, and combat, where X is the total value of its pieces
+- Each contingent may place up to one piece each turn
 
 ----------------------------------------------
 
 7. RAMP
 
-The total number of territories you control defines your ramp.
-
-Default: ramp 1
-5+ territories: ramp 2
-8+ territories: ramp 3
+Ramp describes how armies populate onto the board. Each contingent may place up to one piece per turn.
 
 
 ----------------------------------------------
 
 8. MOVEMENT
 
-- Each piece may move once per turn
+- Movement costs the value of the piece moving
 - Only scouts may move into open territory
-- Each piece can only move into a territory occupied by a piece immediately lower than it in the hierarchy
+- Warriors may only move into territories occupied by scouts of the same army
 
 
 ----------------------------------------------
