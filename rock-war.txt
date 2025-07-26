@@ -45,22 +45,19 @@ A map is an arbitrary graph of territories. It can be a grid, a honeycomb like S
 
 Map / Territories
 
-- Only one army can occupy any given territory
+    Only one army can occupy any given territory
 
+Map / Territories / Capacity
 
-Map / Territories / Terrain
+    Each territory supports 1, 2, 3, 5, or 8 pieces
 
-- Territories can be a certain type of terrain that affects stats and movement of pieces
-- Water
-- (Settlers variant - sheep, wheat, ore, brick, log)
+Map / Territories / Elevation
 
-Map / Unknowns
-
-Optimal map size versus army size?
-
+    - Some territories are elevated
+    - Elevated territories cost an additional movement to access
+    - Warriors attacking from above get +1 attack
 
 ----------------------------------------------
-
 
 2. ARMIES
 
@@ -77,40 +74,37 @@ Armies / Pieces
 Armies / Pieces / Evolution
 
     Pieces evolve into one another according to the Fibonacci sequence
-
-Armies / Pieces / Abilities (?)
-
-    - Scout combos?
-    - Ballistics?
-
-Armies / Obelisk Affinities (?)
-
-    - Smooth army - affinity for water and air
-    - Rough army - affinity for earth and fire
+    Pieces must occupy the same territory to evolve
 
 ----------------------------------------------
 
 
 3. OBELISKS
 
-
-Obelisks / Basics
-
-- Core abilties engine
+Obelisks are the core abilities engine of the game.
 
 
-Obelisks / Mechanics
+Obelisks / Effects
 
-Adjacency       All territories immediately adjacent gain benefit
+Adjacency - All territories immediately adjacent gain benefit
+
+
+Obelisk / Abilities
+
 Return X        
 Sacrifice X     
-Pay X           
 Devolve         
 
 
-Obelisks / Mechanics / Adjacency
+Obelisks / Devotion
 
-- Adjacency
+    Adjacency
+
+Obelisks / Affinities
+
+    - Smooth army - affinity for water and air
+    - Rough army - affinity for earth and fire
+
 
 ----------------------------------------------
 
@@ -145,36 +139,18 @@ Default: ramp 1
 
 Combat / Attack / Mechanics
 
-- Attacking team pays sum of attacking pieces in territory X
-- Entire territory attacks as unit (?)
-- Pay +1 for each additional attacking territory
-- Defending player decides how damage is dealt
+    - Warrior attacks into territory
 
 
-
-Combat / Attack / Hierarchy
-
-- (3-warrior) beats (2-warrior + 1-scout) beats (3x 1-scouts)
-
-
-
-Combat / Attack / Transports
-
-- Transports sustain (initial? all?) damage from an attack before
-
-
-
-Combat / Attack / Etc
-
-- Scouts - 3+ scouts combined can attack together
-- Light transports allow for retreat
 
 ----------------------------------------------
 
 
 APPENDIX
 
+
 A. Obelisks / Zoo
+
 
 Earth
 -----
@@ -182,6 +158,17 @@ spring  adjacent    shelter     def +1
 summer  return x    tremor      evenly split up one territory of value x into all its available adjacent territories
 fall    sac x       landslide   deal x damage distributed evenly among 2+ adjacent territories
 winter  hostile     earthquake  radiate outward from obelisk, shift pieces into adjacent territories, proportional damage
+
+Shelter             Devotion:       DEF++
+Pacifism            Devolve X:      Target warrior X can't attack next turn
+ATK--               Devolve X:      Reduce attack count by 1
+Pump                Devolve X:      Pump target blocking warrior
+Double Block        Return X:       Target defending warrior blocks twice before receiving damage
+Reinforcements      Return X:       Adjacent warrior X or below joins defense in combat
+Indestructible      Return X:       Target blocking rock is indestructible this turn
+Evolve              Sacrifice X:    Evolve up to X
+Landslide           Sacrifice X:    Deal X damage among 2+ adjacent territories (?)
+Earthquake          Sacrifice X:    Radiate outwards, shift pieces into adjacent territories, proportional damage
 
 
 Air
@@ -191,6 +178,15 @@ summer  return x    gust        mv x pcs same dir
 fall    sac x       tornado     path of destruction x, x-1, ..., zig-zag
 winter  hostile     hurricane   circular movement around obelisk, damage higher if closer, movement less further out
 
+Breeze              Devotion        MV++ - ascent is free, one additional move each turn, two additional moves if full devotion
+Motion              Devolve X:      Move X-1
+Safe Passage        Devolve X:      Move contiguous territory
+Gust                Return X:       Move rocks valuing x in same direction
+Gust                Return X:       Move warrior X to open territory
+Tornado             Sacrifice X:    Deal X, X-1, ... damage
+Flight              Sacrifice X:    Target warrior takes flight and moves up to X territories
+Hive                Sacrifice 5:    Every rock may make an additional move this turn
+
 
 Fire
 ----
@@ -198,6 +194,19 @@ spring  adjacent    warmth      atk +1
 summer  return x    embers      drop x small fires, force scouts to retreat
 fall    sac x       wildfire    wall of fire length x
 winter  hostile     volcano     lava out from obelisk
+
+Warmth              Devotion        ATK++
+More Attacks        Devolve X:      ATK++
+Evolve and Attack   Devolve X:      Target newly-evolved warrior may attack this turn
+Scout backup        Devolve X:      Target scout assists attack on adjacent defending territory
+First Strike        Return X:       Attacking warrior deals damage first
+Pump                Return X:       Pump target attacking warrior
+Trample             Return X:       Target warrior may move after conquering a territory
+Embers              Return X:       Drop X small fires, rocks weaker than X must retreat or take damage, pump with air
+Direct Damage       Sacrifice X:    Deal X damage to target rock
+Double Strike       Sacrifice X:    Target warrior deals damage twice before taking damage
+Fight               Sacrifice X:    Two warriors fight
+Inferno             Sacrifice X:    Wall of damaging fire X territories long, pump with air
 
 
 Water
@@ -207,13 +216,44 @@ summer  return x    river       clear line from obelisk to border, or length X
 fall    sac x       flood       one direction, all pieces shift X, elevation avoids, proportional damage
 winter  hostile     avalanche   from north, deal damage, lighter pieces shift more, movement = 0 for turn
 
+Rain                Devotion        RET++
+Balance             Devolve X:      Equalize forces among X adjacent territories
+Devolve             Devolve X:      Devolve target warrior X or weaker
+River               Return X:       Line of territories of length X, displaces all weaker rocks
+Return              Return X:       Return target rock weaker than X
+Swap                Return X:       Swap adjacent territories each of value X or less
+Flood               Sacrifice X:    One direction, all pieces shift X, elevation avoids, proportional damage
+Counter             Sacrifice X:    Counter target obelisk ability
+
 
 Tomb
 ----
-spring  adjacent    protection  return first scout to die instead
+spring  adjacent    protection  revival +1
 summer  return x    revive      return a warrior or transport of value x to your reserves
 fall    sac x       reaper      destroy target warrior or transport of value x
 winter  hostile     zombies     return force of X from grave, mindless attack outwards
+
+Protection          Devotion        REV++
+Fetid Swamp         Devotion        If a warrior an opponent controls dies, return a scout to your reserves
+Raise Dead          Return X:       Return rock weaker than X from the grave to your reserves
+Possess             Return X:       Gain control of target warrior until end of turn
+Deathtouch          Sacrifice X:    Target rock gains deathtouch until end of turn
+Nullify             Sacrifice X:    Target obelisk becomes inert until next turn
+Terror              Sacrifice X:    Destroy target warrior weaker than X
+
+
+Combos
+------
+
+Volcano - earth and fire
+Hurricane - water and air
+Tsunami - earth and water
+Wildfire - fire and air
+
+
+
+
+
 
 
 Gaia
@@ -243,4 +283,33 @@ winter  hostile     ___         ( ... )
 More themes - food (sew, farm, harvest, plague), plants, animals, trees, etc etc.
 
 
+----------------------------------------------
+
+B. ETC
+
+
+Map / Territories / Terrain (?)
+
+- Territories can be a certain type of terrain that affects stats and movement of pieces
+- Water
+- (Settlers variant - sheep, wheat, ore, brick, log)
+
+Map / Unknowns (?)
+
+- Optimal map size versus army size?
+
+
+Armies / Pieces / Abilities (?)
+
+    - Scout combos?
+    - Ballistics?
+
+Combat / Attack / Transports
+
+- Transports sustain (initial? all?) damage from an attack before
+
+Combat / Attack / Etc
+
+- Scouts - 3+ scouts combined can attack together
+- Light transports allow for retreat
 
