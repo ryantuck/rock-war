@@ -1,154 +1,301 @@
 ROCK WAR [Fibonacci Variant]
 
-Rock War is a simple game designed to be played using an arbitrary map and an arbitrary number of rocks, doodads, or trinkets you have lying around.
+Rock War is a simple game designed to be played using an arbitrary map and an arbitrary number
+of rocks, doodads, or trinkets you have lying around.
 
-Armies wage war in an all-out battle royale via territorial expansion, combat, and the elemental magic of the obelisks.
-
+Armies wage war in an all-out battle royale via territorial expansion, combat, and the elemental
+magic of the obelisks.
 
 ----------------------------------------------
 
 How to Play
 
-1. Design - select map, armies, and obelisks
-2. Placement - place obelisks, then place two scouts each, snake-style
-3. Gameplay - each contingent pays up to N for further ramp, movement, and combat
-4. End-game - game ends when one army can do nothing else
+1. Setup 	Select map, armies, and obelisks, and place initial rocks
+2. Play		Armies alternate moving, evolving, attacking, and spawning
+3. Win		Game ends when one army can do nothing else
 
 ----------------------------------------------
 
 Concepts
 
-0. The Fibonacci Sequence
-1. Map
-2. Armies
-3. Obelisks
-4. Placement
-5. Ramp
-6. Movement
-7. Combat
-8. Abilities
+The Fibonacci Sequence
+Mechanics
+Map
+Armies
+Obelisks
+Combat
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ----------------------------------------------
 
-0. FIBONACCI SEQUENCE
+FIBONACCI SEQUENCE
 
-1, 1, 2, 3, 5, 8, ...
+    1, 1, 2, 3, 5, 8, ...
+
+    1 + 1 = 2
+    1 + 2 = 3
+    2 + 3 = 5
+    3 + 5 = 8
+    ...
 
 ----------------------------------------------
 
-1. MAP
+MECHANICS
 
-A map is an arbitrary graph of territories. It can be a grid, a honeycomb like Settlers, or a realistic map like Risk.
+MECHANICS / PLACEMENT
+
+    At the beginning of the game, each army places two scouts anywhere on the board,
+    in snake style.
 
 
-MAP / Territories
+MECHANICS / TURNS
 
-Only one army can occupy any given territory
+    Armies alternate turns moving, evolving, attacking, and spawning.
+
+    MV:     Move                N territories               1 - 20
+    EV:     Evolve              N rock types                1 - 5
+    ATK:    Attack              Maximum warrior strength    2, 3, 5, 8
+    RAMP:   Ramp                1 + N obelisks              1 - 6
+    OB:     Trigger obelisk     N obelisks                  1 - 5
+
+
+MECHANICS / TURNS / SEQUENCE
+
+        My Army         Opponent        Location
+
+
+MAIN    Move                            Map
+        Evolve
+        Obelisks        Obelisks
+
+COMBAT  Attack          Retreat
+                        Defend          Map -> Graveyard
+        Revive          Revive
+
+SPAWN   Ramp                            Reserves -> Map
+
+
+MECHANICS / EVOLUTION
+
+    Pieces evolve into one another according to the Fibonacci sequence
+
+    Pieces must occupy the same territory to evolve
+
+    [1] [1] ==> [2]
+    [1] [2] ==> [3]
+    [2] [3] ==> [5]
+    [3] [5] ==> [8]
+
+
+MECHANICS / MOVEMENT
+
+    Only scouts may move into open territory
+
+
+
+
+
+
+
+
+----------------------------------------------
+
+MAP
+
+    A map is an arbitrary graph of territories.
+
+    It can be a grid, a honeycomb like Settlers, or a realistic map like Risk.
+
+
+MAP / TERRITORIES
+
+    Only one army can occupy any given territory.
 
 
 MAP / TERRITORIES / CAPACITY
 
-Each territory supports 1, 2, 3, 5, or 8 total value.
+    Each territory supports 1, 2, 3, 5, or 8 total value.
+
+    All territories must contain valid rock combinations (e.g. 2+3) after every movement
 
 
 MAP / TERRITORIES / ELEVATION
 
-- Some territories are elevated
-- Elevated territories cost an additional movement to access
-- Warriors attacking from above get +1 attack
+    Some territories are elevated
+
+    Elevated territories cost an additional movement to access
+
+    Warriors attacking from above get +1 attack
+
 
 ----------------------------------------------
 
-2. ARMIES
+ARMIES
 
-Each Rock War battle is between two or more armies.
+    Each Rock War battle is between two or more armies.
 
 ARMIES / PIECES
 
-    - 8x scouts     (1 pt )
-    - 5x soldiers   (2 pts)
-    - 3x chieftains (3 pts)
-    - 2x warlords   (5 pts)
-    - 1x behemoth   (8 pts)
-
-ARMIES / PIECES / EVOLUTION
-
-    Pieces evolve into one another according to the Fibonacci sequence
-    Pieces must occupy the same territory to evolve
-
-----------------------------------------------
-
-
-3. OBELISKS
-
-Obelisks are the core abilities engine of the game.
-
-
-Obelisk / Abilities
-
-  Devolve
-  Return
-  Sacrifice
-
-Obelisks / Devotion
-
-  Devotion - measure of how many territories you occupy surrounding an obelisk
-  Full devotion - effects are intensified if you control all territories surrounding an obelisk
-
-Obelisks / Affinities
-
-  Smooth army - affinity for water and air
-  Rough army - affinity for earth and fire
+    8x scouts     (1 pt )
+    5x soldiers   (2 pts)
+    3x chieftains (3 pts)
+    2x warlords   (5 pts)
+    1x behemoth   (8 pts)
 
 
 ----------------------------------------------
 
-5. PLACEMENT
+COMBAT
 
-At the beginning of the game, each army places two scouts anywhere on the board, in snake style.
+    One or more warriors attack into a single target territory.
+
+    Blockers decide how to apply blocks. Blocks are applied one at a time.
+
+    Attacker decides to continue attacking.
+
+    Combat rules are applied recursively as pieces devolve in combat.
+
+    [2-] = weakened [2] = effectively []
+
+
+
+
+
+
+
+
+
+COMBAT / Battle Tables
+
+
+    []  -> o        ==>                             Scouts trade
+    [2] -> (2)      ==>     [][]->oo                Equal values - both pieces devolve
+    [3] -> (3)      ==>     [2-][] -> (2-)o
+    [5] -> (5)      ==>     [3-][2-] -> (3-)(2-)
+    [8] -> (8)      ==>     [5-][3-] -> (5-)(3-)
+
+    [2] -> o        ==>     [][]
+    [3] -> o        ==>     [3]
+    [5] -> o        ==>     [5]
+    [8] -> o        ==>     [8]
+
+    [3] -> (2)      ==>     [2-][]      Stronger piece devolves, weaker destroyed
+    [5] -> (2)      ==>     [5]
+    [8] -> (2)      ==>     [8]
+
+    [5] -> (3)      ==>     [3-][2-]
+    [8] -> (3)      ==>     [8]
+
+    [8] -> (5)      ==>     [5-][3-]
+
+
+    [2] -> oo       ==>     []          [2]->oo => [][]->o => __->[]
+    [3] -> oo       ==>     [3]
+    [5] -> oo       ==>     [5]
+    [8] -> oo       ==>     [8]
+
+    [3] -> (2)o     ==>     [][]
+
+
+COMBAT / Battle Tables / Further Examples
+
+
+[3][2]  -> (3)      ==>     [2][][][] or [3]
+
+    either:
+
+        [3]->(3)    ==> [2-][] (2-)o    (3) block [3], both devolve
+        [2]->(2-)o  ==> [][]            [2] attack weakened (2-)o, equivalent to [2]->oo
+                    ==> [2][][][]       Victor distributes valid combos among combat territories
+
+    or:
+
+        [2]->(3)    ==> (2-)o           (3) block [2], defending (3) devolves, attacker destroyed
+        [3]->(2-)o  ==> [3]             [3] attacks weakened (2-)o, equivalent to [3]->oo
+                    ==> [3]             Victor claims target territory
+
+
+
+[8] -> (5)(3)
+
+    [8] -> (5)      ==>  [5-] -> (3)    ==>     [2-] -> (2-)    ==>
+           (3)           [3-]                   [3-] ->  o              [2-][]
+                                                [3-]                    [3-]
+
+                                        ==>     [3-] -> (2-)    ==>     [2-][]
+                                                [3-] -> o               [2-][]
+                                                [2-]                    [2-]
+
+                                        ==>     [3-] -> (2-)    ==>     [2-][]
+                                                [2-] -> o
+                                                [3-]                    [3-]
+
+
+                    ==> [3-] -> (3)     ==>     [5-] -> (2-)    ==>     [5-] -> o   ==>     [5-]
+                        [5-]                             o
+
+
 
 ----------------------------------------------
 
-7. RAMP
+OBELISKS
 
-The total number of territories you control defines your ramp.
+    Obelisks are the core abilities engine of Rock War.
 
-Default: ramp 1
-5+ territories: ramp 2
-8+ territories: ramp 3
-
-
-----------------------------------------------
-
-8. MOVEMENT
-
-- Each piece may move once per turn
-- Only scouts may move into open territory
-- All territories must contain valid rock combinations (e.g. 2+3) after every movement
-
-
-----------------------------------------------
-
-9. COMBAT
-
-
-Combat / Attack / Mechanics
-
-
-----------------------------------------------
-
-
-APPENDIX
-
-
-A. Obelisks / Zoo
-
-
-Earth
+EARTH
 -----
 
 Devotion
 
+    Fertility           RAMP++
     Shelter             DEF++
 
 Devolve
@@ -162,174 +309,185 @@ Return
     Double Block        Target defending warrior blocks twice before receiving damage
     Reinforcements      Adjacent warrior X or below joins defense in combat
     Indestructible      Target blocking rock is indestructible this turn
-    Tremor              Evenly split up one territory of value x into all its available adjacent territories
+    Tremor              Evenly split up one territory of value X into all its available
+                          adjacent territories
 
 Sacrifice
 
     Evolve              Evolve up to X
     Landslide           Deal X damage among 2+ adjacent territories (?)
-    Earthquake          Radiate outwards, shift pieces into adjacent territories, proportional damage
+    Earthquake          Radiate outwards,
+                          shift pieces into adjacent territories,
+                          proportional damage
 
 
-Air
+
+FIRE
 ----
 
-Breeze              Devotion        MV++ - ascent is free, one additional move each turn, two additional moves if full devotion
+Devotion
 
-Motion              Devolve X:      Move X-1
-Safe Passage        Devolve X:      Move contiguous territory
-Gust                Devolve X:      Move warrior X to open territory
+    Heat                ATK++
+    Fireball            DMG++
 
-Windstorm           Return X:       Move rocks valuing x in same direction
+Devolve
 
-Tornado             Sacrifice X:    Deal X, X-1, ... damage
-Flight              Sacrifice X:    Target warrior takes flight and moves up to X territories
-Hive                Sacrifice 5:    Every rock may make an additional move this turn
+    Frenzy              ATK++
+    Momentum            Target newly-evolved warrior may attack this turn
+    Backup              Target scout assists attack on adjacent defending territory
 
+Return
 
-Fire
-----
-Warmth              Devotion        ATK++
+    First Strike        Attacking warrior deals damage first
+    Pump                Pump target attacking warrior
+    Trample             Target warrior may move after conquering a territory
+    Embers              Drop X small fires,
+                          rocks weaker than X must retreat or take damage,
+                          pump with air
 
-Frenzy              Devolve X:      ATK++
-Momentum            Devolve X:      Target newly-evolved warrior may attack this turn
-Backup              Devolve X:      Target scout assists attack on adjacent defending territory
+Sacrifice
 
-First Strike        Return X:       Attacking warrior deals damage first
-Pump                Return X:       Pump target attacking warrior
-Trample             Return X:       Target warrior may move after conquering a territory
-Embers              Return X:       Drop X small fires, rocks weaker than X must retreat or take damage, pump with air
-
-Direct Damage       Sacrifice X:    Deal X damage to target rock
-Double Strike       Sacrifice X:    Target warrior deals damage twice before taking damage
-Fight               Sacrifice X:    Two warriors fight
-Inferno             Sacrifice X:    Wall of damaging fire X territories long, pump with air
+    Direct Damage       Deal X damage to target rock
+    Double Strike       Target warrior deals damage twice before taking damage
+    Fight               Two warriors fight
+    Inferno             Wall of damaging fire X territories long,
+                          pump with air
 
 
-Water
+
+
+
+
+
+
+AIR
+---
+
+Devotion
+
+    Breeze              MV++
+    Fog of War          RET++
+
+Devolve
+
+    Motion              Move X-1
+    Safe Passage        Move contiguous territory
+    Gust                Move warrior X to open territory
+
+Return
+
+    Windstorm           Move rocks valuing x in same direction
+
+Sacrifice
+
+    Tornado             Deal X, X-1, ... damage
+    Flight              Target warrior takes flight and moves up to X territories
+    Hive                Every rock may make an additional move this turn
+
+
+
+
+
+WATER
 -----
-Rain                Devotion        RET++
 
-Balance             Devolve X:      Equalize forces among X adjacent territories
-Devolve             Devolve X:      Devolve target warrior X or weaker
+Devotion
 
-River               Return X:       Line of territories of length X, displaces all weaker rocks
-Return              Return X:       Return target rock weaker than X
-Swap                Return X:       Swap adjacent territories each of value X or less
+    Waters of Life      EV++
+    Revival             REV++
 
-Flood               Sacrifice X:    One direction, all pieces shift X, elevation avoids, proportional damage
-Counter             Sacrifice X:    Counter target obelisk ability
+Devolve
 
+    Balance             Equalize forces among X adjacent territories
+    Devolve             Devolve target warrior X or weaker
 
-Beyond
-----
-Protection          Devotion        REV++
-Fetid Swamp         Devotion        If a warrior an opponent controls dies, return a scout to your reserves
+Return
 
-Raise Dead          Return X:       Return rock weaker than X from the grave to your reserves
-Possess             Return X:       Gain control of target warrior until end of turn
+    River               Line of territories of length X, displaces all weaker rocks
+    Return              Return target rock weaker than X
+    Swap                Swap adjacent territories each of value X or less
 
-Deathtouch          Sacrifice X:    Target rock gains deathtouch until end of turn
-Nullify             Sacrifice X:    Target obelisk becomes inert until next turn
-Terror              Sacrifice X:    Destroy target warrior weaker than X
+Sacrifice
+
+    Flood               One direction, all pieces shift X, elevation avoids, proportional damage
+    Counter             Counter target obelisk ability
 
 
 
-Combos
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+BEYOND
 ------
+
+Devotion
+
+    Protection
+    Fetid Swamp         If a warrior an opponent controls dies, return a scout to your reserves
+
+Devolve
+
+    ...
+
+Return
+
+    Raise Dead          Return rock weaker than X from the grave to your reserves
+    Possess             Gain control of target warrior until end of turn
+
+Sacrifice
+
+    Deathtouch          Target rock gains deathtouch until end of turn
+    Nullify             Target obelisk becomes inert until next turn
+    Terror              Destroy target warrior weaker than X
+
+
+
+
+
+
+
+
+COMBOS
+------
+
 Volcano - earth and fire
+
+    ...
+
 Hurricane - water and air
+
+    ...
+
 Tsunami - earth and water
+
+    ...
+
 Wildfire - fire and air
+
+    ...
+
 Cosmos - earth, air, fire, water
-The Dead - beyond - Revive five rocks each from both graveyards.
-Armageddon - earth, air, fire, water, beyond - Destroy all rocks. Each player ramps 1.
 
+    Spawn both sideboards.
 
+The Dead - beyond
 
+    Revive five rocks each from both graveyards.
 
+Armageddon - earth, air, fire, water, beyond
 
-
-----------------------------------------------
-
-B. ETC
-
-
-Map / Territories / Terrain (?)
-
-- Territories can be a certain type of terrain that affects stats and movement of pieces
-- Water
-- (Settlers variant - sheep, wheat, ore, brick, log)
-
-Map / Unknowns (?)
-
-- Optimal map size versus army size?
-
-
-Armies / Pieces / Abilities (?)
-
-    - Scout combos?
-    - Ballistics?
-
-Combat / Attack / Transports
-
-- Transports sustain (initial? all?) damage from an attack before
-
-Combat / Attack / Etc
-
-- Scouts - 3+ scouts combined can attack together
-- Light transports allow for retreat
-
-Obelisks / Zoo
-
-spring  adjacent    shelter     def +1
-summer  return x    tremor      evenly split up one territory of value x into all its available adjacent territories
-fall    sac x       landslide   deal x damage distributed evenly among 2+ adjacent territories
-winter  hostile     earthquake  radiate outward from obelisk, shift pieces into adjacent territories, proportional damage
-
-spring  adjacent    protection  revival +1
-summer  return x    revive      return a warrior or transport of value x to your reserves
-fall    sac x       reaper      destroy target warrior or transport of value x
-winter  hostile     zombies     return force of X from grave, mindless attack outwards
-
-spring  adjacent    rain        retreat +1
-summer  return x    river       clear line from obelisk to border, or length X
-fall    sac x       flood       one direction, all pieces shift X, elevation avoids, proportional damage
-winter  hostile     avalanche   from north, deal damage, lighter pieces shift more, movement = 0 for turn
-
-spring  adjacent    breeze      mv +1
-summer  return x    gust        mv x pcs same dir
-fall    sac x       tornado     path of destruction x, x-1, ..., zig-zag
-winter  hostile     hurricane   circular movement around obelisk, damage higher if closer, movement less further out
-
-spring  adjacent    warmth      atk +1
-summer  return x    embers      drop x small fires, force scouts to retreat
-fall    sac x       wildfire    wall of fire length x
-winter  hostile     volcano     lava out from obelisk
-
-Gaia
-----
-spring  adjacent    ___         ramp +1
-summer  return x    ___         ( ... )
-fall    sac x       golem       ( ... )
-winter  hostile     ___         ( ... )
-
-
-Order
-----
-spring  adjacent    ___         ( ... )
-summer  return x    ___         ( ... )
-fall    sac x       ___         ( ... )
-winter  hostile     ___         ( ... )
-
-
-Chaos
-----
-spring  adjacent    ___         ( ... )
-summer  return x    ___         ( ... )
-fall    sac x       ___         ( ... )
-winter  hostile     ___         ( ... )
-
-
-More themes - food (sew, farm, harvest, plague), plants, animals, trees, etc etc.
-
+    Destroy all rocks. Each player ramps 1.
