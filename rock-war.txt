@@ -103,7 +103,7 @@ MECHANICS / TURNS
     MV:     Move                N territories               1 - 20
     EV:     Evolve              N rock types                1 - 5
     ATK:    Attack              Maximum warrior strength    2, 3, 5, 8
-    RAMP:   Ramp                1 + N obelisks              1 - 6
+    SPAWN:  spawn               1 + N obelisks              1 - 6
     OB:     Trigger obelisk     N obelisks                  1 - 5
 
 
@@ -118,9 +118,8 @@ MAIN    Move                            Map
 
 COMBAT  Attack          Retreat
                         Defend          Map -> Graveyard
-        Revive          Revive
 
-SPAWN   Ramp                            Reserves -> Map
+SPAWN   Spawn                           Reserves -> Map
 
 
 MECHANICS / EVOLUTION
@@ -202,6 +201,8 @@ COMBAT
     Attacker decides to continue attacking.
 
     Combat rules are applied recursively as pieces devolve in combat.
+
+    A warrior that devolves in combat turns into its weakened counterparts.
 
     [2-] = weakened [2] = effectively []
 
@@ -286,39 +287,74 @@ COMBAT / Battle Tables / Further Examples
 
 ----------------------------------------------
 
+
 OBELISKS
 
     Obelisks are the core abilities engine of Rock War.
+
+OBELISKS / DEVOTION
+
+    1. Mystic       Single territory
+    2. Shaman       Majority of obelisk territories
+    3. Demigod      All of obelisk territories
+
+
+    N unique piece types
+    Max warrior strength
+    N scouts
+    N obelisk invocations
+
+
+
 
 EARTH
 -----
 
 Devotion
 
-    Fertility           RAMP++
-    Shelter             DEF++
+    Evolution           EVOLVE++
+    Strength
 
 Devolve
 
-    Pacifism            Target warrior X can't attack next turn
-    ATK--               Reduce attack count by 1
-    Pump                Pump target blocking warrior
+    ...
 
 Return
-
-    Double Block        Target defending warrior blocks twice before receiving damage
-    Reinforcements      Adjacent warrior X or below joins defense in combat
-    Indestructible      Target blocking rock is indestructible this turn
-    Tremor              Evenly split up one territory of value X into all its available
-                          adjacent territories
-
 Sacrifice
 
-    Evolve              Evolve up to X
+Evolution [ EV++ ]
+
+    Evolve              EV++
+    Sacrifice (2):      Evolve (3) -> (5)
+    Sacrifice (3):      Evolve (5) -> (8)
+    Devolve             Devolve target warrior (X)
+
+Strength
+
+    Stamina             Target warrior doesn't weaken when devolving during combat
+    Pump                Pump target warrior
+    Indestructible      Target rock is indestructible this turn
+
+Elemental
+
+    Tremor              Split one territory of value X into its available adjacent territories
     Landslide           Deal X damage among 2+ adjacent territories (?)
     Earthquake          Radiate outwards,
                           shift pieces into adjacent territories,
                           proportional damage
+
+???
+
+Target Army ATK--
+Target warrior disable
+Target rock
+Target scout
+Every rock
+
+Target territory
+Target territories (adjacent)
+
+
 
 
 
@@ -341,18 +377,22 @@ Return
     First Strike        Attacking warrior deals damage first
     Pump                Pump target attacking warrior
     Trample             Target warrior may move after conquering a territory
-    Embers              Drop X small fires,
-                          rocks weaker than X must retreat or take damage,
-                          pump with air
 
 Sacrifice
 
     Direct Damage       Deal X damage to target rock
     Double Strike       Target warrior deals damage twice before taking damage
     Fight               Two warriors fight
+
+Elemental
+
+    Embers              Drop X small fires,
+                          rocks weaker than X must retreat or take damage,
+                          pump with air
     Inferno             Wall of damaging fire X territories long,
                           pump with air
 
+???
 
 
 
@@ -369,21 +409,31 @@ Devotion
     Fog of War          RET++
 
 Devolve
+Return
+Sacrifice
+
+Movement [ MV++ ]
+
+    MV += N obelisks
 
     Motion              Move X-1
     Safe Passage        Move contiguous territory
     Gust                Move warrior X to open territory
-
-Return
-
-    Windstorm           Move rocks valuing x in same direction
-
-Sacrifice
-
-    Tornado             Deal X, X-1, ... damage
     Flight              Target warrior takes flight and moves up to X territories
     Hive                Every rock may make an additional move this turn
 
+Retreat [ RET++ ]
+
+    All rocks may retreat sideways
+
+    Full retreat        Retreat one warrior through friendly territory to open space
+
+Elemental
+
+    Windstorm           Move rocks valuing x in same direction
+    Tornado             Deal X, X-1, ... damage
+
+???
 
 
 
@@ -391,27 +441,43 @@ Sacrifice
 WATER
 -----
 
+Forces
+
+    SPAWN++
+    Balance
+
 Devotion
 
-    Waters of Life      EV++
-    Revival             REV++
+    Mystic
+    Shaman
+    Demigod
 
-Devolve
+Abilities
+
+    Devolve
+    Return
+    Sacrifice
+
+Spawn
+
+    SPAWN++
+    Spawn adjacent
+    Spawn (2)
+    Sacrifice (3): Spawn 3
+
+Balance
 
     Balance             Equalize forces among X adjacent territories
-    Devolve             Devolve target warrior X or weaker
-
-Return
-
-    River               Line of territories of length X, displaces all weaker rocks
-    Return              Return target rock weaker than X
+    Return              Return target rock
     Swap                Swap adjacent territories each of value X or less
-
-Sacrifice
-
-    Flood               One direction, all pieces shift X, elevation avoids, proportional damage
     Counter             Counter target obelisk ability
 
+Elemental
+
+    River               Line of territories of length X, displaces all weaker rocks
+    Flood               One direction, all pieces shift X, elevation avoids, proportional damage
+
+???
 
 
 
@@ -436,7 +502,7 @@ BEYOND
 
 Devotion
 
-    Protection
+    Protection          REV++
     Fetid Swamp         If a warrior an opponent controls dies, return a scout to your reserves
 
 Devolve
@@ -466,23 +532,42 @@ COMBOS
 
 Volcano - earth and fire
 
-    ...
+    earth radius (n territories) x fire damage (eg 3)
+
+    shift outwards
 
 Hurricane - water and air
 
-    ...
+    air radius x water damage
+
+    shift cyclone
 
 Tsunami - earth and water
 
-    ...
+    water wall x earth damage
+
+    shift one direction
 
 Wildfire - fire and air
 
-    ...
+    N fires x air damage
+
+    shift away
+
+
 
 Cosmos - earth, air, fire, water
 
     Spawn both sideboards.
+
+Gaia Awakens - earth, air, fire, water
+
+    Sacrifice () () (2) (3) (5) (8)
+
+    Move all pieces.
+    Spawn everywhere.
+    Evolve everywhere.
+    Attack everything.
 
 The Dead - beyond
 
@@ -490,4 +575,4 @@ The Dead - beyond
 
 Armageddon - earth, air, fire, water, beyond
 
-    Destroy all rocks. Each player ramps 1.
+    Destroy all rocks. Each player spawns 1.
