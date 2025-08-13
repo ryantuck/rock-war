@@ -109,8 +109,9 @@ MECHANICS / TURNS
 
 MECHANICS / TURNS / SEQUENCE
 
-        My Army         Opponent        Location
 
+
+        MY ARMY         OPPONENT        LOCATION
 
 MAIN    Move                            Map
         Evolve
@@ -198,13 +199,12 @@ COMBAT
 
     Blockers decide how to apply blocks. Blocks are applied one at a time.
 
-    Attacker decides to continue attacking.
+    All rocks must engage in combat until finished.
+
+    Defending army decides to counter-attack if pieces are available.
 
     Combat rules are applied recursively as pieces devolve in combat.
 
-    A warrior that devolves in combat turns into its weakened counterparts.
-
-    [2-] = weakened [2] = effectively []
 
 
 
@@ -219,23 +219,23 @@ COMBAT / Battle Tables
 
     []  -> o        ==>                             Scouts trade
     [2] -> (2)      ==>     [][]->oo                Equal values - both pieces devolve
-    [3] -> (3)      ==>     [2-][] -> (2-)o
-    [5] -> (5)      ==>     [3-][2-] -> (3-)(2-)
-    [8] -> (8)      ==>     [5-][3-] -> (5-)(3-)
+    [3] -> (3)      ==>     [2][] -> (2)o
+    [5] -> (5)      ==>     [3][2] -> (3)(2)
+    [8] -> (8)      ==>     [5][3] -> (5)(3)
 
     [2] -> o        ==>     [][]
     [3] -> o        ==>     [3]
     [5] -> o        ==>     [5]
     [8] -> o        ==>     [8]
 
-    [3] -> (2)      ==>     [2-][]      Stronger piece devolves, weaker destroyed
+    [3] -> (2)      ==>     [2][]      Stronger piece devolves, weaker destroyed
     [5] -> (2)      ==>     [5]
     [8] -> (2)      ==>     [8]
 
-    [5] -> (3)      ==>     [3-][2-]
+    [5] -> (3)      ==>     [3][2]
     [8] -> (3)      ==>     [8]
 
-    [8] -> (5)      ==>     [5-][3-]
+    [8] -> (5)      ==>     [5][3]
 
 
     [2] -> oo       ==>     []          [2]->oo => [][]->o => __->[]
@@ -253,14 +253,18 @@ COMBAT / Battle Tables / Further Examples
 
     either:
 
-        [3]->(3)    ==> [2-][] (2-)o    (3) block [3], both devolve
-        [2]->(2-)o  ==> [][]            [2] attack weakened (2-)o, equivalent to [2]->oo
-                    ==> [2][][][]       Victor distributes valid combos among combat territories
+        [3]->(3)    ==> [2][] (2)o      (3) block [3], both devolve
+        [2]->(2)o   ==> [][] ooo        [2] attack weakened (2)o, picks (2) as target, both devolve
+                    ==> [2][][][] ooo   Victor distributes valid combos among combat territories
+
+        [3]->(3)    ==> [2][] (2)o      (3) block [3], both devolve
+        [2]->o(2)   ==> [][] (2)        [2] attack weakened (2)o, picks o as target, both devolve
+                    ==> [2][][][] (2)   Victor distributes valid combos among combat territories
 
     or:
 
-        [2]->(3)    ==> (2-)o           (3) block [2], defending (3) devolves, attacker destroyed
-        [3]->(2-)o  ==> [3]             [3] attacks weakened (2-)o, equivalent to [3]->oo
+        [2]->(3)    ==> (2)o            (3) block [2], defending (3) devolves, attacker destroyed
+        [3]->(2)o   ==> [3]             [3] attacks weakened (2-)o, equivalent to [3]->oo
                     ==> [3]             Victor claims target territory
 
 
@@ -298,6 +302,9 @@ OBELISKS / DEVOTION
     2. Shaman       Majority of obelisk territories
     3. Demigod      All of obelisk territories
 
+OBELISKS / DEVOLVE
+
+    Devolve any 
 
     N unique piece types
     Max warrior strength
@@ -324,15 +331,23 @@ Sacrifice
 
 Evolution [ EV++ ]
 
-    Evolve              EV++
-    Sacrifice (2):      Evolve (3) -> (5)
-    Sacrifice (3):      Evolve (5) -> (8)
+    EVOLVE = N rock types
+
+    Devolve: EVOLVE++
+
+    Return  o                 :     ???
+    Return (2) / Sacrifice  o :     Evolve (2) -> (3)
+    Return (3) / Sacrifice (2):     Evolve (3) -> (5)
+    Return (5) / Sacrifice (3):     Evolve (5) -> (8)
+    Return (8) / Sacrifice (5):     Evolve (3) -> (8) ???
+    Sacrifice (8):                  Demigod of Earth
+
     Devolve             Devolve target warrior (X)
 
 Strength
 
-    Stamina             Target warrior doesn't weaken when devolving during combat
-    Pump                Pump target warrior
+    Stamina             Target warrior doesn't devolve during combat
+    Giant strength      Pump target warrior until end of turn
     Indestructible      Target rock is indestructible this turn
 
 Elemental
@@ -454,7 +469,7 @@ Devotion
 
 Abilities
 
-    Devolve
+    Devolve: SPAWN++
     Return
     Sacrifice
 
