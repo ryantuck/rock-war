@@ -115,10 +115,11 @@ MECHANICS / TURNS
     SPAWN:  spawn               1 + N obelisks              1 - 6
     OB:     Trigger obelisk     N obelisks                  1 - 5
 
+    Move / Attack:              N territories               1-20
+    Spawn / Evolve:             Max warrior strength        2, 3, 5, 8
+
 
 MECHANICS / TURNS / SEQUENCE
-
-
 
         MY ARMY         OPPONENT        LOCATION
 
@@ -175,6 +176,7 @@ MAP / TERRITORIES
             8               21              3
            13               34              5
            21               55              8
+           34               89             13
 
 
 MAP / TERRITORIES / CAPACITY
@@ -341,12 +343,17 @@ OBELISKS / DEVOTION
 
     Devotion == Total value of rocks adjacent to obelisk
 
-OBELISKS / DEVOLVE
-
     N unique piece types
     Max warrior strength
     N scouts
     N obelisk invocations
+
+OBELISKS / DEVOLVE
+
+OBELISKS / RETURN
+
+OBELISKS / SACRIFICE
+
 
 
 
@@ -356,28 +363,22 @@ EARTH
 
 Devotion
 
-    Evolution           EVOLVE++
+    Evolution
     Strength
 
-Devolve
+Evolution
 
-    ...
+    Scouts evolve free  ( oo -> (2) )
 
-Return
-Sacrifice
-
-Evolution [ EV++ ]
-
-    EVOLVE = N rock types
+    Warriors don't devolve during combat
 
     Devolve: EVOLVE++
 
-    Return  o                 :     ???
-    Return (2) / Sacrifice  o :     Evolve (2) -> (3)
-    Return (3) / Sacrifice (2):     Evolve (3) -> (5)
-    Return (5) / Sacrifice (3):     Evolve (5) -> (8)
-    Return (8) / Sacrifice (5):     Evolve (3) -> (8) ???
-    Sacrifice (8):                  Demigod of Earth
+    Sacrifice  o :      Evolve (2) -> (3)
+    Sacrifice (2):      Evolve (3) -> (5)
+    Sacrifice (3):      Evolve (5) -> (8)
+    Sacrifice (5):      Evolve (3) -> (8) ???
+    Sacrifice (8):      Demigod of Earth
 
     Devolve             Devolve target warrior (X)
 
@@ -449,36 +450,34 @@ Elemental
 
 
 
-
-
-
 AIR
 ---
 
+Forces
+
+    Movement
+    Retreat
+
 Devotion
 
-    Breeze              MV++
-    Fog of War          RET++
-
-Devolve
-Return
-Sacrifice
+    Believer
+    Shaman
+    Demigod
 
 Movement [ MV++ ]
 
-    MV += N obelisks
+    Breeze:         Scouts move freely in friendly territories.
+    Fog of war:     Warriors may retreat into lesser territory (e.g. (3) -retreat-> (2) ).
+
+    Devolve     (X):    Move X-
+    Return      (X):    Move X
 
     Motion              Move X-1
     Safe Passage        Move contiguous territory
-    Gust                Move warrior X to open territory
+    Gust                Move (X) to open territory
     Flight              Target warrior takes flight and moves up to X territories
     Hive                Every rock may make an additional move this turn
 
-Retreat [ RET++ ]
-
-    All rocks may retreat sideways
-
-    Full retreat        Retreat one warrior through friendly territory to open space
 
 Elemental
 
@@ -495,7 +494,7 @@ WATER
 
 Forces
 
-    SPAWN++
+    Spawn
     Balance
 
 Devotion
@@ -504,17 +503,15 @@ Devotion
     Shaman
     Demigod
 
-Abilities
-
-    Devolve     (X):    Spawn X--
-    Return      (X):    Spawn (X-)
-    Sacrifice   (X):    Spawn o/O
-
 Spawn
 
-    SPAWN++
-    Spawn adjacent
-    Spawn (2)
+    Scouts may spawn into open adjacent territories.
+
+    If a defending rock dies in combat, spawn (X-).
+
+    Devolve     (X):    Spawn (X--)     eg (5)->(2)
+    Return      (X):    Spawn (X-)      eg (5)->(3)
+    Sacrifice   (X):    Spawn o/O       eg (5)->(3)(2)
 
 Balance
 
@@ -525,10 +522,17 @@ Balance
 
 Elemental
 
-    River               Line of territories of length X, displaces all weaker rocks
-    Flood               One direction, all pieces shift X, elevation avoids, proportional damage
+    River               Return (3)(2):      Line of territories length 3, displace 2
+    Flood               Sacrifice (3)(2)o:  Line of territories length 3, displace 2, damage 1
+
+    (elevation avoids)
 
 ???
+
+balance - move forces within contingent
+vs
+movement - move forces into open territory
+
 
 
 
