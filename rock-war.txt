@@ -341,71 +341,81 @@ OBELISKS / DEVOTION
     2. Shaman       Majority of obelisk territories
     3. Demigod      All of obelisk territories
 
-    Devotion == Total value of rocks adjacent to obelisk
-
-    N unique piece types
-    Max warrior strength
-    N scouts
-    N obelisk invocations
+    Fervor == Total value of rocks adjacent to obelisk
+                or ...
+                N unique rock types
+                Max warrior strength
+                N scouts
+                N obelisk invocations
 
 OBELISKS / DEVOLVE
 
-OBELISKS / RETURN
+    Devolve to pump the base mechanic.
 
-OBELISKS / SACRIFICE
+OBELISKS / ELEMENTAL
 
+    Range (n territories? dist from obelisk?)
+    x
+    Effect
 
+OBELISKS / ETC
+
+    downsides? - air must spread out, earth must evolve, fire must attack, water must spawn
 
 
 
 EARTH
 -----
 
-Devotion
+Forces
 
     Evolution
     Strength
 
+Devotion
+
+    Believer: 
+    Shaman: 
+    Demigod: 
+
 Evolution
 
-    Scouts evolve free  ( oo -> (2) )
+    Fertility           Scouts evolve free  ( oo -> (2) )
+    Fitness             Warriors don't devolve during combat
 
-    Warriors don't devolve during combat
-
-    Devolve: EVOLVE++
+    Devolve (X):        EVOLVE + (X-)
+    Devolve (2):        EVOLVE + 1
+    Devolve (3):        EVOLVE + 2
+    Devolve (5):        EVOLVE + 3
+    Devolve (8):        EVOLVE + 5
 
     Sacrifice  o :      Evolve (2) -> (3)
     Sacrifice (2):      Evolve (3) -> (5)
     Sacrifice (3):      Evolve (5) -> (8)
-    Sacrifice (5):      Evolve (3) -> (8) ???
-    Sacrifice (8):      Demigod of Earth
-
-    Devolve             Devolve target warrior (X)
-
-Strength
-
-    Stamina             Target warrior doesn't devolve during combat
-    Giant strength      Pump target warrior until end of turn
-    Indestructible      Target rock is indestructible this turn
+    Sacrifice (5):      Evolve (3) -> (8) ??? 
+    Sacrifice (8):      Demigod of Earth 
 
 Elemental
 
-    Tremor              Split one territory of value X into its available adjacent territories
-    Landslide           Deal X damage among 2+ adjacent territories (?)
-    Earthquake          Radiate outwards,
-                          shift pieces into adjacent territories,
-                          proportional damage
+    Tremor          Sacrifice (3): Range 2, devolve 1
+    Aftershock      Sacrifice (5): Range 3, devolve 2 (?) 
+    Earthquake      Sacrifice (8): Range 5, devolve 3
+
 
 ???
 
-Target Army ATK--
-Target warrior disable
-Target rock
-Target scout
-Every rock
+    Devolve             Devolve target warrior (X)
+    Indestructible      Target rock is indestructible this turn
+    Giant strength      Pump target warrior until end of turn
 
-Target territory
-Target territories (adjacent)
+    Target Army ATK--
+    Target warrior disable
+    Target rock
+    Target scout
+    Every rock
+
+    Target territory
+    Target territories (adjacent)
 
 
 
@@ -414,38 +424,41 @@ Target territories (adjacent)
 FIRE
 ----
 
+Forces
+
+    Attack
+    Damage
+
 Devotion
 
-    Heat                ATK++
-    Fireball            DMG++
+    Believer: 
+    Shaman: 
+    Demigod: 
 
-Devolve
+Attack
 
-    Frenzy              ATK++
-    Momentum            Target newly-evolved warrior may attack this turn
-    Backup              Target scout assists attack on adjacent defending territory
+    Horde               Scouts may attack
+    Revenge             Counter-attacks may go on indefinitely
 
-Return
+    Devolve (2):        ATK + 1
+    Devolve (3):        ATK + 2
+    Devolve (5):        ATK + 3
+    Devolve (8):        ATK + 5
 
-    First Strike        Attacking warrior deals damage first
-    Pump                Pump target attacking warrior
-    Trample             Target warrior may move after conquering a territory
-
-Sacrifice
-
-    Direct Damage       Deal X damage to target rock
-    Double Strike       Target warrior deals damage twice before taking damage
-    Fight               Two warriors fight
+    Sacrifice o:        Join attack
+    Sacrifice (2):
+    Sacrifice (3):
+    Sacrifice (5):
+    Sacrifice (8):
 
 Elemental
 
-    Embers              Drop X small fires,
-                          rocks weaker than X must retreat or take damage,
-                          pump with air
-    Inferno             Wall of damaging fire X territories long,
-                          pump with air
+    Embers              Sacrifice (3):      Range 2, damage 1
+    Blaze               Sacrifice (5):      Range 3, damage 2
+    Inferno             Sacrifice (8):      Range 5, damage 3
 
 ???
+
 
 
 
@@ -460,32 +473,33 @@ Forces
 
 Devotion
 
-    Believer
-    Shaman
-    Demigod
+    Believer 
+    Shaman 
+    Demigod 
 
 Movement [ MV++ ]
 
-    Breeze:         Scouts move freely in friendly territories.
-    Fog of war:     Warriors may retreat into lesser territory (e.g. (3) -retreat-> (2) ).
+    Breeze              Scouts move freely in friendly territories.
+    Fog of War          Warriors may retreat into lesser territory (e.g. (3) -retreat-> (2) ).
 
     Devolve     (X):    Move X-
+
     Return      (X):    Move X
+
+
+Elemental
+
+    Gust                Return (3):  Range 2, move 1
+    Windstorm           Return (5):  Range 3, move 2
+    Tornado             Return (8):  Range 5, move 3 ??? 
+
+???
 
     Motion              Move X-1
     Safe Passage        Move contiguous territory
     Gust                Move (X) to open territory
     Flight              Target warrior takes flight and moves up to X territories
     Hive                Every rock may make an additional move this turn
-
-
-Elemental
-
-    Windstorm           Move rocks valuing x in same direction
-    Tornado             Deal X, X-1, ... damage
-
-???
-
 
 
 
@@ -499,19 +513,30 @@ Forces
 
 Devotion
 
-    Mystic
-    Shaman
-    Demigod
+    Mystic 
+    Shaman 
+    Demigod 
 
 Spawn
 
-    Scouts may spawn into open adjacent territories.
+    Spores              Scouts may spawn into open adjacent territories.
+    Replacement         If a defending warrior dies in combat, spawn (X-).
 
-    If a defending rock dies in combat, spawn (X-).
+    Return  (X):        Spawn (X-)      eg (5)->(3)
 
-    Devolve     (X):    Spawn (X--)     eg (5)->(2)
-    Return      (X):    Spawn (X-)      eg (5)->(3)
-    Sacrifice   (X):    Spawn o/O       eg (5)->(3)(2)
+Elemental
+
+    River               Return (3):     Range 2, return 1
+    Flood               Return (5):     Range 3, return 2
+    Deluge              Return (8):     Range 5, return 3
+
+    (elevation avoids)
+
+???
+
+    balance - move forces within contingent
+    vs
+    movement - move forces into open territory
 
 Balance
 
@@ -520,18 +545,6 @@ Balance
     Swap                Swap adjacent territories each of value X or less
     Counter             Counter target obelisk ability
 
-Elemental
-
-    River               Return (3)(2):      Line of territories length 3, displace 2
-    Flood               Sacrifice (3)(2)o:  Line of territories length 3, displace 2, damage 1
-
-    (elevation avoids)
-
-???
-
-balance - move forces within contingent
-vs
-movement - move forces into open territory
 
 
 
