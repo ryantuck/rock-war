@@ -158,6 +158,7 @@ MECHANICS / EVOLUTION
 
     Pieces must occupy the same territory to evolve
 
+
     [1] [1] ==> [2]
     [1] [2] ==> [3]
     [2] [3] ==> [5]
@@ -356,7 +357,7 @@ OBELISKS
 
 OBELISKS / DEVOTION
 
-    1. Believer     Single territory                    Territory gains base mechainic
+    1. Believer     Single territory                    Territory gains base mechanic
     2. Shaman       Majority of obelisk territories     Offer up tributes
     3. Demigod      All of obelisk territories          Summon elemental spells
 
@@ -382,27 +383,28 @@ OBELISKS / ELEMENTAL
     Return / Sac all territories at once - sum ∑ = 1, 2, 3, 5, 8, 13, ...
 
 
-evolution cost = X.b, benefit = X.A, A+b=X
+Devotion
+
+    Believer        Devolve (X)     SPAWN + X-
+
+    Shaman          Return (X)      Spawn (X-)
+                    Return (X)      Return (X-)
+
+    Demigod         Return all ∑=X  Range X-, return X--
+                    Sac all ∑=X     Range X-, damage X--, return X--
+
+
 
 
 EARTH
 -----
 
-Forces
-
-    Evolution
-    Strength
-
-Devotion
-
-    Believer: 
-    Shaman: 
-    Demigod: 
-
-Evolution
+Effects     [Believer - single territory]
 
     Fertility           Scouts evolve free  ( oo -> (2) )
     Fitness             Warriors don't devolve during combat
+
+Tributes    [Shaman - majority territories]
 
     Devolve (X):        EVOLVE + (X-)
     Devolve (2):        EVOLVE + 1
@@ -416,11 +418,11 @@ Evolution
     Sacrifice (5):      Evolve (3) -> (8) ??? 
     Sacrifice (8):      Demigod of Earth 
 
-Elemental
+Elemental   [Demigod - all territories]
 
-    Tremor          Sacrifice (3): Range 2, devolve 1
-    Aftershock      Sacrifice (5): Range 3, devolve 2 (?) 
-    Earthquake      Sacrifice (8): Range 5, devolve 3
+    Tremor          Devolve All ∑ = 3: Range 2, devolve 1
+    Aftershock      Devolve All ∑ = 5: Range 3, devolve 2
+    Earthquake      Devolve All ∑ = 8: Range 4, devolve 3
 
 
 
@@ -428,17 +430,6 @@ Elemental
 
 FIRE
 ----
-
-Forces
-
-    Attack
-    Damage
-
-Devotion
-
-    Believer: 
-    Shaman: 
-    Demigod: 
 
 Attack
 
@@ -451,6 +442,8 @@ Attack
     Devolve (5):        ATK + 3
     Devolve (8):        ATK + 5
 
+    Return (X):         Pacify (X)
+
     Sacrifice o:        Join attack
     Sacrifice (2):
     Sacrifice (3):
@@ -459,9 +452,9 @@ Attack
 
 Elemental
 
-    Embers              Sacrifice (3):      Range 2, damage 1
-    Blaze               Sacrifice (5):      Range 3, damage 2
-    Inferno             Sacrifice (8):      Range 5, damage 3
+    Embers              Sac all - ∑ = 3:      Range 2, damage 1
+    Blaze               Sac all - ∑ = 5:      Range 3, damage 2
+    Inferno             Sac all - ∑ = 8:      Range 5, damage 3
 
 
 
@@ -471,18 +464,7 @@ Elemental
 AIR
 ---
 
-Forces
-
-    Movement
-    Retreat
-
-Devotion
-
-    Believer 
-    Shaman 
-    Demigod 
-
-Movement [ MV++ ]
+Movement
 
     Breeze              Scouts move freely in friendly territories.
     Fog of War          Warriors may retreat into lesser territory (e.g. (3) -retreat-> (2) ).
@@ -513,16 +495,15 @@ Elemental
 WATER
 -----
 
-Forces
-
-    Spawn
-    Balance
-
 Devotion
 
-    Mystic 
-    Shaman 
-    Demigod 
+    Believer        Devolve (X)     SPAWN + X-
+
+    Shaman          Return (X)      Spawn (X-)
+                    Return (X)      Return (X-)
+
+    Demigod         Return all ∑=X  Range X-, return X--
+                    Sac all ∑=X     Range X-, damage X--, return X--
 
 Spawn
 
@@ -576,7 +557,9 @@ Elemental
         Target territory
         Target territories (adjacent)
 
+    Mechanics / Evolution
 
+        evolution cost = X.b, benefit = X.A, A+b=X
 
     Water / Balance
 
