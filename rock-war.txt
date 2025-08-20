@@ -379,12 +379,10 @@ OBELISKS / ELEMENTAL
     x
     Effect
 
-    Return / Sac all territories at once - sum is 1, 2, 3, 5, 8, 13, ...
+    Return / Sac all territories at once - sum ∑ = 1, 2, 3, 5, 8, 13, ...
 
-OBELISKS / ETC
 
-    downsides? - air must spread out, earth must evolve, fire must attack, water must spawn
-
+evolution cost = X.b, benefit = X.A, A+b=X
 
 
 EARTH
@@ -559,6 +557,11 @@ Elemental
 
 
 ???
+
+
+    Obelisks / Downsides?
+
+        air must spread out, earth must evolve, fire must attack, water must spawn
 
     Obelisks / Local Effects (!?)
 
