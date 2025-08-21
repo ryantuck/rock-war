@@ -1,9 +1,38 @@
 # Rock War v1 Game Engine
+
+#    ┌─────┐          
+#    │  a  │          
+#    └┬─┬─┬┘          
+#     │ │┌┴─────────┐ 
+#     │ ││    b     │ 
+#     │ │└┬─┬──┬───┬┘ 
+#     │┌┴─┴┐│  │   │  
+#     ││ X ││  │   │  
+#     │└┬──┘│  │   │  
+#    ┌┴─┴───┴─┐│   │  
+#    │   d    ││   │  
+#    └┬─┬─────┘│   │  
+#     │┌┴──────┴──┐│  
+#     ││    e     ││  
+#     │└┬─────┬──┬┘│  
+#    ┌┴─┴──┐  │  │ │  
+#    │  g  │  │  │ │  
+#    └┬─┬─┬┘  │  │ │  
+#     │ │┌┴──┐│  │ │  
+#     │ ││ h ││  │ │  
+#     │ │└┬─┬┘│  │ │  
+#     │┌┴─┴┐│ │  │ │  
+#     ││ Y ││ │  │ │  
+#     │└┬──┘│ │  │ │  
+#    ┌┴─┴───┴─┴─┐│ │  
+#    │    f     ││ │  
+#    └┬─────────┘│ │  
+#    ┌┴──────────┴─┴─┐
+#    │       c       │
+#    └───────────────┘
+
 import json
 
-
-def attack(ti, tf):
-    pass
 
 fib = [1,1,2,3,5,8,13,21]
 
@@ -21,6 +50,53 @@ game = {
     'army_size': 3,
 }
 
+
+def print_terr(army, rocks):
+
+    s = ''
+
+    if army == 'SMOOTH':
+        for v in rocks:
+            if v == 1:
+                s += 'o'
+            else:
+                s += f'({v})'
+
+    if army == 'ROCKY':
+        for v in rocks:
+            if v == 1:
+                s += '[]'
+            else:
+                s += f'[{v}]'
+
+    if len(s) < 6:
+        s += ' '*(6-len(s))
+
+    assert len(s) == 6
+    return s
+
+def print_game(state):
+
+    board = state['board']
+    aaaa = print_terr(**board['a'])
+    bbbb = print_terr(**board['b'])
+    cccc = print_terr(**board['c'])
+    dddd = print_terr(**board['d'])
+    eeee = print_terr(**board['e'])
+    ffff = print_terr(**board['f'])
+    gggg = print_terr(**board['g'])
+    hhhh = print_terr(**board['h'])
+
+    print(f'|---------------------------------------------')
+    print(f'|          |    {bbbb}    |     {cccc}       |')
+    print(f'| {aaaa}   |     _________|__                |')
+    print(f'|          |    /           /----------------|')
+    print(f'|---------/X\--|  {eeee}   /    {ffff}      / ')
+    print(f' \             |__________/                /  ')
+    print(f'  \  {dddd}    |          \------\Y/------/_  ')
+    print(f'   \           |                 |          \ ')
+    print(f'    ------------\  {gggg}        | {hhhh}    |')
+    print(f'                 \_______________|___________|')
 
 
 def initial_state(game):
@@ -75,7 +151,7 @@ def move(state, army, ti, tf, v=1):
     assert claimed_by(board, ti) == army
     assert are_adjacent(state['map'], ti, tf)
 
-    board[ti]['rocks'].pop(v)
+    board[ti]['rocks'].remove(v)
 
     if board[ti]['rocks'] == []:
         board[ti]['army'] = None
@@ -126,14 +202,32 @@ def play(game):
     # Placement
     state = spawn(state, 'SMOOTH', 'd', spawn_open=True)
     state = spawn(state, 'ROCKY', 'f', spawn_open=True)
+    print_game(state)
 
     # Turn 1
     state = spawn(state, 'SMOOTH', 'd')
     state = move(state, 'SMOOTH', 'd', 'g', v=1)
+    print_game(state)
 
     # Turn 2
     state = spawn(state, 'ROCKY', 'f')
     state = evolve(state, 'ROCKY', 'f') # borders earth, scouts evolve free
+    print_game(state)
+
+    # Turn 3
+    # max rock = o (1) --> evolve / spawn = 1
+    state = spawn(state, 'SMOOTH', 'g')
+    # n terr = 2 --> move / attack = 2
+    state = move(state, 'SMOOTH', 'g', 'h')
+    state = move(state, 'SMOOTH', 'd', 'e')
+    print_game(state)
+
+    # Turn 4
+    state = spawn(state, 'ROCKY', 'f')
+    state = evolve(state, 'ROCKY', 'f')
+    # state = attack(state, 'ROCKY', 'f', 'g')
+    print_game(state)
+
 
 
 def main():
