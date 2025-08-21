@@ -1,3 +1,6 @@
+v1-history.txt : engine.py
+	python engine.py > $@
+
 game-history.txt : output.jsonl watch.py
 	cat $< | python watch.py > $@
 

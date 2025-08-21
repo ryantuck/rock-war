@@ -1,0 +1,63 @@
+{"map": {"obelisks": "xy", "territories": "abcdefgh", "edges": ["ab", "ad", "bc", "bd", "be", "ce", "cf", "de", "dg", "eg", "ef", "fg", "fh", "gh", "xa", "xb", "xd", "yf", "yg", "yh"]}, "obelisks": ["fire", "earth"], "armies": ["smooth", "rocky"], "army_size": 3}
+{"reserves": {"SMOOTH": [1, 1, 1, 2, 2, 3], "ROCKY": [1, 1, 1, 2, 2, 3]}, "board": {"a": {"army": null, "rocks": []}, "b": {"army": null, "rocks": []}, "c": {"army": null, "rocks": []}, "d": {"army": null, "rocks": []}, "e": {"army": null, "rocks": []}, "f": {"army": null, "rocks": []}, "g": {"army": null, "rocks": []}, "h": {"army": null, "rocks": []}}, "map": {"obelisks": "xy", "territories": "abcdefgh", "edges": ["ab", "ad", "bc", "bd", "be", "ce", "cf", "de", "dg", "eg", "ef", "fg", "fh", "gh", "xa", "xb", "xd", "yf", "yg", "yh"]}, "graveyard": {"SMOOTH": [], "ROCKY": []}}
+{"d": {"army": "SMOOTH", "rocks": [1]}}
+{"d": {"army": "SMOOTH", "rocks": [1]}, "f": {"army": "ROCKY", "rocks": [1]}}
+|---------------------------------------------
+|          |              |                  |
+|          |     _________|__                |
+|          |    /           /----------------|
+|---------/X\--|           /    []          / 
+ \             |__________/                /  
+  \  o         |          \------\Y/------/_  
+   \           |                 |          \ 
+    ------------\                |           |
+                 \_______________|___________|
+{"d": {"army": "SMOOTH", "rocks": [1, 1]}, "f": {"army": "ROCKY", "rocks": [1]}}
+{"d": {"army": "SMOOTH", "rocks": [1]}, "f": {"army": "ROCKY", "rocks": [1]}, "g": {"army": "SMOOTH", "rocks": [1]}}
+|---------------------------------------------
+|          |              |                  |
+|          |     _________|__                |
+|          |    /           /----------------|
+|---------/X\--|           /    []          / 
+ \             |__________/                /  
+  \  o         |          \------\Y/------/_  
+   \           |                 |          \ 
+    ------------\  o             |           |
+                 \_______________|___________|
+{"d": {"army": "SMOOTH", "rocks": [1]}, "f": {"army": "ROCKY", "rocks": [1, 1]}, "g": {"army": "SMOOTH", "rocks": [1]}}
+{"d": {"army": "SMOOTH", "rocks": [1]}, "f": {"army": "ROCKY", "rocks": [2]}, "g": {"army": "SMOOTH", "rocks": [1]}}
+|---------------------------------------------
+|          |              |                  |
+|          |     _________|__                |
+|          |    /           /----------------|
+|---------/X\--|           /    [2]         / 
+ \             |__________/                /  
+  \  o         |          \------\Y/------/_  
+   \           |                 |          \ 
+    ------------\  o             |           |
+                 \_______________|___________|
+{"d": {"army": "SMOOTH", "rocks": [1]}, "f": {"army": "ROCKY", "rocks": [2]}, "g": {"army": "SMOOTH", "rocks": [1, 1]}}
+{"d": {"army": "SMOOTH", "rocks": [1]}, "f": {"army": "ROCKY", "rocks": [2]}, "g": {"army": "SMOOTH", "rocks": [1]}, "h": {"army": "SMOOTH", "rocks": [1]}}
+{"e": {"army": "SMOOTH", "rocks": [1]}, "f": {"army": "ROCKY", "rocks": [2]}, "g": {"army": "SMOOTH", "rocks": [1]}, "h": {"army": "SMOOTH", "rocks": [1]}}
+|---------------------------------------------
+|          |              |                  |
+|          |     _________|__                |
+|          |    /           /----------------|
+|---------/X\--|  o        /    [2]         / 
+ \             |__________/                /  
+  \            |          \------\Y/------/_  
+   \           |                 |          \ 
+    ------------\  o             | o         |
+                 \_______________|___________|
+{"e": {"army": "SMOOTH", "rocks": [1]}, "f": {"army": "ROCKY", "rocks": [2, 1]}, "g": {"army": "SMOOTH", "rocks": [1]}, "h": {"army": "SMOOTH", "rocks": [1]}}
+{"e": {"army": "SMOOTH", "rocks": [1]}, "f": {"army": "ROCKY", "rocks": [3]}, "g": {"army": "SMOOTH", "rocks": [1]}, "h": {"army": "SMOOTH", "rocks": [1]}}
+|---------------------------------------------
+|          |              |                  |
+|          |     _________|__                |
+|          |    /           /----------------|
+|---------/X\--|  o        /    [3]         / 
+ \             |__________/                /  
+  \            |          \------\Y/------/_  
+   \           |                 |          \ 
+    ------------\  o             | o         |
+                 \_______________|___________|
