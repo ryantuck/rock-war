@@ -1,36 +1,5 @@
 # Rock War v1 Game Engine
 
-#    ┌─────┐          
-#    │  a  │          
-#    └┬─┬─┬┘          
-#     │ │┌┴─────────┐ 
-#     │ ││    b     │ 
-#     │ │└┬─┬──┬───┬┘ 
-#     │┌┴─┴┐│  │   │  
-#     ││ X ││  │   │  
-#     │└┬──┘│  │   │  
-#    ┌┴─┴───┴─┐│   │  
-#    │   d    ││   │  
-#    └┬─┬─────┘│   │  
-#     │┌┴──────┴──┐│  
-#     ││    e     ││  
-#     │└┬─────┬──┬┘│  
-#    ┌┴─┴──┐  │  │ │  
-#    │  g  │  │  │ │  
-#    └┬─┬─┬┘  │  │ │  
-#     │ │┌┴──┐│  │ │  
-#     │ ││ h ││  │ │  
-#     │ │└┬─┬┘│  │ │  
-#     │┌┴─┴┐│ │  │ │  
-#     ││ Y ││ │  │ │  
-#     │└┬──┘│ │  │ │  
-#    ┌┴─┴───┴─┴─┐│ │  
-#    │    f     ││ │  
-#    └┬─────────┘│ │  
-#    ┌┴──────────┴─┴─┐
-#    │       c       │
-#    └───────────────┘
-
 import json
 
 
@@ -189,6 +158,41 @@ def evolve(state, army, t):
 def state_lite(state):
     return {t: d for t, d in state['board'].items() if d['army']}
 
+def opponent(state, army):
+    armies = state['reserves'].keys() # hack, should pass in game?
+    return next(a for a in armies if a != army)
+
+def attack(state, army, ti, tf, v):
+
+    terr_i = state['board'][ti]
+    terr_f = state['board'][tf]
+
+    assert terr_i['army'] != terr_f['army'] != None
+    assert v in terr_i['rocks']
+
+    attacker = v
+    defenders = list(reversed(sorted(terr_f['rocks'])))
+    defender = defenders[0]
+
+    if attacker - defender > 1:
+        # simple combat, roll through
+
+        terr_i['rocks'].remove(attacker)
+        if terr_i['rocks'] == []:
+            terr_i['army'] == None
+
+        terr_f['rocks'].remove(defender)
+        terr_f['army'] == army
+        terr_f['rocks'].append(attacker)
+
+        state['graveyard'][opponent(state, army)].append(defender)
+
+
+    assert state_is_valid(state)
+    print(json.dumps(state_lite(state)))
+    return state
+
+
 
 def play(game):
 
@@ -225,7 +229,7 @@ def play(game):
     # Turn 4
     state = spawn(state, 'ROCKY', 'f')
     state = evolve(state, 'ROCKY', 'f')
-    # state = attack(state, 'ROCKY', 'f', 'g')
+    state = attack(state, 'ROCKY', 'f', 'g', 3)
     print_game(state)
 
 
