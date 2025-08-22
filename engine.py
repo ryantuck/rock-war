@@ -19,8 +19,7 @@ game = {
     'army_size': 3,
 }
 
-
-def print_terr(army, rocks):
+def print_rocks(army, rocks):
 
     s = ''
 
@@ -37,6 +36,13 @@ def print_terr(army, rocks):
                 s += '[]'
             else:
                 s += f'[{v}]'
+
+    return s
+
+
+def print_terr(army, rocks):
+
+    s = print_rocks(army, rocks)
 
     if len(s) < 6:
         s += ' '*(6-len(s))
@@ -56,6 +62,17 @@ def print_game(state):
     gggg = print_terr(**board['g'])
     hhhh = print_terr(**board['h'])
 
+    reserves = state['reserves']
+    reserves_s = print_rocks('SMOOTH', reserves['SMOOTH'])
+    reserves_r = print_rocks('ROCKY', reserves['ROCKY'])
+
+    graveyard = state['graveyard']
+    graveyard_s = print_rocks('SMOOTH', graveyard['SMOOTH'])
+    graveyard_r = print_rocks('ROCKY', graveyard['ROCKY'])
+
+
+
+    print()
     print(f'|---------------------------------------------')
     print(f'|          |    {bbbb}    |     {cccc}       |')
     print(f'| {aaaa}   |     _________|__                |')
@@ -66,6 +83,10 @@ def print_game(state):
     print(f'   \           |                 |          \ ')
     print(f'    ------------\  {gggg}        | {hhhh}    |')
     print(f'                 \_______________|___________|')
+    print()
+    print(f'{reserves_s: <20}      {graveyard_s}  ')
+    print(f'{reserves_r: <20}      {graveyard_r}  ')
+    print()
 
 
 def initial_state(game):
@@ -92,7 +113,7 @@ def spawn(state, army, t, v=1, spawn_open=False):
         assert state['board'][t]['army'] == army
         assert state['board'][t]['rocks'] == [v+1] or [v] # TODO fibonacci up and down
 
-    state['reserves'][army].pop(v)
+    state['reserves'][army].remove(v)
     state['board'][t]['rocks'].append(v)
     state['board'][t]['army'] = army
 
@@ -146,7 +167,7 @@ def evolve(state, army, t):
     a,b = terr['rocks']
     assert evolvable(a,b)
 
-    state['reserves'][army].pop(a+b)    # :)
+    state['reserves'][army].remove(a+b)    # :)
     state['reserves'][army].extend([a,b])
     state['board'][t]['rocks'] = [a+b]
 
@@ -179,10 +200,10 @@ def attack(state, army, ti, tf, v):
 
         terr_i['rocks'].remove(attacker)
         if terr_i['rocks'] == []:
-            terr_i['army'] == None
+            terr_i['army'] = None
 
         terr_f['rocks'].remove(defender)
-        terr_f['army'] == army
+        terr_f['army'] = army
         terr_f['rocks'].append(attacker)
 
         state['graveyard'][opponent(state, army)].append(defender)
@@ -191,7 +212,6 @@ def attack(state, army, ti, tf, v):
     assert state_is_valid(state)
     print(json.dumps(state_lite(state)))
     return state
-
 
 
 def play(game):
@@ -232,6 +252,9 @@ def play(game):
     state = attack(state, 'ROCKY', 'f', 'g', 3)
     print_game(state)
 
+    # Turn 5
+    # r - evolve / attack   = 1
+    # t - spawn / move      = 2
 
 
 def main():
