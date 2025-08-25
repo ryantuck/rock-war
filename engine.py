@@ -137,7 +137,7 @@ def move(state, army, ti, tf, v=1):
 
     board = state['board']
 
-    assert is_open(board, tf)
+    assert claimed_by(board, tf) == army or (is_open(board, tf) and v == 1)
     assert claimed_by(board, ti) == army
     assert are_adjacent(state['map'], ti, tf)
 
@@ -160,6 +160,7 @@ def evolvable(a, b):
 
 def evolve(state, army, t):
     terr = state['board'][t]
+    print(terr)
 
     assert terr['army'] == army
     assert len(terr['rocks']) == 2
@@ -170,6 +171,34 @@ def evolve(state, army, t):
     state['reserves'][army].remove(a+b)    # :)
     state['reserves'][army].extend([a,b])
     state['board'][t]['rocks'] = [a+b]
+
+    assert state_is_valid(state)
+    print(json.dumps(state_lite(state)))
+    return state
+
+def devolve(state, army, t):
+    terr = state['board'][t]
+    # print(terr)
+
+    assert terr['army'] == army
+    assert len(terr['rocks']) == 1
+    rock = terr['rocks'][0]
+
+    a = fib[fib.index(rock)-1]
+    b = fib[fib.index(rock)-2]
+    # print(a,b)
+
+    state['board'][t]['rocks'].remove(rock)
+    state['reserves'][army].append(rock)
+    # print(state)
+
+    if a in state['reserves'][army]:
+        state['reserves'][army].remove(a)
+        state['board'][t]['rocks'].append(a)
+    if b in state['reserves'][army]:
+        state['reserves'][army].remove(b)
+        state['board'][t]['rocks'].append(b)
+    # print(state)
 
     assert state_is_valid(state)
     print(json.dumps(state_lite(state)))
@@ -194,8 +223,9 @@ def attack(state, army, ti, tf, v):
     attacker = v
     defenders = list(reversed(sorted(terr_f['rocks'])))
     defender = defenders[0]
+    print(attacker, defender)
 
-    if attacker - defender > 1:
+    if len(defenders) == 1 and (attacker - defender > 1 or (adjacent_to_obelisk(ti, 'earth') and attacker - defender == 1)):
         # simple combat, roll through
 
         terr_i['rocks'].remove(attacker)
@@ -208,10 +238,46 @@ def attack(state, army, ti, tf, v):
 
         state['graveyard'][opponent(state, army)].append(defender)
 
+    if attacker == 2 and defenders == [1,1]:
+
+        terr_i['rocks'].remove(attacker)
+        if terr_i['rocks'] == []:
+            terr_i['army'] = None
+
+        terr_f['army'] = army
+        terr_f['rocks'] = [attacker]
+        state = devolve(state, army, tf) # [2] -> oo ==> [][]
+
+        state['graveyard'][opponent(state, army)].extend(defenders)
 
     assert state_is_valid(state)
     print(json.dumps(state_lite(state)))
     return state
+
+def adjacent_to_obelisk(t, obelisk):
+    return True # todo
+
+def earth_devolve_to_evolve(state, army, tribute, target):
+
+    assert adjacent_to_obelisk(tribute, 'earth')
+    # todo get costs
+
+    rocks = state['board'][tribute]['rocks']
+    assert len(rocks) == 1
+    rock_tribute = rocks[0]
+
+    if rock_tribute == 1: # scout devolve = return
+        state['board'][tribute]['rocks'].remove(rock_tribute)
+        state['board'][tribute]['army'] = None
+        state['board'][target]['rocks'].append(rock_tribute)
+    else:
+        state = devolve(state, army, tribute)
+    state = evolve(state, state['board'][target]['army'], target)
+
+    assert state_is_valid(state)
+    print(json.dumps(state_lite(state)))
+    return state
+
 
 
 def play(game):
@@ -239,9 +305,7 @@ def play(game):
     print_game(state)
 
     # Turn 3
-    # max rock = o (1) --> evolve / spawn = 1
     state = spawn(state, 'SMOOTH', 'g')
-    # n terr = 2 --> move / attack = 2
     state = move(state, 'SMOOTH', 'g', 'h')
     state = move(state, 'SMOOTH', 'd', 'e')
     print_game(state)
@@ -252,9 +316,73 @@ def play(game):
     state = attack(state, 'ROCKY', 'f', 'g', 3)
     print_game(state)
 
+    # Checkmate? smooth can't spawn, can't move far enough away from 3, will attack one of them, then a single scout can't support spawning anything else, game over. 
+
+    # maybe not?
+
     # Turn 5
-    # r - evolve / attack   = 1
-    # t - spawn / move      = 2
+    state = move(state, 'SMOOTH', 'e', 'f')
+    state = earth_devolve_to_evolve(state, 'SMOOTH', 'h', 'f') # devolve scout == return scout
+    state = spawn(state, 'SMOOTH', 'f')
+    state = move(state, 'SMOOTH', 'f', 'e')
+    print_game(state)
+
+    # Turn 6
+    state = attack(state, 'ROCKY', 'g', 'f', 3)
+    print_game(state)
+
+    # Turn 7
+    turn = 'SMOOTH'
+    state = move(state, turn, 'e', 'b')
+    state = spawn(state, turn, 'b')
+    print_game(state)
+
+    # Turn 8
+    turn = 'ROCKY'
+    state = earth_devolve_to_evolve(state, turn, 'f', 'b') # have to target available evolve
+    print_game(state)
+
+    # Turn 9
+    turn = 'SMOOTH'
+    state = spawn(state, turn, 'b') # spawn b
+    state = move(state, turn, 'b', 'd') # mv b d
+    print_game(state)
+
+    # Turn 10
+    turn = 'ROCKY'
+    state = move(state, turn, 'f', 'g', 1)
+    state = spawn(state, turn, 'g')
+    state = spawn(state, turn, 'f')
+    print_game(state)
+
+    # Turn 11
+    turn = 'SMOOTH'
+    state = move(state, turn, 'b', 'd', 2)
+    state = attack(state, turn, 'd', 'g', 2)
+    print_game(state)
+
+    # Turn 12
+    turn = 'ROCKY'
+    state = evolve(state, turn, 'f')
+    state = attack(state, turn, 'f', 'g', v=3)
+    print_game(state)
+
+    print('GG')
+
+    # gg. [3] remains, o runs around, can't spawn, etc. cool.
+
+    # very constrained game is good. mechanics are tedious at times but it is whittling.
+
+    # move spawn evolve attack
+
+    # devolve scout == return scout?
+
+
+
+
+
+
+
 
 
 def main():
