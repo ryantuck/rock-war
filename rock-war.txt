@@ -28,28 +28,9 @@ Combat
 
 
 
+Obelisks - abilities, how to pay, mechanics of elemental spells should be clear and powerful, locality, range, effect, damage, synergy, opposition, army affinities, devotion, godhood for game, effects building (eg successful attack anywhere -> deal damage), game rank-aware effects ([5] largest warrior, largest effect should be proportionate, scale appropriately),
 
-2025-08-18 - 5-army, 4-obelisk, 13-territory, 1-placement - spawn/evolve=max warrior, move/attack=n territories, worked well, lacked real strategy but ok, spawn move evolve attack in one shot is pretty brutal, attacking costs for warriors should maybe be x--, x-, x, x+ (eg (3) pays 1 to attack then 2, 3 for subsequent), smooth army lost, being able to pop scouts would be tight, can gain shaman pretty quickly since most intersections are 3-territories, def felt pain of not spreading out further, utilized retreat nicely, scouts can actually survive a while doing that probably, retreat should be less easy for higher attack differential - scout retreats into scout attacked by a (2), but what about a (3)?, daisy chain attack into corner of board not planned, density felt okay other than quick attacks even with a buffer being inevitable and undefendable, or maybe just game one, (3) gets stranded somewhere, should it be able to devolve?, 
-
-map:
-
-    territories: abcdefghijklm
-    edges: ab ac bc ad bd de be ce ...
-
-    adjacent_territories(t):
-
-    attack(ti, tf):
-
-    move(ti, tf):
-
-    spawn(t, x):
-
-    evolve(t):
-
-
-
-
-
+Scale - rank, terminology (A+b=X?, A/x and b/x?), invariant references (max capacity 8, etc),
 
 
 
@@ -109,7 +90,7 @@ MECHANICS
 
 MECHANICS / PLACEMENT
 
-    Army Size       Placement
+    Army Rank       Placement
             2               1
             3               1
             5               2
@@ -123,33 +104,38 @@ MECHANICS / PLACEMENT
     At the beginning of the game, each army places N scouts anywhere on the board,
     in snake style.
 
+    First turn - not all maxed out, avoid first mover advantage.
+
 
 MECHANICS / TURNS
 
-    Armies alternate turns moving, evolving, attacking, and spawning.
+    Armies alternate turns moving, evolving, attacking, spawning, and triggering obelisks in any order.
 
-    MV:     Move                N territories               1 - 20
-    EV:     Evolve              N rock types                1 - 5
-    ATK:    Attack              Maximum warrior strength    2, 3, 5, 8
-    SPAWN:  spawn               1 + N obelisks              1 - 6
-    OB:     Trigger obelisk     N obelisks                  1 - 5
+    The number of actions you can take per turn is based on the level of your total army strength.
 
-    Move / Attack:              N territories               1-20
-    Spawn / Evolve:             Max warrior strength        2, 3, 5, 8
+    Total Army strength       # Move, Spawn, Evolve, Attack, Obelisk
+        ∑ = 1                            1
+        ∑ = 2                            2
+        ∑ = 3+                           3
+        ∑ = 5+                           5
+        ∑ = 8+                           8
+        ∑ = 13+                         13
+        ∑ = 21+                         21
 
 
-MECHANICS / TURNS / SEQUENCE
+MECHANICS / REFERENCE
 
-        MY ARMY         OPPONENT        LOCATION
+                MY ARMY         OPPONENT        LOCATION
 
-MAIN    Move                            Map
-        Evolve
-        Obelisks        Obelisks
+    MANEUVER    Move                            Map
 
-COMBAT  Attack          Retreat
-                        Defend          Map -> Graveyard
+    GROWTH      Spawn                           Reserves -> Map
+                Evolve                          Map
 
-SPAWN   Spawn                           Reserves -> Map
+    COMBAT      Attack          Retreat         Map
+                                Defend          Map -> Graveyard
+
+    OBELISKS    Obelisks        Obelisks        Map
 
 
 MECHANICS / EVOLUTION
@@ -157,7 +143,6 @@ MECHANICS / EVOLUTION
     Pieces evolve into one another according to the Fibonacci sequence
 
     Pieces must occupy the same territory to evolve
-
 
     [1] [1] ==> [2]
     [1] [2] ==> [3]
@@ -167,13 +152,13 @@ MECHANICS / EVOLUTION
 
 MECHANICS / MOVEMENT
 
-    Only scouts may move into open territory
+    Only scouts may move into open territory.
 
+    Rocks must move into adjacent territories with a valid fibonacci pair.
 
+MECHANICS / SPAWN
 
-
-
-
+    Scouts spawn into territories with 1x existing scout or 1x [2] warrior.
 
 
 ----------------------------------------------
@@ -189,7 +174,7 @@ MAP / TERRITORIES
 
     Only one army can occupy any given territory.
 
-    Army Size       Map Size        N Obelisks
+    Army Rank       Map Size        N Obelisks
             2                5              0
             3                8              1
             5               13              2
@@ -201,33 +186,47 @@ MAP / TERRITORIES
 
 MAP / TERRITORIES / CAPACITY
 
-    Each territory supports 1, 2, 3, 5, or 8 total value.
+    Each territory supports 1, 2, 3, 5, or 8 total value, and a maximum of two pieces.
 
-    All territories must contain valid rock combinations (e.g. 3+5, 3+1+1) after every movement
-
-
-MAP / TERRITORIES / ELEVATION
-
-    Some territories are elevated
-
-    Elevated territories cost an additional movement to access
-
-    Warriors attacking from above get +1 attack
+    All territories must contain valid rock combinations (e.g. 2+1, 3+5) after every movement.
 
 
 ----------------------------------------------
 
 ARMIES
 
-    Each Rock War battle is between two or more armies.
+    Each Rock War battle is between two or more equally-sized armies.
 
-ARMIES / PIECES
+ARMIES / RANKS
 
-    8x scouts      o
-    5x soldiers   (2)
-    3x chieftains (3)
-    2x warlords   (5)
-    1x behemoth   (8)
+
+    Rank-3 Army
+
+        Scout           []      x 3
+        Soldier         [2]     x 2
+        Chieftain       [3]     x 1
+
+
+    Rank-8 Army
+
+        Scout           []      x 8
+        Soldier         [2]     x 5
+        Chieftain       [3]     x 3
+        Warlord         [5]     x 2
+        Behemoth        [8]     x 1
+
+
+    Rank-34 Army
+
+        Scout           []      x 34
+        Soldier         [2]     x 21
+        Chieftain       [3]     x 13
+        Warlord         [5]     x  8
+        Behemoth        [8]     x  5
+        Juggernaut      (13)    x  3
+        Leviathan       (21)    x  2
+        Titan           (34)    x  1
+
 
 
 ----------------------------------------------
@@ -236,7 +235,7 @@ COMBAT
 
     One or more warriors attack into a single target territory.
 
-    Rocks in defending territory may retreat into valid friendly territories (eg 2 into 3).
+    Rocks in defending territory may retreat by moving to valid adjacent friendly or open (scouts only) territories.
 
     Defending army assigns defending rocks to attacking rocks one-to-one.
 
@@ -245,13 +244,6 @@ COMBAT
     Defending army may decide to counter-attack after initial blocks.
 
     Combat rules are applied recursively as pieces devolve in combat.
-
-
-
-
-
-
-
 
 
 
@@ -508,7 +500,7 @@ Devotion
 Spawn
 
     Spores              Scouts may spawn into open adjacent territories.
-    Replacement         If a defending warrior dies in combat, spawn (X-).
+    Bounce              You may return warriors to avoid combat in addition to retreating and defending.
 
     Devolve (X):        SPAWN + (X-1)
     Devolve (2):        SPAWN + 1
@@ -534,59 +526,6 @@ Elemental
 
 
 
-
-
-
-???
-
-
-    Obelisks / Downsides?
-
-        air must spread out, earth must evolve, fire must attack, water must spawn
-
-    Obelisks / Local Effects (!?)
-
-    Obelisk / Ability targets
-
-        Target Army ATK--
-        Target warrior disable
-        Target rock
-        Target scout
-        Every rock
-
-        Target territory
-        Target territories (adjacent)
-
-    Mechanics / Evolution
-
-        evolution cost = X.b, benefit = X.A, A+b=X
-
-    Water / Balance
-
-        balance - move forces within contingent
-        vs
-        movement - move forces into open territory
-
-        Balance             Equalize forces among X adjacent territories
-        Return              Return target rock
-        Swap                Swap adjacent territories each of value X or less
-        Counter             Counter target obelisk ability
-
-
-    Air / Movement
-
-        Motion              Move X-1
-        Safe Passage        Move contiguous territory
-        Gust                Move (X) to open territory
-        Flight              Target warrior takes flight and moves up to X territories
-        Hive                Every rock may make an additional move this turn
-
-
-    Earth / Defense / Strength
-
-        Devolve             Devolve target warrior (X)
-        Indestructible      Target rock is indestructible this turn
-        Giant strength      Pump target warrior until end of turn
 
 
 
@@ -686,3 +625,99 @@ The Dead - beyond
 Armageddon - earth, air, fire, water, beyond
 
     Destroy all rocks. Each player spawns 1.
+
+
+
+
+
+
+???
+
+
+    Obelisks / Downsides?
+
+        air must spread out, earth must evolve, fire must attack, water must spawn
+
+    Obelisks / Local Effects (!?)
+
+    Obelisk / Ability targets
+
+        Target Army ATK--
+        Target warrior disable
+        Target rock
+        Target scout
+        Every rock
+
+        Target territory
+        Target territories (adjacent)
+
+    Mechanics / Evolution
+
+        evolution cost = X.b, benefit = X.A, A+b=X
+
+    Water / Balance
+
+        balance - move forces within contingent
+        vs
+        movement - move forces into open territory
+
+        Balance             Equalize forces among X adjacent territories
+        Return              Return target rock
+        Swap                Swap adjacent territories each of value X or less
+        Counter             Counter target obelisk ability
+        Replacement         If a defending warrior dies in combat, spawn (X-).
+
+    Air / Movement
+
+        Motion              Move X-1
+        Safe Passage        Move contiguous territory
+        Gust                Move (X) to open territory
+        Flight              Target warrior takes flight and moves up to X territories
+        Hive                Every rock may make an additional move this turn
+
+
+    Earth / Defense / Strength
+
+        Devolve             Devolve target warrior (X)
+        Indestructible      Target rock is indestructible this turn
+        Giant strength      Pump target warrior until end of turn
+
+
+
+Etc
+    Combat - Should diff matter? [5] -> o should be more difficult to retreat from? Or [5] can just attack again and that's the advantage?
+    Map - 3+1+1 valid? 1+1+1+1+1 valid?
+    Concentrate - move and evolve an unlimited amount of times
+    Spread      - move and devolve an unlimited amount of times
+
+ETC / MAP / TERRITORIES / ELEVATION
+
+    Some territories are elevated
+
+    Elevated territories cost an additional movement to access
+
+    Warriors attacking from above get +1 attack
+
+
+2025-08-18 - 5-army, 4-obelisk, 13-territory, 1-placement - spawn/evolve=max warrior, move/attack=n territories, worked well, lacked real strategy but ok, spawn move evolve attack in one shot is pretty brutal, attacking costs for warriors should maybe be x--, x-, x, x+ (eg (3) pays 1 to attack then 2, 3 for subsequent), smooth army lost, being able to pop scouts would be tight, can gain shaman pretty quickly since most intersections are 3-territories, def felt pain of not spreading out further, utilized retreat nicely, scouts can actually survive a while doing that probably, retreat should be less easy for higher attack differential - scout retreats into scout attacked by a (2), but what about a (3)?, daisy chain attack into corner of board not planned, density felt okay other than quick attacks even with a buffer being inevitable and undefendable, or maybe just game one, (3) gets stranded somewhere, should it be able to devolve?, 
+
+map:
+
+    territories: abcdefghijklm
+    edges: ab ac bc ad bd de be ce ...
+
+    adjacent_territories(t):
+
+    attack(ti, tf):
+
+    move(ti, tf):
+
+    spawn(t, x):
+
+    evolve(t):
+
+
+Mechanics - given map, what are available moves? each rock can move, then what? spawn and evolve from same pool? attack based on warrior strength? no, just total army strength, duh!(???)
+
+Combat - mostly solved, problem of evolving mega warrior is getting stuck,
+
