@@ -28,16 +28,10 @@ Combat
 
 
 
-Obelisks - abilities, how to pay, mechanics of elemental spells should be clear and powerful, locality, range, effect, damage, synergy, opposition, army affinities, devotion, godhood for game, effects building (eg successful attack anywhere -> deal damage), game rank-aware effects ([5] largest warrior, largest effect should be proportionate, scale appropriately),
 
 Scale - rank, terminology (A+b=X?, A/x and b/x?), invariant references (max capacity 8, etc),
 
-
-
-
-
-
-
+Contingents? Water as balance?
 
 
 
@@ -347,24 +341,29 @@ OBELISKS
 
     Obelisks are the core abilities engine of Rock War.
 
-OBELISKS / DEVOTION
+    Rocks benefit from the glow of being close to obelisks.
+
+    Stronger fervor
+
+OBELISKS / FERVOR
 
     1. Believer     Single territory                    Territory gains base mechanic
     2. Shaman       Majority of obelisk territories     Offer up tributes
     3. Demigod      All of obelisk territories          Summon elemental spells
 
     Fervor == Total value of rocks adjacent to obelisk
-                or ...
-                N unique rock types
-                Max warrior strength
-                N scouts
-                N obelisk invocations
 
-OBELISKS / TRIBUTE
+    If both armies occupy adjacent territories to obelisk, controlling army is determined by total number of territories and then by total strength.
 
-    Devolve:    Pump base obelisk mechanic (MOVE, SPAWN, EVOLVE, ATTACK)
-    Return:     Water and Air return warriors for movement
-    Sacrifice:  Fire and Earth demand sacrifices for abilities
+OBELISKS / AURA
+
+    Greater fervor creates a stronger aura to amplifies base obelisk mechanics.
+
+    Aura       Fervor = 3 - within range 2, spawn/evolve/move/attack free x 1
+                5 - range 3 x 2
+                8 - range 5 x 3
+                13 - range 8 x 5
+
 
 OBELISKS / ELEMENTAL
 
@@ -373,6 +372,61 @@ OBELISKS / ELEMENTAL
     Effect
 
     Return / Sac all territories at once - sum ∑ = 1, 2, 3, 5, 8, 13, ...
+
+    Blaze - damage, displace?
+    Gust - displacement only, tornado damaging?
+    Flood - n adjacent territories / river, displace / return weak?
+    Tremor - devolve -> displace
+
+    Effect Strength - eg ∑=3, like attacking w 3, instead of dmg, effect, can retreat if targeted if available, else effect, displacement too, or just wind?
+
+    These should be broken abilities, payoff huge. Should implicate own army's pieces (eg must affect one friendly and one enemy territory) but can be strategized accordingly (eg friendly scout, enemy (5)).
+
+    Earth, fervor = (3) + (2)() + (2) = 8   [ 3 territories ]
+
+        Evolve++ effect also local etc
+
+        If evolve within range --> effect
+
+        Sac 2 range 3 effect 5, tremor, 5 adjacent territories, 2 opp, 1 friendly
+
+            Fervor 8
+                -> Range 3
+                -> Effect 5
+
+            Sac (2)
+
+            Range 3
+            Effect 5
+                Devolve 3
+                Damage 2
+
+
+            ************
+            Among N=3 adjacent territories
+                Devolve total warrior strength 5, max warrior strength 3
+                Deal 5 total damage, max 2 damage per territory
+
+            Deal 2 damage or devolve warriors up to strength 3 in each to up to N adjacent territories, where N is your devoted territories to earth
+
+            1. Devolve 3 Damage 2
+            2. Devolve 2 Damage 1
+            3. Devolve 1
+
+            Adjacent: (3) [2] []
+
+    Water
+
+        Spawn (X)
+
+        Flood
+
+            Sacrifice (2)
+
+
+
+Obelisks - abilities, how to pay, mechanics of elemental spells should be clear and powerful, locality, range, effect, damage, synergy, opposition, army affinities, devotion, godhood for game, effects building (eg successful attack anywhere -> deal damage), game rank-aware effects ([5] largest warrior, largest effect should be proportionate, scale appropriately),
+
 
 
 Devotion
@@ -385,6 +439,40 @@ Devotion
     Demigod         Return all ∑=X  Range X-, return X--
                     Sac all ∑=X     Range X-, damage X--, return X--
 
+
+
+Devotion        (1 2 3 5 8 13 21)
+Target rock(s)  (1 2 3 5 8)
+
+Fire    Blaze       N       damage X                    Scattered
+Earth   Quake       N       devolve / damage X          Outwards
+Water   Flood       N       return / damage X           Linear
+Air     Gust        N       displace / damage X         Directional
+
+
+Flood
+
+    Length:     3
+    Return:     
+    Damage:     
+
+Gust
+
+    Territories: 3
+    Displace:       
+    Damage:     
+
+Quake
+
+    Adjacent:   3
+    Devolve:
+    Damage:
+
+
+Blaze
+
+    Territories: 3
+    Damage:
 
 
 
@@ -486,16 +574,6 @@ Elemental
 
 WATER
 -----
-
-Devotion
-
-    Believer        Devolve (X)     SPAWN + X-
-
-    Shaman          Return (X)      Spawn (X-)
-                    Return (X)      Return (X-)
-
-    Demigod         Return all ∑=X  Range X-, return X--
-                    Sac all ∑=X     Range X-, damage X--, return X--
 
 Spawn
 
@@ -651,9 +729,34 @@ Armageddon - earth, air, fire, water, beyond
         Target territory
         Target territories (adjacent)
 
+    Obelisks / Tribute (?)
+
+        Devolve:    Pump base obelisk mechanic (MOVE, SPAWN, EVOLVE, ATTACK)
+        Return:     Water and Air return warriors for movement
+        Sacrifice:  Fire and Earth demand sacrifices for abilities
+
+    Obelisks / Fervor (?)
+
+        N unique rock types
+        Max warrior strength
+        N scouts
+        N obelisk invocations
+
+    Obelisks / Devotion
+
+        Believer        Devolve (X)     SPAWN + X-
+
+        Shaman          Return (X)      Spawn (X-)
+                        Return (X)      Return (X-)
+
+        Demigod         Return all ∑=X  Range X-, return X--
+                        Sac all ∑=X     Range X-, damage X--, return X--
+
     Mechanics / Evolution
 
         evolution cost = X.b, benefit = X.A, A+b=X
+
+            cost to devolve X.A > X.b, appropriate
 
     Water / Balance
 
