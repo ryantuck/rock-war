@@ -343,8 +343,6 @@ OBELISKS
 
     Rocks benefit from the glow of being close to obelisks.
 
-    Stronger fervor
-
 OBELISKS / FERVOR
 
     1. Believer     Single territory                    Territory gains base mechanic
@@ -409,19 +407,64 @@ OBELISKS / ELEMENTAL
 
             Deal 2 damage or devolve warriors up to strength 3 in each to up to N adjacent territories, where N is your devoted territories to earth
 
-            1. Devolve 3 Damage 2
-            2. Devolve 2 Damage 1
-            3. Devolve 1
 
-            Adjacent: (3) [2] []
+    Earth
+
+        Quake
+
+            Sacrifice (2)
+
+                Fervor 8
+                    -> Range 3
+                    -> Effect 5
+
+                Unleash earthquake with epicenter at place of sacrifice.
+                    Devolve total warrior strength 5, max warrior strength 3.
+                    Deal 5 total damage, max 2 damage per territory.
 
     Water
-
-        Spawn (X)
 
         Flood
 
             Sacrifice (2)
+
+                Fervor 8
+                    -> Range 3
+                    -> Effect 5
+
+                Create river of flooded territories from place of sacrifice back to water obelisk up to length 3.
+                    Return total warrior strength 5, max warrior strength 3.
+                    Deal 5 total damage, max 2 damage per territory.
+
+
+    Fire
+
+        Blaze
+
+            Sacrifice (2)
+
+                Fervor 8
+                    -> Range 3
+                    -> Effect 5
+
+                Start fire at place of sacrifice.
+                    Deal 8 damage among adjacent territories, max 2 per territory
+
+
+    Air
+
+        Tornado
+
+            Sacrifice (2)
+
+                Fervor 8
+                    -> Range 3
+                    -> Effect 5
+
+                Rip a tornado from the place of sacrifice in any direction up to length 3.
+                    Displace rocks up to strength 5
+                    Deal 5 total damage, up to 2 damage per territory.
+
 
 
 
@@ -441,7 +484,7 @@ Devotion
 
 
 
-Devotion        (1 2 3 5 8 13 21)
+Fervor          (1 2 3 5 8 13 21)
 Target rock(s)  (1 2 3 5 8)
 
 Fire    Blaze       N       damage X                    Scattered
