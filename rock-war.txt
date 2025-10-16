@@ -29,11 +29,6 @@ Combat
 
 
 
-Scale - rank, terminology (A+b=X?, A/x and b/x?), invariant references (max capacity 8, etc),
-
-Contingents? Water as balance?
-
-
 
 
 
@@ -341,44 +336,195 @@ OBELISKS
 
     Obelisks are the core abilities engine of Rock War.
 
-    Rocks benefit from the glow of being close to obelisks.
+    Battle for territories to gain control of obelisks, and wield their elemental magic to shape the war to your will.
+
+    To control an obelisk, an army must occupy at least two adjacent territories and have a total fervor of at least 3.
 
 OBELISKS / FERVOR
 
-    1. Believer     Single territory                    Territory gains base mechanic
-    2. Shaman       Majority of obelisk territories     Offer up tributes
-    3. Demigod      All of obelisk territories          Summon elemental spells
+    Fervor is a measure of the strength of the forces occupying obelisk territories.
 
-    Fervor == Total value of rocks adjacent to obelisk
+    Greater fervor allows for stronger elemental effects.
 
     If both armies occupy adjacent territories to obelisk, controlling army is determined by total number of territories and then by total strength.
 
-OBELISKS / AURA
+    Greater fervor creates a wider aura across the map where elemental storms can be summoned.
 
-    Greater fervor creates a stronger aura to amplifies base obelisk mechanics.
-
-    Aura       Fervor = 3 - within range 2, spawn/evolve/move/attack free x 1
-                5 - range 3 x 2
-                8 - range 5 x 3
-                13 - range 8 x 5
+    Believer    Fervor = 3  ->  Range 2, Effect 1   or  Range 1, Effect 2
+    Cleric      Fervor = 5  ->  Range 3, Effect 2   or  Range 2, Effect 3
+    Shaman      Fervor = 8  ->  Range 5, Effect 3   or  Range 3, Effect 5
+    Demigod     Fervor = 13 ->  Range 8, Effect 5   or  Range 5, Effect 8
 
 
 OBELISKS / ELEMENTAL
 
-    Range (n territories? dist from obelisk?)
-    x
-    Effect
+    Elemental magic can be summoned within the obelisk's aura, with range and effect proportional to fervor.
 
-    Return / Sac all territories at once - sum ∑ = 1, 2, 3, 5, 8, 13, ...
+    Enemy determines how damage and effects are applied.
 
-    Blaze - damage, displace?
-    Gust - displacement only, tornado damaging?
-    Flood - n adjacent territories / river, displace / return weak?
-    Tremor - devolve -> displace
+    Fervor          (1 2 3 5 8 13 21)
+    Target rock(s)  (1 2 3 5 8)
 
-    Effect Strength - eg ∑=3, like attacking w 3, instead of dmg, effect, can retreat if targeted if available, else effect, displacement too, or just wind?
+    Fire    Blaze          damage / damage X            Scattered       (dmg, then retreat or more dmg?)
+    Earth   Quake          devolve / damage X           Outwards
+    Water   Flood          return / damage X            Linear
+    Air     Storm          displace / damage X          Directional
 
-    These should be broken abilities, payoff huge. Should implicate own army's pieces (eg must affect one friendly and one enemy territory) but can be strategized accordingly (eg friendly scout, enemy (5)).
+    Sac (X): Blaze / Quake / Flood / Storm with damage = X, (range, effect) = fervor
+
+
+
+EARTH
+-----
+
+Evolution
+
+    Fertility           Scouts evolve free  ( oo -> (2) )
+    Fitness             Warriors don't devolve during combat
+
+Elemental
+
+    Quake
+
+        Fervor F = Range R + Effect E
+
+        Sacrifice (X).
+
+        Unleash earthquake with epicenter at place of sacrifice.
+            Devolve total warrior strength E, max warrior strength 3.
+            Deal E total damage, max X damage per territory.
+
+
+
+FIRE
+----
+
+Attack
+
+    Horde               Scouts may attack
+    Revenge             Counter-attacks may go on indefinitely
+
+Elemental
+
+    Blaze
+
+        Sacrifice (X).
+
+        Start fire at place of sacrifice.
+            Deal 8 damage among adjacent territories, max 2 per territory
+
+
+
+
+AIR
+---
+
+Movement
+
+    Breeze              Scouts move freely in friendly territories.
+    Fog of War          Warriors may retreat into lesser territory (e.g. (3) -retreat-> (2) ).
+
+Elemental
+
+    Storm
+
+        Sacrifice (X).
+
+        Rip a tornado from the place of sacrifice in any direction up to length 3.
+            Displace rocks up to strength 5
+            Deal 5 total damage, up to 2 damage per territory.
+            (elevation hurts)
+
+
+
+WATER
+-----
+
+Spawn
+
+    Spores              Scouts may spawn into open adjacent territories.
+    Bounce              You may return warriors to avoid combat in addition to retreating and defending.
+
+Elemental
+
+    Flood
+
+        Sacrifice (X).
+
+        Create river of flooded territories from place of sacrifice back to water obelisk up to length 3.
+            Return total warrior strength 5, max warrior strength 3.
+            Deal 5 total damage, max 2 damage per territory.
+            (elevation avoids)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+COMBOS
+------
+
+Volcano - earth and fire
+
+    earth radius (n territories) x fire damage (eg 3)
+
+    shift outwards
+
+Hurricane - water and air
+
+    air radius x water damage
+
+    shift cyclone
+
+Tsunami - earth and water
+
+    water wall x earth damage
+
+    shift one direction
+
+Wildfire - fire and air
+
+    N fires x air damage
+
+    shift away
+
+Cosmos - earth, air, fire, water
+
+    Spawn both sideboards.
+
+Gaia Awakens - earth, air, fire, water
+
+    Sacrifice () () (2) (3) (5) (8)
+
+    Move all pieces.
+    Spawn everywhere.
+    Evolve everywhere.
+    Attack everything.
+
+The Dead - beyond
+
+    Revive five rocks each from both graveyards.
+
+Armageddon - earth, air, fire, water, beyond
+
+    Destroy all rocks. Each player spawns 1.
+
+
+
+
+
+
+???
 
     Earth, fervor = (3) + (2)() + (2) = 8   [ 3 territories ]
 
@@ -468,292 +614,14 @@ OBELISKS / ELEMENTAL
 
 
 
-Obelisks - abilities, how to pay, mechanics of elemental spells should be clear and powerful, locality, range, effect, damage, synergy, opposition, army affinities, devotion, godhood for game, effects building (eg successful attack anywhere -> deal damage), game rank-aware effects ([5] largest warrior, largest effect should be proportionate, scale appropriately),
 
 
 
-Devotion
+    Obelisks - abilities, how to pay, mechanics of elemental spells should be clear and powerful, locality, range, effect, damage, synergy, opposition, army affinities, devotion, godhood for game, effects building (eg successful attack anywhere -> deal damage), game rank-aware effects ([5] largest warrior, largest effect should be proportionate, scale appropriately),
 
-    Believer        Devolve (X)     SPAWN + X-
+    Scale - rank, terminology (A+b=X?, A/x and b/x?), invariant references (max capacity 8, etc),
 
-    Shaman          Return (X)      Spawn (X-)
-                    Return (X)      Return (X-)
-
-    Demigod         Return all ∑=X  Range X-, return X--
-                    Sac all ∑=X     Range X-, damage X--, return X--
-
-
-
-Fervor          (1 2 3 5 8 13 21)
-Target rock(s)  (1 2 3 5 8)
-
-Fire    Blaze       N       damage X                    Scattered
-Earth   Quake       N       devolve / damage X          Outwards
-Water   Flood       N       return / damage X           Linear
-Air     Gust        N       displace / damage X         Directional
-
-
-Flood
-
-    Length:     3
-    Return:     
-    Damage:     
-
-Gust
-
-    Territories: 3
-    Displace:       
-    Damage:     
-
-Quake
-
-    Adjacent:   3
-    Devolve:
-    Damage:
-
-
-Blaze
-
-    Territories: 3
-    Damage:
-
-
-
-EARTH
------
-
-Effects     [Believer - single territory]
-
-    Fertility           Scouts evolve free  ( oo -> (2) )
-    Fitness             Warriors don't devolve during combat
-
-Tributes    [Shaman - majority territories]
-
-    Devolve (X):        EVOLVE + (X-)
-    Devolve (2):        EVOLVE + 1
-    Devolve (3):        EVOLVE + 2
-    Devolve (5):        EVOLVE + 3
-    Devolve (8):        EVOLVE + 5
-
-    Sacrifice  o :      Evolve (2) -> (3)
-    Sacrifice (2):      Evolve (3) -> (5)
-    Sacrifice (3):      Evolve (5) -> (8)
-    Sacrifice (5):      Evolve (3) -> (8) ??? 
-    Sacrifice (8):      Demigod of Earth 
-
-Elemental   [Demigod - all territories]
-
-    Tremor          Devolve All ∑ = 3: Range 2, devolve 1
-    Aftershock      Devolve All ∑ = 5: Range 3, devolve 2
-    Earthquake      Devolve All ∑ = 8: Range 4, devolve 3
-
-
-
-
-
-FIRE
-----
-
-Attack
-
-    Horde               Scouts may attack
-    Revenge             Counter-attacks may go on indefinitely
-
-    Devolve (X):        ATK + X-
-    Devolve (2):        ATK + 1
-    Devolve (3):        ATK + 2
-    Devolve (5):        ATK + 3
-    Devolve (8):        ATK + 5
-
-    Return (X):         Pacify (X)
-
-    Sacrifice o:        Join attack
-    Sacrifice (2):
-    Sacrifice (3):
-    Sacrifice (5):
-    Sacrifice (8):
-
-Elemental
-
-    Embers              Sac all - ∑ = 3:      Range 2, damage 1
-    Blaze               Sac all - ∑ = 5:      Range 3, damage 2
-    Inferno             Sac all - ∑ = 8:      Range 5, damage 3
-
-
-
-
-
-
-AIR
----
-
-Movement
-
-    Breeze              Scouts move freely in friendly territories.
-    Fog of War          Warriors may retreat into lesser territory (e.g. (3) -retreat-> (2) ).
-
-    Devolve (X):        MV + X-
-    Devolve (2):        MV + 1
-    Devolve (3):        MV + 2
-    Devolve (5):        MV + 3
-    Devolve (8):        MV + 5
-
-    Return (X):         Move (X) -> ___
-    Return (2):         Move (2) -> ___
-    Return (3):         Move (3) -> ___
-    Return (5):         Move (5) -> ___
-    Return (8):         Move (8) -> ___
-
-
-Elemental
-
-    Gust                Return (3):  Range 2, move 1
-    Windstorm           Return (5):  Range 3, move 2
-    Tornado             Return (8):  Range 5, move 3 ??? 
-
-    (elevation hurts)
-
-
-
-WATER
------
-
-Spawn
-
-    Spores              Scouts may spawn into open adjacent territories.
-    Bounce              You may return warriors to avoid combat in addition to retreating and defending.
-
-    Devolve (X):        SPAWN + (X-1)
-    Devolve (2):        SPAWN + 1
-    Devolve (3):        SPAWN + 2
-    Devolve (5):        SPAWN + 3
-    Devolve (8):        SPAWN + 5
-
-
-    Return  (X):        Spawn (X-)
-    Return  (2):        Spawn  o
-    Return  (3):        Spawn (2)
-    Return  (5):        Spawn (3)
-    Return  (8):        Spawn (5)
-
-Elemental
-
-    River               Return (3):     Range 2, return 1
-    Flood               Return (5):     Range 3, return 2
-    Deluge              Return (8):     Range 5, return 3
-
-    (elevation avoids)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-BEYOND
-------
-
-Devotion
-
-    Protection          REV++
-    Fetid Swamp         If a warrior an opponent controls dies, return a scout to your reserves
-
-Devolve
-
-    ...
-
-Return
-
-    Raise Dead          Return rock weaker than X from the grave to your reserves
-    Possess             Gain control of target warrior until end of turn
-
-Sacrifice
-
-    Deathtouch          Target rock gains deathtouch until end of turn
-    Nullify             Target obelisk becomes inert until next turn
-    Terror              Destroy target warrior weaker than X
-
-
-
-
-
-
-
-
-COMBOS
-------
-
-Volcano - earth and fire
-
-    earth radius (n territories) x fire damage (eg 3)
-
-    shift outwards
-
-Hurricane - water and air
-
-    air radius x water damage
-
-    shift cyclone
-
-Tsunami - earth and water
-
-    water wall x earth damage
-
-    shift one direction
-
-Wildfire - fire and air
-
-    N fires x air damage
-
-    shift away
-
-
-
-Cosmos - earth, air, fire, water
-
-    Spawn both sideboards.
-
-Gaia Awakens - earth, air, fire, water
-
-    Sacrifice () () (2) (3) (5) (8)
-
-    Move all pieces.
-    Spawn everywhere.
-    Evolve everywhere.
-    Attack everything.
-
-The Dead - beyond
-
-    Revive five rocks each from both graveyards.
-
-Armageddon - earth, air, fire, water, beyond
-
-    Destroy all rocks. Each player spawns 1.
-
-
-
-
-
-
-???
-
+    Contingents? Water as balance?
 
     Obelisks / Downsides?
 
