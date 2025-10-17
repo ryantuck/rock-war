@@ -95,12 +95,11 @@ MECHANICS / PLACEMENT
 
     First turn - not all maxed out, avoid first mover advantage.
 
-
 MECHANICS / TURNS
 
     Armies alternate turns moving, evolving, attacking, spawning, and triggering obelisks in any order.
 
-    The number of actions you can take per turn is based on the level of your total army strength.
+    The number of actions each contingent can take per turn is based on the level of that contingent's total army strength.
 
     Total Army strength       # Move, Spawn, Evolve, Attack, Obelisk
         ∑ = 1                            1
@@ -149,6 +148,12 @@ MECHANICS / SPAWN
 
     Scouts spawn into territories with 1x existing scout or 1x [2] warrior.
 
+MECHANICS / CONTINGENTS
+
+    A connected set of territories occupied by the same army is a contingent.
+
+    Contingents are the turn-taking units in the battle.
+
 
 ----------------------------------------------
 
@@ -185,6 +190,19 @@ MAP / TERRITORIES / CAPACITY
 ARMIES
 
     Each Rock War battle is between two or more equally-sized armies.
+
+
+ARMIES / ZOO
+
+    Smooth Army
+
+        Affinities      Water, Air
+
+    Rocky  Army
+
+        Affinities      Earth, Fire
+        Abilities       Flip warrior to charge
+
 
 ARMIES / RANKS
 
@@ -336,9 +354,9 @@ OBELISKS
 
     Obelisks are the core abilities engine of Rock War.
 
-    Battle for territories to gain control of obelisks, and wield their elemental magic to shape the war to your will.
+    Battle for territories adjacent to obelisks to gain control of their elemental magic to shape the war to your will.
 
-    To control an obelisk, an army must occupy at least two adjacent territories and have a total fervor of at least 3.
+    To control an obelisk, a contingent must occupy at least two adjacent territories with a total strength of at least 3 occupying.
 
 OBELISKS / FERVOR
 
@@ -350,10 +368,39 @@ OBELISKS / FERVOR
 
     Greater fervor creates a wider aura across the map where elemental storms can be summoned.
 
-    Believer    Fervor = 3  ->  Range 2, Effect 1   or  Range 1, Effect 2
-    Cleric      Fervor = 5  ->  Range 3, Effect 2   or  Range 2, Effect 3
-    Shaman      Fervor = 8  ->  Range 5, Effect 3   or  Range 3, Effect 5
-    Demigod     Fervor = 13 ->  Range 8, Effect 5   or  Range 5, Effect 8
+    DEVOTION    FERVOR      RANGE X EFFECT      ELEMENTAL SACRIFICE
+
+    Believer        3           2x1 / 1x2                o
+    Mystic          5           3x2 / 2x3               (2)
+    Cleric          8           5x3 / 3x5               (3)
+    Shaman         13           8x5 / 5x8               (5)
+
+    Believer (3+)
+
+        Aura - ...
+        Return o - ...
+        Sacrifice o - ...
+
+    Mystic (5+)
+
+        Aura - ...
+        Devolve (2) - ...
+        Return (2) - ...
+        Sacrifice (2) - ...
+
+    Cleric (8+)
+
+        Aura - ...
+        Devolve (3) - ...
+        Return (3) - ...
+        Sacrifice (3) - ...
+
+    Shaman (13+)
+
+        Aura - ...
+        Devolve (5) - ...
+        Return (5) - ...
+        Sacrifice (5) - ...
 
 
 OBELISKS / ELEMENTAL
@@ -372,21 +419,42 @@ OBELISKS / ELEMENTAL
 
     Sac (X): Blaze / Quake / Flood / Storm with damage = X, (range, effect) = fervor
 
+    (X)
+    Fervor
+    N obelisk territories
+    Contingent strength (?)
+
+    Range       ~ Fervor
+    Effect      ~ Fervor
+    Damage      ~ Sac
+    N Targets   ~ 
+
+
+    ???
+
+        Sac X - total damage X? total effect also X? Xa + Xb?
+
 
 
 EARTH
 -----
 
-Evolution
+Auras
 
-    Fertility           Scouts evolve free  ( oo -> (2) )
-    Fitness             Warriors don't devolve during combat
+    Believer    3+       o      Fertility       Scouts evolve free [ oo -> (2) ]
+    Mystic      5+      (2)     
+    Cleric      8+      (3)     Fitness         Warriors don't devolve during combat
+    Shaman     13+      (5)     Thriving        Evolution is free
+
+Abilities
+
+    Devolve (X)     Devolve 3 -> add o to evolution
+    Return (X)      Devolve target
+    Sacrifice (X)   Quake
 
 Elemental
 
     Quake
-
-        Fervor F = Range R + Effect E
 
         Sacrifice (X).
 
@@ -458,7 +526,12 @@ Elemental
 
 
 
+AETHER
+------
 
+Invoke
+
+    
 
 
 
