@@ -1,4 +1,4 @@
-ROCK WAR [Fibonacci Variant]
+ROCK WAR
 
 Rock War is a simple game designed to be played using an arbitrary map and an arbitrary number
 of rocks, doodads, or trinkets you have lying around.
@@ -8,7 +8,7 @@ magic of the obelisks.
 
 ----------------------------------------------
 
-How to Play
+HOW TO PLAY
 
 1. Setup 	Select map, armies, and obelisks, and place initial rocks
 2. Play		Armies alternate moving, evolving, attacking, and spawning
@@ -16,7 +16,7 @@ How to Play
 
 ----------------------------------------------
 
-Concepts
+CONCEPTS
 
 The Fibonacci Sequence
 Mechanics
@@ -24,41 +24,6 @@ Map
 Armies
 Obelisks
 Combat
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 ----------------------------------------------
@@ -92,8 +57,6 @@ MECHANICS / PLACEMENT
 
     At the beginning of the game, each army places N scouts anywhere on the board,
     in snake style.
-
-    First turn - not all maxed out, avoid first mover advantage.
 
 MECHANICS / TURNS
 
@@ -427,7 +390,7 @@ OBELISKS / ELEMENTAL
     Range       ~ Fervor
     Effect      ~ Fervor
     Damage      ~ Sac
-    N Targets   ~ 
+    N Targets   ~ X (!)
 
 
     ???
@@ -442,21 +405,25 @@ EARTH
 Auras
 
     Believer    3+       o      Fertility       Scouts evolve free [ oo -> (2) ]
-    Mystic      5+      (2)     
+    Mystic      5+      (2)     ...             ...
     Cleric      8+      (3)     Fitness         Warriors don't devolve during combat
     Shaman     13+      (5)     Thriving        Evolution is free
 
 Abilities
 
-    Devolve (X)     Devolve 3 -> add o to evolution
-    Return (X)      Devolve target
+    Devolve (X)     Evolve target ...
+    Return (X)      Devolve target ...
     Sacrifice (X)   Quake
 
 Elemental
 
     Quake
 
-        Sacrifice (X).
+        Fervor 3    Sacrifice  o        Deal 2 damage among 1 territory
+        Fervor 5    Sacrifice (2)       Deal 3 damage among 2 territories
+        Fervor 8    Sacrifice (3)       Deal 5 damage among 3 territories
+        Fervor 13   Sacrifice (5)       Deal 8 damage among 5 territories
+
 
         Unleash earthquake with epicenter at place of sacrifice.
             Devolve total warrior strength E, max warrior strength 3.
@@ -472,14 +439,34 @@ Attack
     Horde               Scouts may attack
     Revenge             Counter-attacks may go on indefinitely
 
+Auras
+
+    Believer    3+      ...
+    Mystic      5+      Horde       Scouts may attack
+    Cleric      8+      Revenge     Counter-attacks may go on indefinitely
+    Shaman     13+      ...
+
+Abilities
+
+    Believer    3+      Return   o
+    Mystic      5+      Return  (2)
+    Cleric      8+      Return  (3)
+    Shaman     13+      Return  (5)
+
+    Believer    3+      Return   o
+    Mystic      5+      Return  (2)
+    Cleric      8+      Return  (3)
+    Shaman     13+      Return  (5)
+
 Elemental
 
     Blaze
 
-        Sacrifice (X).
+        Fervor 3    Sacrifice  o        Deal 2 damage among 1 territory
+        Fervor 5    Sacrifice (2)       Deal 3 damage among 2 territories (max 2)
+        Fervor 8    Sacrifice (3)       Deal 5 damage among 3 territories (max 3)
+        Fervor 13   Sacrifice (5)       Deal 8 damage among 5 territories (max 5)
 
-        Start fire at place of sacrifice.
-            Deal 8 damage among adjacent territories, max 2 per territory
 
 
 
@@ -487,16 +474,26 @@ Elemental
 AIR
 ---
 
-Movement
+Auras
 
-    Breeze              Scouts move freely in friendly territories.
-    Fog of War          Warriors may retreat into lesser territory (e.g. (3) -retreat-> (2) ).
+    Believer    3+      Breeze          Scouts move freely in friendly territories.
+    Mystic      5+      Fog of War      Warriors may retreat into lesser territory (e.g. (3) -retreat-> (2) ).
+    Cleric      8+      ...
+    Shaman     13+      ...
+
+
+Abilities
+
+
 
 Elemental
 
     Storm
 
-        Sacrifice (X).
+        Believer    3+      Sacrifice   o       Displace 3, 1 territory
+        Mystic      5+      Sacrifice  (2)      Displace 5, 2 territories
+        Cleric      8+      Sacrifice  (3)      Displace 8, 3 territories
+        Shaman     13+      Sacrifice  (5)      Displace 13, 5 territories
 
         Rip a tornado from the place of sacrifice in any direction up to length 3.
             Displace rocks up to strength 5
@@ -517,9 +514,12 @@ Elemental
 
     Flood
 
-        Sacrifice (X).
+        Fervor      River   Effect      Sacrifice       Return      Damage
+            3           2       1            o              1           0 (?)
+            5           3       2           (2)             2           0 (?)
+            8           5       3           (3)             3           0 (?)
+           13           8       5           (5)             5           0 (?)   OR trade-off - return x or take damage y, enemy decides?
 
-        Create river of flooded territories from place of sacrifice back to water obelisk up to length 3.
             Return total warrior strength 5, max warrior strength 3.
             Deal 5 total damage, max 2 damage per territory.
             (elevation avoids)
@@ -595,9 +595,77 @@ Armageddon - earth, air, fire, water, beyond
 
 
 
+ABOUT
+
+    Rock war was inspired by magic, settlers, risk, chess, mancala, go.
+
+    It is ideally arbitrarily scalable and can support a variety of obelisk collections outside the original collection modeled off the greek elements.
+
+    Most importantly, it's a simple game you can play when you're out and about in the world and all you've got is a couple of rocks lying around.
 
 
-???
+
+??????????????????????????????????????????????????????
+
+
+
+    Obelisks
+
+        elemental coming into view
+
+        fervor as part of contingent helpful development
+
+        fervor = range + effect (5 = 2 + 3)
+
+        fervor defines ability unlocks (3, 5, 8, 13)
+
+        fire can sacrifice scouts with fervor 3
+
+            should earth? air? water?
+
+                return scouts instead?
+
+                fervor 3 -  sac o - 2 damage to 1 territory (broken??)
+
+                fervor 5 -  sac (2) - effect 3 range 2 -- 3 damage among 2 territories, max 2
+
+                fervor 8  - sac (3) - effect 5 range 3 -- 5 damage among 3 territories, max 3
+
+                fervor 13 - sac (5) - effect 8 range 5 - deal 8 damage among 5 territories, max 5
+
+                devolving at least-effective is a one-operation slowdown, and at best is the first part of a combo to whittle and destroy a stronger warrior. it also introduces sideboard limitations late game where half a devolve might fizzle from being unavailable, or might be returned from having nowhere to settle in, will often be equivalent to devolving and returning half of it.
+
+                flood
+
+                    fervor 3 - sac o - range 2 effect 1 - return o
+
+                    fervor 5 - sac (2) - range 3 effect 2
+
+                    fervor 8 - sac (3) - range 5 effect 3
+
+                    fervor 13 - sac (5) - range 8 effect 5
+
+        additional auras and abilities per level - good mechanics
+
+            quant aura
+
+                fervor 3, contingent strength 3, territories 2 - spawn ... 
+
+                fervor 5, contingent 8, territories 4 - spawn ... 
+
+                fervor 8, contingent 10, territories 5 - spawn ... 
+
+                fervor 13, contingent 16, territories 5 - spawn ... 
+
+            devolve?
+
+            return
+
+
+        no single-territory benefit is good thing, simplifying
+
+        devolve target warrior? devolve target warrior up to strength x?
+
 
     Earth, fervor = (3) + (2)() + (2) = 8   [ 3 territories ]
 
@@ -687,7 +755,7 @@ Armageddon - earth, air, fire, water, beyond
 
 
 
-
+    Territory Capacity - effect on elemental spells, strategy,
 
 
     Obelisks - abilities, how to pay, mechanics of elemental spells should be clear and powerful, locality, range, effect, damage, synergy, opposition, army affinities, devotion, godhood for game, effects building (eg successful attack anywhere -> deal damage), game rank-aware effects ([5] largest warrior, largest effect should be proportionate, scale appropriately),
