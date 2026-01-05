@@ -1,0 +1,270 @@
+ROCK WAR
+
+Rock War is a simple game designed to be played using an arbitrary map and an arbitrary number of rocks, doodads, or trinkets you have lying around.
+
+Armies wage war in an all-out battle royale throughout the four seasons via expansion, combat, and the elemental magic of the obelisks.
+
+Spring - The game begins at the Spring equinox, where our budding armies stake out territory and begin to expand turn-by-turn, seeking nourishing energy from the obelisks.
+
+Summer - As armies grow, summer begins, and strategic use of the obelisks will turn nature against your enemy to stymie their territorial goals. 
+
+Fall - As Fall commences at the height of the game, the obelisks power grows, unleashing deadly forces of nature against vast contingents, for a mortal cost.
+
+Winter - As the body count piles up for both armies, Winter begins, and all hope is lost as the obelisks turn hostile and indiscriminately barrage both armies with the greatest catastrophes nature can summon as a winter storm bears down turn-by-turn from the North. Armies offer sacrifices of their power to save their contingents from the onslaught turn-by-turn as they now merely battle for the honor to die last against the epic strength and indifference of Nature to claim yet another battle in the endless Rock War.
+
+----------------------------------------------
+
+How to Play
+
+1. Design - select map, armies, and obelisks
+2. Placement - place obelisks, then place two scouts each, snake-style
+3. Gameplay - each contingent pays up to N for further ramp, movement, and combat
+4. End-game - game ends when one army can do nothing else
+
+----------------------------------------------
+
+Concepts
+
+1. Map
+2. Armies
+3. Obelisks
+4. Seasons
+5. Placement
+6. Contingents
+7. Ramp
+8. Movement
+9. Combat
+10. Abilities
+
+----------------------------------------------
+
+1. MAP
+
+A map is an arbitrary graph of territories. It can be a grid, a honeycomb like Settlers, or a realistic map like Risk.
+
+Map / Territories
+
+- Only one army can occupy any given territory
+- By default, a territory has a maximum capacity of 7 points of pieces
+
+
+Map / Territories / Terrain
+
+- Territories can be a certain type of terrain that affects stats and movement of pieces
+- Water
+- (Settlers variant - sheep, wheat, ore, brick, log)
+
+
+----------------------------------------------
+
+
+2. ARMIES
+
+Each Rock War battle is between two or more armies of the same total strength N.
+
+Armies / Pieces
+
+- Scouts - 1-value pieces core to expanding territory and enabling movement
+- Warriors - 2+ value pieces with unique abilities
+- Transports - Pieces capable of transporting N other non-transport pieces
+
+
+----------------------------------------------
+
+
+3. OBELISKS
+
+
+Obelisks / Basics
+
+- Core abilties engine
+- Evolve with seasons
+- Each army may trigger a return or sacrifice ability exactly once per obelisk
+- Each army can trigger one obelisk per turn (?)
+
+
+Obelisks / Seasonal Mechanics
+
+Spring      Adjacency       Adjacency is nourishing
+Summer      Return X        Abilities are strategic and disruptive
+Fall        Sacrifice X     Abilities are strategic and lethal
+Winter      Pay X Ramp      Avoid destruction by payment alone
+
+
+Obelisks / Mechanics / Adjacency
+
+- immediately adjacent vs once removed vs adjacent contingent vs shared territory (???)
+- balance of piece counts
+- spring only vs always (depleting benefits)
+- n territories vs n pieces
+
+
+
+----------------------------------------------
+
+4. SEASONS
+
+Seasons are phases of the game triggered by piece counts on the board and graveyard
+
+
+Seasons / Spring
+
+- Placement occurs at Spring equinox
+- Obelisks provide adjacent territories and contingents with benefits
+
+
+Seasons / Summer
+
+- Summer solstice occurs when 50% of pieces are on the board
+- Obelisks provide the ability to return pieces in exchange for strategic maneuvering of enemy forces
+
+
+Seasons / Fall
+
+- Fall equinox when all of one army is on the board (?)
+- Obelisks abilities turn lethal, with greater costs
+
+
+Seasons / Winter
+
+- Winter solstice triggered when 50% of pieces are in graveyard
+- Storm from North
+- Obelisks turn hostile, pay ramp costs to avoid destruction and survive long enough to win
+
+----------------------------------------------
+
+5. PLACEMENT
+
+- At the beginning of the game, each army places two scouts anywhere on the board, in snake style
+- Scouts cannot initially be placed next to obelisks
+
+----------------------------------------------
+
+6. CONTINGENTS
+
+- A contingent is a connected set of territories occupied by the same army
+- A contingent has X to spend each turn on ramp, abilities, movement, and combat, where X is the total value of its pieces
+- Each contingent may place up to one piece each turn
+
+----------------------------------------------
+
+7. RAMP
+
+Ramp describes how armies populate onto the board. Each contingent may place up to one piece per turn.
+
+
+----------------------------------------------
+
+8. MOVEMENT
+
+- Movement costs the value of the piece moving
+- Only scouts may move into open territory
+- Warriors may only move into territories occupied by scouts of the same army
+
+
+----------------------------------------------
+
+9. COMBAT
+
+
+Combat / Attack / Mechanics
+
+- Attacking team pays sum of attacking pieces in territory X
+- Entire territory attacks as unit (?)
+- Pay +1 for each additional attacking territory
+- Defending player decides how damage is dealt
+
+
+
+Combat / Attack / Hierarchy
+
+- (3-warrior) beats (2-warrior + 1-scout) beats (3x 1-scouts)
+
+
+
+Combat / Attack / Transports
+
+- Transports sustain (initial? all?) damage from an attack before
+
+
+
+Combat / Attack / Etc
+
+- Scouts - 3+ scouts combined can attack together
+- Light transports allow for retreat
+
+----------------------------------------------
+
+
+APPENDIX
+
+A. Obelisks / Zoo
+
+Earth
+-----
+spring  adjacent    shelter     def +1
+summer  return x    tremor      evenly split up one territory of value x into all its available adjacent territories
+fall    sac x       landslide   deal x damage distributed evenly among 2+ adjacent territories
+winter  hostile     earthquake  radiate outward from obelisk, shift pieces into adjacent territories, proportional damage
+
+
+Air
+----
+spring  adjacent    breeze      mv +1
+summer  return x    gust        mv x pcs same dir
+fall    sac x       tornado     path of destruction x, x-1, ..., zig-zag
+winter  hostile     hurricane   circular movement around obelisk, damage higher if closer, movement less further out
+
+
+Fire
+----
+spring  adjacent    warmth      atk +1
+summer  return x    embers      drop x small fires, force scouts to retreat
+fall    sac x       wildfire    wall of fire length x
+winter  hostile     volcano     lava out from obelisk
+
+
+Water
+-----
+spring  adjacent    rain        retreat +1
+summer  return x    river       clear line from obelisk to border, or length X
+fall    sac x       flood       one direction, all pieces shift X, elevation avoids, proportional damage
+winter  hostile     avalanche   from north, deal damage, lighter pieces shift more, movement = 0 for turn
+
+
+Tomb
+----
+spring  adjacent    protection  return first scout to die instead
+summer  return x    revive      return a warrior or transport of value x to your reserves
+fall    sac x       reaper      destroy target warrior or transport of value x
+winter  hostile     zombies     return force of X from grave, mindless attack outwards
+
+
+Gaia
+----
+spring  adjacent    ___         ramp +1
+summer  return x    ___         ( ... )
+fall    sac x       golem       ( ... )
+winter  hostile     ___         ( ... )
+
+
+Order
+----
+spring  adjacent    ___         ( ... )
+summer  return x    ___         ( ... )
+fall    sac x       ___         ( ... )
+winter  hostile     ___         ( ... )
+
+
+Chaos
+----
+spring  adjacent    ___         ( ... )
+summer  return x    ___         ( ... )
+fall    sac x       ___         ( ... )
+winter  hostile     ___         ( ... )
+
+
+More themes - food (sew, farm, harvest, plague), plants, animals, trees, etc etc.
+
+
+
