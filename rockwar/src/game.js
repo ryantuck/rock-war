@@ -43,6 +43,8 @@ export function defaultConfig() {
     //   'mutual'            — the attacker always dies with the defenders
     //   'attacker-survives' — the attacker always survives and advances
     combatRule: 'margin',
+    // Minimum piece value that may attack: scouts (1) cannot attack.
+    minAttackValue: 2,
     // First-turn handicap: the first player acts with at most this many
     // contingents on turn 1 (their engine chooses which). null = no handicap.
     firstTurnContingents: 1,
@@ -284,8 +286,9 @@ export function legalActions(state, cont, remainingBudget, actionsTaken) {
             acts.push({ type: 'move', from: t, piece: p, to: n, cost });
           }
         } else {
-          // Attack: cost equals the attacking piece's value.
-          if (p <= remainingBudget) {
+          // Attack: cost equals the attacking piece's value. Pieces below
+          // minAttackValue (scouts by default) cannot attack.
+          if (p >= (config.minAttackValue ?? 1) && p <= remainingBudget) {
             acts.push({ type: 'attack', from: t, piece: p, to: n, cost: p });
           }
         }

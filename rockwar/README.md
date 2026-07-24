@@ -52,7 +52,7 @@ in-browser with the same stats as the CLI.
     co-located pieces into their fibonacci sum (1+1→2, 1+2→3, 2+3→5). Both
     constituents return to the sideboard; the new piece must be available there.
   - *Attack* (cost = attacking piece's value): strike an adjacent enemy
-    territory with one piece.
+    territory with one piece. **Scouts cannot attack** (`minAttackValue: 2`).
 - **Combat**: the defender may retreat each piece for free into an adjacent
   territory it occupies (respecting stacking limits), plus up to 1 scout per
   attack may retreat into an adjacent *empty* territory. Then, against the
@@ -85,6 +85,7 @@ box or via `--config file.json` on the CLI:
 | `combatRule` | `'margin'` | attacker dies only on an exact-value tie; `'mutual'` = attacker always dies with the defenders; `'attacker-survives'` = attacker never does |
 | `firstTurnContingents` | 1 | contingents the opening player may act with on turn 1 (0 = skip turn 1, null = no handicap) |
 | `firstTurnActions` | 1 | actions per contingent on turn 1 (null = normal 2) |
+| `minAttackValue` | 2 | minimum piece value that may attack — scouts can't (1 = anyone can) |
 | destroyed pieces | removed | destroyed pieces leave the game entirely (they do *not* return to the sideboard) |
 | capture on retreat | yes | if all defenders retreat, the attacker advances into the vacated territory |
 | simultaneous wipe | draw | mutual destruction can empty both boards at once → draw |
@@ -122,16 +123,20 @@ engine can't corrupt game state.
   (kill a smaller stack, keep your piece, take the territory), so skill
   dominates. Under pure `'mutual'` combat the gap collapsed to 55/26 because
   aggression was never materially profitable.
-- **Turn-1 tempo is knife-edged in mirrors.** With the old full first turn,
-  seat A won ~91% of decided greedy mirrors; with `firstTurnActions: 1`, the
-  advantage *flips* — seat B wins ~94% (24 vs 399). One action on turn 1
-  leaves the opener permanently an action behind, and in a tempo-dominated
-  game whoever is up an action snowballs. The balance point sits between
-  "1 action" and "2 actions" on turn 1 — candidates: a turn-1 fib *budget*
-  cap (spend ≤ 2, say), or a pie rule. Sweep `firstTurnActions` /
-  `firstTurnContingents` to explore.
+- **Turn-1 tempo is knife-edged in mirrors, but scout pacifism helps.** With
+  a full first turn and scouts able to attack, seat A won ~91% of decided
+  greedy mirrors; capping turn 1 to one action flipped it to ~94% seat B.
+  Banning scout attacks (`minAttackValue: 2`) pulled it back to ~75% seat A
+  (286 vs 94, 24% draws) — the best balance so far, since the opening scout
+  skirmish was part of the snowball. Still worth sweeping; candidates: a
+  turn-1 fib *budget* cap, or a pie rule.
+- **Scout-only remnants get smothered.** With scouts unable to attack,
+  `immobilized` endings appear (~4–11% of games): an army reduced to scouts
+  can be cornered — every adjacent cell enemy-held or stacking-blocked — and
+  loses without a final battle.
 - Engine lessons that generalize to human play: avoid "spawn-lock" (a board
   of lone 3s/5s can never spawn again — scouts only stack with 1s and 2s),
   and note that exact-tie attacks are the only way to trade evenly, so
   material advantage compounds fast.
-- random mirrors resolve in ~69 turns; ~10% draws.
+- random mirrors run long (~115 turns, ~20% draws) — with scouts pacifist,
+  random's pressure drops and games grind.
