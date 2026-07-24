@@ -55,13 +55,20 @@ in-browser with the same stats as the CLI.
     territory with one piece.
 - **Combat**: the defender may retreat each piece for free into an adjacent
   territory it occupies (respecting stacking limits), plus up to 1 scout per
-  attack may retreat into an adjacent *empty* territory. Pieces that remain are
-  destroyed (removed from the game) if the attacking piece's value ≥ their
-  combined value; otherwise the attack is repelled with no effect (cost still
-  paid). If the territory ends up empty — by retreat or destruction — the
-  attacking piece advances into it.
+  attack may retreat into an adjacent *empty* territory. Then, against the
+  pieces that stayed (margin rule):
+  - attacker value **<** defenders' sum → repelled, no effect (cost still paid)
+  - attacker value **=** defenders' sum → all pieces die, attacker included
+    (a 3 attacking a (2,1) kills all three)
+  - attacker value **>** defenders' sum → only the defenders die; the attacker
+    survives and advances (a 3 attacking a (2) kills just the 2)
+  If every defender retreats, no combat happens and the attacker advances.
+- **First-turn handicap**: on turn 1, the opening player acts with only one
+  contingent (their engine chooses which) and it takes only one action.
+  Tunable via `firstTurnContingents` / `firstTurnActions`.
 - **Winning**: eliminate all enemy pieces from the board, or leave the enemy
-  with no legal action on their turn. Games hit a draw at the turn limit.
+  with no legal action on their turn. If a combat wipes both boards at once,
+  the game is a draw (`mutual-elimination`). Games also draw at the turn limit.
 
 ## Assumptions made where the spec was open (all tunable)
 
@@ -75,9 +82,12 @@ box or via `--config file.json` on the CLI:
 | budget | ≤ strength | action costs sum *up to* strength (exact sums are usually impossible with 2 fib values) |
 | `evolveCost` | `'smaller'` | evolve's cost wasn't specified; also supports `'larger'` and `'result'` |
 | `scoutRetreatBudget` | 1 | read as *1 scout per attack* may flee to an empty territory |
-| combat resolution | ≥ total | attacker destroys non-retreated defenders iff its piece value ≥ their sum, else repelled |
+| `combatRule` | `'margin'` | attacker dies only on an exact-value tie; `'mutual'` = attacker always dies with the defenders; `'attacker-survives'` = attacker never does |
+| `firstTurnContingents` | 1 | contingents the opening player may act with on turn 1 (0 = skip turn 1, null = no handicap) |
+| `firstTurnActions` | 1 | actions per contingent on turn 1 (null = normal 2) |
 | destroyed pieces | removed | destroyed pieces leave the game entirely (they do *not* return to the sideboard) |
-| capture on attack | yes | if the defended territory empties out, the attacker advances into it |
+| capture on retreat | yes | if all defenders retreat, the attacker advances into the vacated territory |
+| simultaneous wipe | draw | mutual destruction can empty both boards at once → draw |
 | `initialScouts` | 2 | scouts each army places in the placement phase (capped at scout supply) |
 | `maxTurns` | 200 | draw backstop so batch runs always terminate |
 | `supply` | 5/3/2/1 | change piece mix freely; placement uses the scout count |
@@ -98,17 +108,30 @@ Add an engine by implementing three functions and registering it in
   placeScout(state, army, rng) -> territory index
   chooseAction(state, ctx, legalActions, rng) -> one of legalActions | null (pass)
   planRetreats(state, attackInfo, options, rng) -> [{ piece, dest }, ...]
+  chooseContingents(state, conts, limit, rng) -> subset of conts  // optional:
+    // which contingents act under the first-turn handicap
 }
 ```
 
 Engines only ever pick from engine-generated legal-action lists, so a buggy
 engine can't corrupt game state.
 
-## Current observations (seed 42, 500 games, seats swapped)
+## Current observations (seed 42/7/99, 500 games, seats swapped)
 
-- greedy beats random ~98%.
-- greedy mirror: ~12% draws, and a *large* first-mover advantage — with only
-  2 initial scouts, seat A won 391 of 440 decided games. The opening tempo
-  (first spawn/evolve) dominates; a prime target for rule iteration.
-- random mirror games run long (~81 turns avg) but still mostly end in
-  elimination, so the rules don't deadlock on their own.
+- greedy beats random 95% under margin combat — profitable attacks exist again
+  (kill a smaller stack, keep your piece, take the territory), so skill
+  dominates. Under pure `'mutual'` combat the gap collapsed to 55/26 because
+  aggression was never materially profitable.
+- **Turn-1 tempo is knife-edged in mirrors.** With the old full first turn,
+  seat A won ~91% of decided greedy mirrors; with `firstTurnActions: 1`, the
+  advantage *flips* — seat B wins ~94% (24 vs 399). One action on turn 1
+  leaves the opener permanently an action behind, and in a tempo-dominated
+  game whoever is up an action snowballs. The balance point sits between
+  "1 action" and "2 actions" on turn 1 — candidates: a turn-1 fib *budget*
+  cap (spend ≤ 2, say), or a pie rule. Sweep `firstTurnActions` /
+  `firstTurnContingents` to explore.
+- Engine lessons that generalize to human play: avoid "spawn-lock" (a board
+  of lone 3s/5s can never spawn again — scouts only stack with 1s and 2s),
+  and note that exact-tie attacks are the only way to trade evenly, so
+  material advantage compounds fast.
+- random mirrors resolve in ~69 turns; ~10% draws.

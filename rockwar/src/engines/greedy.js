@@ -2,17 +2,24 @@
 // No search — just material, tempo, and position heuristics. Weights are
 // exposed so you can tune behavior while iterating on rules.
 
-import { legalPlacements, neighbors, xy, other } from '../game.js';
+import { legalPlacements, neighbors, xy, other, armyPieceCount, armyStrengthOnBoard, canAddPiece, combatRuleOf } from '../game.js';
 
 const DEFAULT_WEIGHTS = {
   killPerPoint: 12,     // per point of enemy material destroyed
   capture: 6,           // taking an enemy territory
+  trade: 8,             // base value of forcing combat (mutual destruction)
   evolve: 10,           // consolidating into a bigger piece
   evolvePerPoint: 3,
   advancePerStep: 5,    // moving one step closer to the nearest enemy
   consolidate: 4,       // moving onto a friendly piece (enables evolve)
+  expand: 3,            // moving into an empty territory (spawn real estate)
+  spawnUnlock: 12,      // expanding when no cell can currently accept a scout
+  presencePenalty: 25,  // evolving down to <=2 board pieces is a trap
+  spawnLockPenalty: 40, // evolving into a position where no cell can accept a
+                        // scout (1 only stacks with 1 or 2) freezes the army
   spawn: 8,
-  spawnDecayTurns: 30,  // spawning matters less as the game goes on
+  spawnDecayTurns: 30,  // spawning matters less as the game goes on...
+  spawnFloor: 3,        // ...but board presence never stops mattering
   costPenalty: 0.5,     // mild preference for cheaper actions
   passThreshold: 0,     // pass if the best score is below this
 };
@@ -27,6 +34,13 @@ function enemyCells(state, army) {
   const out = [];
   state.cells.forEach((c, i) => { if (c.army === other(army)) out.push(i); });
   return out;
+}
+
+// Deployable strength: board material plus sideboard scouts. Bigger sideboard
+// pieces only re-enter through evolves, which need board pairs — without
+// scouts they're frozen assets, so they don't count toward fighting strength.
+function totalStrength(state, army) {
+  return armyStrengthOnBoard(state, army) + (state.sideboard[army][1] || 0);
 }
 
 function distToNearestEnemy(state, army, i) {
@@ -73,23 +87,59 @@ export function makeGreedyEngine(opts = {}) {
         if (a.type === 'attack') {
           const defCell = state.cells[a.to];
           const defSum = defCell.pieces.reduce((s, p) => s + p, 0);
-          if (a.piece >= defSum) {
-            // Likely kill (defenders may still retreat, but we take territory).
-            score += defSum * W.killPerPoint + W.capture;
-          } else {
+          const rule = combatRuleOf(state.config);
+          const attackerDies = rule === 'mutual' || (rule === 'margin' && a.piece === defSum);
+          if (a.piece < defSum) {
             score -= 100; // attack would be repelled — never worth it
+          } else if (attackerDies) {
+            // We die with them: value the trade by material delta, and only
+            // seek trades from a position of strength — when ahead on total
+            // material, simplifying wins; when behind, it loses.
+            const mine = totalStrength(state, army);
+            const theirs = totalStrength(state, other(army));
+            score += (defSum - a.piece) * W.killPerPoint + (mine >= theirs ? W.trade : -W.trade);
+            // Never trade away our last board piece: 0 pieces = we lose.
+            if (armyPieceCount(state, army) <= 1) score -= 1000;
+          } else {
+            score += defSum * W.killPerPoint + W.capture;
           }
         } else if (a.type === 'evolve') {
           const cell = state.cells[a.at];
           const sum = cell.pieces[0] + cell.pieces[1];
           score += W.evolve + sum * W.evolvePerPoint;
+          if (armyPieceCount(state, army) <= 2) score -= W.presencePenalty;
+          // Would this evolve leave us nowhere to spawn? A scout only stacks
+          // with a 1 or 2, so a board of lone 3s/5s is frozen forever.
+          if ((state.sideboard[army][1] || 0) > 0 && sum > 2) {
+            const elsewhere = state.cells.some(
+              (c, i) => i !== a.at && c.army === army && canAddPiece(state.config, c, 1)
+            );
+            if (!elsewhere) score -= W.spawnLockPenalty;
+          }
         } else if (a.type === 'move') {
           const before = distToNearestEnemy(state, army, a.from);
           const after = distToNearestEnemy(state, army, a.to);
           score += (before - after) * W.advancePerStep;
-          if (state.cells[a.to].pieces.length > 0) score += W.consolidate;
+          const target = state.cells[a.to];
+          if (target.pieces.length > 0) {
+            // Stacking is only worth it if it sets up an available evolve and
+            // doesn't collapse our board presence into a single stack.
+            const sum = target.pieces[0] + a.piece;
+            const canEvolve = (state.sideboard[army][sum] || 0) > 0;
+            if (canEvolve && armyPieceCount(state, army) > 2) score += W.consolidate;
+          } else if (state.cells[a.from].pieces.length === 2) {
+            // Splitting a pair into an empty cell genuinely grows our footprint
+            // (moving a lone piece just relocates it).
+            score += W.expand;
+            // If no cell of ours can accept a scout, expansion re-opens spawning.
+            if (state.sideboard[army][1] > 0 &&
+                !state.cells.some((c) => c.army === army && canAddPiece(state.config, c, 1))) {
+              score += W.spawnUnlock;
+            }
+          }
         } else if (a.type === 'spawn') {
-          score += W.spawn * Math.max(0, 1 - state.turn / W.spawnDecayTurns);
+          const decay = Math.max(0, 1 - state.turn / W.spawnDecayTurns);
+          score += Math.max(W.spawn * decay, W.spawnFloor);
         }
 
         if (score > bestScore) { bestScore = score; best = a; }
@@ -99,18 +149,30 @@ export function makeGreedyEngine(opts = {}) {
       return best;
     },
 
-    // If the attack would destroy us (attacker >= our total), save what we can,
-    // biggest pieces first. Otherwise stand and repel the attack.
+    // If the attack would connect (attacker >= our total), save what we can,
+    // biggest pieces first. Under 'mutual', deliberately leave the smallest
+    // piece behind — it takes the attacker down with it. Under 'margin', an
+    // exact tie kills the attacker, so stand and trade; partial retreats only
+    // hand the attacker a free kill (its margin grows as pieces leave).
+    // Otherwise stand only when the attack would be repelled.
     planRetreats(state, attackInfo, options, rng) {
       const total = options.reduce((s, o) => s + o.piece, 0);
       if (attackInfo.piece < total) return []; // attack fails; don't budge
-      const plan = [];
+      const rule = combatRuleOf(state.config);
+      if (rule === 'margin' && attackInfo.piece === total) return []; // even trade, deny tempo
       const sorted = [...options].sort((a, b) => b.piece - a.piece);
-      for (const opt of sorted) {
+      const retreaters = rule === 'mutual' ? sorted.slice(0, -1) : sorted;
+      const plan = [];
+      for (const opt of retreaters) {
         const dest = opt.dests[0] ?? opt.emptyDests[0];
         if (dest !== undefined) plan.push({ piece: opt.piece, dest });
       }
       return plan;
+    },
+
+    // First-turn handicap: act with the strongest contingent(s).
+    chooseContingents(state, conts, limit, rng) {
+      return [...conts].sort((a, b) => b.strength - a.strength).slice(0, limit);
     },
   };
 }
