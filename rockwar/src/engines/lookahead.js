@@ -9,7 +9,7 @@
 import {
   legalPlacements, legalActions, applyAction, contingents, neighbors, xy,
   other, armyPieceCount, armyStrengthOnBoard, canAddPiece, obeliskBonuses,
-  combatRuleOf,
+  obeliskStatus, obeliskCells, combatRuleOf,
 } from '../game.js';
 
 const DEFAULT_WEIGHTS = {
@@ -17,7 +17,11 @@ const DEFAULT_WEIGHTS = {
   pieces: 3,        // per board piece difference
   fighting: 4,      // per point of attack-capable board material (>= minAttackValue)
   territory: 1.5,   // per occupied territory difference
-  obelisk: 6,       // per point of obelisk bonus budget difference
+  obeliskHold: 5,   // per point of held bonus — control is an annuity, it
+                    // pays budget every turn it's held
+  obeliskProgress: 0.5, // per point of adjacency-margin toward each obelisk,
+                    // so partial progress (first cell, more value) pays too
+  obeliskFoothold: 2,   // having the 2-territory foothold at an obelisk
   potential: 2,     // per point of evolve-ready pairs (sum in sideboard)
   threat: 3,        // per point the enemy's best reply attack would win
   myThreat: 6,      // per point our own best attack would win (keep pressure on)
@@ -54,8 +58,23 @@ function fightingStrength(state, army) {
   return s;
 }
 
-function obeliskPower(state, army) {
-  return Object.values(obeliskBonuses(state, army)).reduce((s, n) => s + n, 0);
+// Graded obelisk score: held control pays as an annuity, and progress toward
+// control (adjacent value margin, the 2-territory foothold) pays on the way —
+// a one-ply searcher can't chase a reward that only exists at the finish line.
+function obeliskGradient(state, me, W) {
+  const enemy = other(me);
+  const topTier = (state.config.obeliskTiers ?? [3, 5, 8, 13])[3] ?? 13;
+  let s = 0;
+  for (const ob of state.config.obelisks ?? []) {
+    const st = obeliskStatus(state, ob);
+    s += W.obeliskProgress *
+      (Math.min(st.score[me], topTier) - Math.min(st.score[enemy], topTier));
+    if (st.count[me] >= 2) s += W.obeliskFoothold;
+    if (st.count[enemy] >= 2) s -= W.obeliskFoothold;
+    if (st.controller === me) s += W.obeliskHold * st.bonus;
+    else if (st.controller === enemy) s -= W.obeliskHold * st.bonus;
+  }
+  return s;
 }
 
 // Evolve-ready pairs: cells whose two pieces could combine right now (the
@@ -148,7 +167,7 @@ function evaluate(state, me, W) {
   score += W.pieces * (myPieces - theirPieces);
   score += W.fighting * (fightingStrength(state, me) - fightingStrength(state, enemy));
   score += W.territory * (territoryCount(state, me) - territoryCount(state, enemy));
-  score += W.obelisk * (obeliskPower(state, me) - obeliskPower(state, enemy));
+  score += obeliskGradient(state, me, W);
   score += W.potential * (evolvePotential(state, me) - evolvePotential(state, enemy));
   score -= W.advance * avgDistToEnemy(state, me);
   if (spawnLocked(state, me)) score -= W.spawnLock;
@@ -198,6 +217,9 @@ export function makeLookaheadEngine(opts = {}) {
         for (const n of neighbors(config, i)) {
           if (state.cells[n].army === army) score += 2;
           if (state.cells[n].army === other(army)) score -= 0.5;
+        }
+        for (const ob of config.obelisks ?? []) {
+          if (obeliskCells(config, ob.corner).includes(i)) score += 1.5;
         }
         score += rng() * 0.1;
         if (score > bestScore) { bestScore = score; best = i; }
