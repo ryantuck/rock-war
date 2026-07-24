@@ -173,8 +173,13 @@ engine can't corrupt game state.
   and note that exact-tie attacks are the only way to trade evenly, so
   material advantage compounds fast.
 - random mirrors run ~158 turns with ~46% draws on the big board.
-- **Obelisks add gentle resolution pressure**: greedy-mirror stalemates
-  dipped from ~53% to ~47% and seats stayed balanced (148 vs 115). Obelisk
-  budget gets drawn in about a third of greedy mirrors — most often earth
-  (evolve) and fire (attack). Bigger tiers or more central obelisk
-  placement would raise the stakes.
+- **Obelisks are now raced for, not stumbled into.** Originally both engines
+  treated obelisks as an accident: control emerged around turn 8–9 in under
+  half of games, with ~2 budget draws per game. After adding control-gradient
+  terms (progress toward control pays, not just the finish line),
+  obelisk-aware placement, and control-completion bonuses, first control
+  lands around **turn 4** with ~10 draws per game. A cautionary result from
+  tuning: with obelisk weights ~2× higher, both engines camped corners and
+  lookahead-vs-greedy went 91% draws — obelisk value must serve the war, not
+  replace it. Greedy pays a real price for caring (84% vs random, down from
+  93%) since corner-seeking placement is worse for pure combat.

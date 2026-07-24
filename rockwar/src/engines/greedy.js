@@ -2,7 +2,7 @@
 // No search — just material, tempo, and position heuristics. Weights are
 // exposed so you can tune behavior while iterating on rules.
 
-import { legalPlacements, neighbors, xy, other, armyPieceCount, armyStrengthOnBoard, canAddPiece, combatRuleOf, obeliskCells } from '../game.js';
+import { legalPlacements, neighbors, xy, other, armyPieceCount, armyStrengthOnBoard, canAddPiece, combatRuleOf, obeliskCells, obeliskStatus } from '../game.js';
 
 const DEFAULT_WEIGHTS = {
   killPerPoint: 12,     // per point of enemy material destroyed
@@ -14,7 +14,8 @@ const DEFAULT_WEIGHTS = {
   consolidate: 4,       // moving onto a friendly piece (enables evolve)
   expand: 3,            // moving into an empty territory (spawn real estate)
   spawnUnlock: 12,      // expanding when no cell can currently accept a scout
-  obeliskAdj: 2,        // per obelisk touching a cell we move/spawn into
+  obeliskAdj: 2,        // per uncontrolled obelisk touching a cell we move/spawn into
+  obeliskControl: 8,    // an action that would complete obelisk control
   presencePenalty: 25,  // evolving down to <=2 board pieces is a trap
   spawnLockPenalty: 40, // evolving into a position where no cell can accept a
                         // scout (1 only stacks with 1 or 2) freezes the army
@@ -44,13 +45,27 @@ function totalStrength(state, army) {
   return armyStrengthOnBoard(state, army) + (state.sideboard[army][1] || 0);
 }
 
-// How many obelisks touch each cell (computed from config, so it's static).
-function obeliskWeight(state, i) {
-  let n = 0;
-  for (const ob of state.config.obelisks ?? []) {
-    if (obeliskCells(state.config, ob.corner).includes(i)) n++;
+// Score the obelisk value of putting `pieceValue` onto cell `target`:
+// a pull toward any obelisk we don't yet control, plus a big bonus when the
+// action would complete control (>=2 cells, >= first tier, strictly ahead).
+// Approximation: a move between two cells adjacent to the same obelisk
+// slightly overcounts the new adjacency value; fine for a heuristic.
+function obeliskPull(state, army, target, pieceValue, W) {
+  const { config } = state;
+  const tiers = config.obeliskTiers ?? [3, 5, 8, 13, 21, 34];
+  let s = 0;
+  for (const ob of config.obelisks ?? []) {
+    if (!obeliskCells(config, ob.corner).includes(target)) continue;
+    const st = obeliskStatus(state, ob);
+    if (st.controller === army) continue; // already ours
+    s += W.obeliskAdj;
+    const newCount = st.count[army] + (state.cells[target].army === army ? 0 : 1);
+    const newScore = st.score[army] + pieceValue;
+    if (newCount >= 2 && newScore >= tiers[0] && newScore > st.score[other(army)]) {
+      s += W.obeliskControl;
+    }
   }
-  return n;
+  return s;
 }
 
 function distToNearestEnemy(state, army, i) {
@@ -79,6 +94,9 @@ export function makeGreedyEngine(opts = {}) {
         for (const n of neighbors(config, i)) {
           if (state.cells[n].army === army) score += 2; // adjacent to own
           if (state.cells[n].army === other(army)) score -= 0.5;
+        }
+        for (const ob of config.obelisks ?? []) {
+          if (obeliskCells(config, ob.corner).includes(i)) score += 1.5;
         }
         score += rng() * 0.1; // tiebreak
         if (score > bestScore) { bestScore = score; best = i; }
@@ -130,7 +148,7 @@ export function makeGreedyEngine(opts = {}) {
           const before = distToNearestEnemy(state, army, a.from);
           const after = distToNearestEnemy(state, army, a.to);
           score += (before - after) * W.advancePerStep;
-          score += obeliskWeight(state, a.to) * W.obeliskAdj;
+          score += obeliskPull(state, army, a.to, a.piece, W);
           const target = state.cells[a.to];
           if (target.pieces.length > 0) {
             // Stacking is only worth it if it sets up an available evolve and
@@ -151,7 +169,7 @@ export function makeGreedyEngine(opts = {}) {
         } else if (a.type === 'spawn') {
           const decay = Math.max(0, 1 - state.turn / W.spawnDecayTurns);
           score += Math.max(W.spawn * decay, W.spawnFloor);
-          score += obeliskWeight(state, a.to) * W.obeliskAdj;
+          score += obeliskPull(state, army, a.to, 1, W);
         }
 
         if (score > bestScore) { bestScore = score; best = a; }
