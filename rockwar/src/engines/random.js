@@ -16,6 +16,15 @@ export function makeRandomEngine({ passChance = 0.1 } = {}) {
       return rng.pick(acts);
     },
 
+    chooseContingents(state, conts, limit, rng) {
+      const pool = [...conts];
+      const out = [];
+      while (out.length < limit && pool.length) {
+        out.push(pool.splice(rng.int(pool.length), 1)[0]);
+      }
+      return out;
+    },
+
     // Retreat each piece with 50% probability, preferring own territories.
     planRetreats(state, attackInfo, options, rng) {
       const plan = [];

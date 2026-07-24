@@ -35,6 +35,13 @@ export function defaultConfig() {
     // Per attack, how many scouts may retreat into EMPTY territories.
     // (Retreats into own-occupied territories are always free.)
     scoutRetreatBudget: 1,
+    // When an attack connects (attacker value >= non-retreated defenders'
+    // sum), the attacking piece dies too. Set false for the older rule where
+    // the attacker survives and advances.
+    mutualDestruction: true,
+    // First-turn handicap: the first player acts with at most this many
+    // contingents on turn 1 (their engine chooses which). null = no handicap.
+    firstTurnContingents: 1,
     // Game is a draw after this many turns (one turn = one army's contingents acting).
     maxTurns: 200,
   };
@@ -341,6 +348,12 @@ function resolveAttack(state, army, action, engines, rng) {
       destroyed = [...remaining];
       defCell.pieces = [];
       defCell.army = null;
+      if (config.mutualDestruction) {
+        // Combat annihilates both sides: the attacker dies with the defenders.
+        removePiece(state, action.from, action.piece);
+        pushLog(state, `${army} ${action.piece} and ${defArmy} [${destroyed.join(',')}] destroy each other at ${fmtCell(config, action.to)}`);
+        return { advanced: false, destroyed };
+      }
       pushLog(state, `${army} ${action.piece} destroys [${destroyed.join(',')}] at ${fmtCell(config, action.to)}`);
     } else {
       pushLog(state, `${army} ${action.piece} attack on ${fmtCell(config, action.to)} repelled (def ${defSum})`);
@@ -399,16 +412,22 @@ export function applyAction(state, army, action, engines, rng) {
 // ---------------------------------------------------------------------------
 
 function checkElimination(state) {
-  for (const army of ['A', 'B']) {
-    if (armyPieceCount(state, army) === 0) {
-      state.phase = 'over';
-      state.winner = other(army);
-      state.reason = 'elimination';
-      pushLog(state, `${other(army)} wins: ${army} eliminated`);
-      return true;
-    }
+  const aOut = armyPieceCount(state, 'A') === 0;
+  const bOut = armyPieceCount(state, 'B') === 0;
+  if (!aOut && !bOut) return false;
+  state.phase = 'over';
+  if (aOut && bOut) {
+    // Mutual destruction can wipe both boards at once.
+    state.winner = 'draw';
+    state.reason = 'mutual-elimination';
+    pushLog(state, 'draw: both armies eliminated');
+  } else {
+    const loser = aOut ? 'A' : 'B';
+    state.winner = other(loser);
+    state.reason = 'elimination';
+    pushLog(state, `${other(loser)} wins: ${loser} eliminated`);
   }
-  return false;
+  return true;
 }
 
 // Plays one full turn for state.toMove: every contingent (snapshotted at turn
@@ -432,7 +451,28 @@ export function playTurn(state, engines, rng) {
     return state;
   }
 
-  for (const cont of conts) {
+  // First-turn handicap: on turn 1 the opening player acts with at most
+  // config.firstTurnContingents contingents; their engine picks which.
+  let acting = conts;
+  const limit = state.turn === 1 ? (config.firstTurnContingents ?? Infinity) : Infinity;
+  if (Number.isFinite(limit) && conts.length > limit) {
+    let chosen = engines[army].chooseContingents
+      ? engines[army].chooseContingents(state, conts, limit, rng)
+      : null;
+    if (Array.isArray(chosen)) chosen = chosen.filter((c) => conts.includes(c)).slice(0, limit);
+    if (!Array.isArray(chosen) || chosen.length === 0) {
+      // Fallback: strongest contingents that can actually do something.
+      const usable = conts.filter((c) => legalActions(state, c, c.strength, 0).length > 0);
+      chosen = (usable.length ? usable : conts)
+        .slice()
+        .sort((x, y) => y.strength - x.strength)
+        .slice(0, limit);
+    }
+    acting = chosen;
+    pushLog(state, `${army} first-turn handicap: ${acting.length} of ${conts.length} contingents may act`);
+  }
+
+  for (const cont of acting) {
     let remaining = cont.strength;
     let taken = 0;
     while (taken < config.maxActionsPerContingent && state.phase === 'play') {
