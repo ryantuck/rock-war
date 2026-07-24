@@ -52,6 +52,20 @@ export function defaultConfig() {
     // First-turn handicap: each acting contingent takes at most this many
     // actions on turn 1. null = no cap beyond maxActionsPerContingent.
     firstTurnActions: 1,
+    // Obelisks sit on interior corner points where four territories meet:
+    // corner [cx, cy] touches cells (cx-1,cy-1) (cx,cy-1) (cx-1,cy) (cx,cy).
+    // Each element grants bonus budget for its mechanic while controlled:
+    // fire → attack, earth → evolve, air → move, water → spawn.
+    obelisks: [
+      { element: 'fire', corner: [1, 1] },
+      { element: 'earth', corner: [4, 1] },
+      { element: 'air', corner: [1, 4] },
+      { element: 'water', corner: [4, 4] },
+    ],
+    // Control requires occupying >= 2 of the obelisk's adjacent territories
+    // with the strictly greatest total adjacent piece value, which must reach
+    // the first tier. Tiers: value >= 3 → +1 budget, >= 5 → +2, >= 8 → +3, ...
+    obeliskTiers: [3, 5, 8, 13, 21, 34],
     // Game is a draw after this many turns (one turn = one army's contingents acting).
     maxTurns: 200,
   };
@@ -86,6 +100,59 @@ export function neighbors(config, i) {
   if (y > 0) out.push(i - config.width);
   if (y < config.height - 1) out.push(i + config.width);
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// Obelisks
+// ---------------------------------------------------------------------------
+
+export const ELEMENT_ACTIONS = { fire: 'attack', earth: 'evolve', air: 'move', water: 'spawn' };
+
+// The up-to-4 territories touching an obelisk's corner point.
+export function obeliskCells(config, corner) {
+  const [cx, cy] = corner;
+  const out = [];
+  for (const [x, y] of [[cx - 1, cy - 1], [cx, cy - 1], [cx - 1, cy], [cx, cy]]) {
+    if (x >= 0 && x < config.width && y >= 0 && y < config.height) out.push(idx(config, x, y));
+  }
+  return out;
+}
+
+// Who controls this obelisk, and at what bonus tier?
+export function obeliskStatus(state, ob) {
+  const cells = obeliskCells(state.config, ob.corner);
+  const score = { A: 0, B: 0 };
+  const count = { A: 0, B: 0 };
+  for (const i of cells) {
+    const c = state.cells[i];
+    if (!c.army) continue;
+    count[c.army]++;
+    for (const p of c.pieces) score[c.army] += p;
+  }
+  const tiers = state.config.obeliskTiers ?? [3, 5, 8, 13, 21, 34];
+  let controller = null;
+  for (const army of ['A', 'B']) {
+    if (count[army] >= 2 && score[army] >= tiers[0] && score[army] > score[other(army)]) {
+      controller = army;
+    }
+  }
+  let bonus = 0;
+  if (controller) {
+    for (let i = 0; i < tiers.length; i++) if (score[controller] >= tiers[i]) bonus = i + 1;
+  }
+  return { element: ob.element, action: ELEMENT_ACTIONS[ob.element], controller, bonus, score, count };
+}
+
+// Per-turn bonus budget pools by action type for `army`, e.g. { attack: 1 }.
+export function obeliskBonuses(state, army) {
+  const pool = {};
+  for (const ob of state.config.obelisks ?? []) {
+    const st = obeliskStatus(state, ob);
+    if (st.controller === army && st.bonus > 0) {
+      pool[st.action] = (pool[st.action] || 0) + st.bonus;
+    }
+  }
+  return pool;
 }
 
 // Snake placement order: A B B A ... one scout per slot,
@@ -244,11 +311,14 @@ export function evolveCostOf(config, a, b) {
 // All legal actions for `cont` given the remaining fib budget and actions taken.
 // Actions carry their cost. Contingent membership (cont.terrs) may have been
 // extended mid-turn by moves/attacks — callers keep cont.terrs updated.
-export function legalActions(state, cont, remainingBudget, actionsTaken) {
+// bonusPool holds obelisk bonus budget by action type ({ attack: 1, ... });
+// an action is affordable if cost <= remainingBudget + its type's bonus.
+export function legalActions(state, cont, remainingBudget, actionsTaken, bonusPool = {}) {
   const { config } = state;
   const acts = [];
   if (actionsTaken >= config.maxActionsPerContingent) return acts;
   const army = cont.army;
+  const afford = (type, cost) => cost <= remainingBudget + (bonusPool[type] || 0);
 
   for (const t of cont.terrs) {
     const cell = state.cells[t];
@@ -257,7 +327,7 @@ export function legalActions(state, cont, remainingBudget, actionsTaken) {
     // Spawn: 1 scout from sideboard into an own territory of this contingent.
     if (
       state.sideboard[army][1] > 0 &&
-      remainingBudget >= 1 &&
+      afford('spawn', 1) &&
       canAddPiece(config, cell, 1)
     ) {
       acts.push({ type: 'spawn', to: t, cost: 1 });
@@ -270,7 +340,7 @@ export function legalActions(state, cont, remainingBudget, actionsTaken) {
       const sum = hi + lo;
       if ((state.sideboard[army][sum] || 0) > 0) {
         const cost = evolveCostOf(config, hi, lo);
-        if (isFib(cost) && cost <= remainingBudget) {
+        if (isFib(cost) && afford('evolve', cost)) {
           acts.push({ type: 'evolve', at: t, cost });
         }
       }
@@ -283,13 +353,13 @@ export function legalActions(state, cont, remainingBudget, actionsTaken) {
         if (nc.army === null || nc.army === army) {
           if (!canAddPiece(config, nc, p)) continue;
           const cost = moveCost(p, nc);
-          if (cost >= 1 && isFib(cost) && cost <= remainingBudget) {
+          if (cost >= 1 && isFib(cost) && afford('move', cost)) {
             acts.push({ type: 'move', from: t, piece: p, to: n, cost });
           }
         } else {
           // Attack: cost equals the attacking piece's value. Pieces below
           // minAttackValue (scouts by default) cannot attack.
-          if (p >= (config.minAttackValue ?? 1) && p <= remainingBudget) {
+          if (p >= (config.minAttackValue ?? 1) && afford('attack', p)) {
             acts.push({ type: 'attack', from: t, piece: p, to: n, cost: p });
           }
         }
@@ -463,8 +533,12 @@ export function playTurn(state, engines, rng) {
 
   const conts = contingents(state, army);
 
+  // Obelisk bonus budget pools for this turn, by action type. Army-wide:
+  // contingents draw from them first-come, and they reset every turn.
+  const bonusPool = obeliskBonuses(state, army);
+
   // Loss by immobilization: no contingent has any legal action.
-  const anyLegal = conts.some((c) => legalActions(state, c, c.strength, 0).length > 0);
+  const anyLegal = conts.some((c) => legalActions(state, c, c.strength, 0, bonusPool).length > 0);
   if (!anyLegal) {
     state.phase = 'over';
     state.winner = other(army);
@@ -503,11 +577,11 @@ export function playTurn(state, engines, rng) {
     let remaining = cont.strength;
     let taken = 0;
     while (taken < maxActions && state.phase === 'play') {
-      const acts = legalActions(state, cont, remaining, taken);
+      const acts = legalActions(state, cont, remaining, taken, bonusPool);
       if (acts.length === 0) break;
       const choice = engines[army].chooseAction(
         state,
-        { army, contingent: cont, remainingBudget: remaining, actionsTaken: taken },
+        { army, contingent: cont, remainingBudget: remaining, actionsTaken: taken, bonusPool },
         acts,
         rng
       );
@@ -517,7 +591,13 @@ export function playTurn(state, engines, rng) {
       if (!match) break;
       const res = applyAction(state, army, match, engines, rng);
       if (res.capturedTerritory !== undefined) cont.terrs.add(res.capturedTerritory);
-      remaining -= match.cost;
+      // Pay with the action type's obelisk bonus first, then contingent budget.
+      const drawn = Math.min(bonusPool[match.type] || 0, match.cost);
+      if (drawn > 0) {
+        bonusPool[match.type] -= drawn;
+        pushLog(state, `${army} draws ${drawn} obelisk ${match.type} budget`);
+      }
+      remaining -= match.cost - drawn;
       taken++;
       if (checkElimination(state)) return state;
     }

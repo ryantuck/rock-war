@@ -2,7 +2,7 @@
 // No search — just material, tempo, and position heuristics. Weights are
 // exposed so you can tune behavior while iterating on rules.
 
-import { legalPlacements, neighbors, xy, other, armyPieceCount, armyStrengthOnBoard, canAddPiece, combatRuleOf } from '../game.js';
+import { legalPlacements, neighbors, xy, other, armyPieceCount, armyStrengthOnBoard, canAddPiece, combatRuleOf, obeliskCells } from '../game.js';
 
 const DEFAULT_WEIGHTS = {
   killPerPoint: 12,     // per point of enemy material destroyed
@@ -14,6 +14,7 @@ const DEFAULT_WEIGHTS = {
   consolidate: 4,       // moving onto a friendly piece (enables evolve)
   expand: 3,            // moving into an empty territory (spawn real estate)
   spawnUnlock: 12,      // expanding when no cell can currently accept a scout
+  obeliskAdj: 2,        // per obelisk touching a cell we move/spawn into
   presencePenalty: 25,  // evolving down to <=2 board pieces is a trap
   spawnLockPenalty: 40, // evolving into a position where no cell can accept a
                         // scout (1 only stacks with 1 or 2) freezes the army
@@ -41,6 +42,15 @@ function enemyCells(state, army) {
 // scouts they're frozen assets, so they don't count toward fighting strength.
 function totalStrength(state, army) {
   return armyStrengthOnBoard(state, army) + (state.sideboard[army][1] || 0);
+}
+
+// How many obelisks touch each cell (computed from config, so it's static).
+function obeliskWeight(state, i) {
+  let n = 0;
+  for (const ob of state.config.obelisks ?? []) {
+    if (obeliskCells(state.config, ob.corner).includes(i)) n++;
+  }
+  return n;
 }
 
 function distToNearestEnemy(state, army, i) {
@@ -120,6 +130,7 @@ export function makeGreedyEngine(opts = {}) {
           const before = distToNearestEnemy(state, army, a.from);
           const after = distToNearestEnemy(state, army, a.to);
           score += (before - after) * W.advancePerStep;
+          score += obeliskWeight(state, a.to) * W.obeliskAdj;
           const target = state.cells[a.to];
           if (target.pieces.length > 0) {
             // Stacking is only worth it if it sets up an available evolve and
@@ -140,6 +151,7 @@ export function makeGreedyEngine(opts = {}) {
         } else if (a.type === 'spawn') {
           const decay = Math.max(0, 1 - state.turn / W.spawnDecayTurns);
           score += Math.max(W.spawn * decay, W.spawnFloor);
+          score += obeliskWeight(state, a.to) * W.obeliskAdj;
         }
 
         if (score > bestScore) { bestScore = score; best = a; }

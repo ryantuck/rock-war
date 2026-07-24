@@ -67,6 +67,17 @@ in-browser with the same stats as the CLI.
 - **First-turn handicap**: on turn 1, the opening player acts with only one
   contingent (their engine chooses which) and it takes only one action.
   Tunable via `firstTurnContingents` / `firstTurnActions`.
+- **Obelisks**: four elemental obelisks sit on corner points where four
+  territories meet — fire (red) at [1,1], earth (green) at [4,1], air
+  (yellow) at [1,4], water (blue) at [4,4]. Each maps to a mechanic:
+  fire → attack, earth → evolve, air → move, water → spawn. An army
+  *controls* an obelisk by occupying **at least 2** of its adjacent
+  territories with the **strictly greatest** total adjacent piece value of
+  **at least 3**. Control grants bonus budget for that mechanic, tiered by
+  adjacent value: ≥3 → +1, ≥5 → +2, ≥8 → +3, ≥13 → +4, … The bonus is an
+  army-wide per-turn pool: any contingent may draw from it when paying for
+  an action of that type (bonus is spent before contingent budget), and it
+  refreshes each turn while control holds.
 - **Winning**: eliminate all enemy pieces from the board, or leave the enemy
   with no legal action on their turn. If a combat wipes both boards at once,
   the game is a draw (`mutual-elimination`). Games also draw at the turn limit.
@@ -87,6 +98,8 @@ box or via `--config file.json` on the CLI:
 | `firstTurnContingents` | 1 | contingents the opening player may act with on turn 1 (0 = skip turn 1, null = no handicap) |
 | `firstTurnActions` | 1 | actions per contingent on turn 1 (null = normal 2) |
 | `minAttackValue` | 2 | minimum piece value that may attack — scouts can't (1 = anyone can) |
+| `obelisks` | 4 corners | element + corner position per obelisk; empty array disables them |
+| `obeliskTiers` | 3/5/8/13/21/34 | adjacent-value thresholds for +1/+2/+3/… bonus budget |
 | destroyed pieces | removed | destroyed pieces leave the game entirely (they do *not* return to the sideboard) |
 | capture on retreat | yes | if all defenders retreat, the attacker advances into the vacated territory |
 | simultaneous wipe | draw | mutual destruction can empty both boards at once → draw |
@@ -143,3 +156,8 @@ engine can't corrupt game state.
   and note that exact-tie attacks are the only way to trade evenly, so
   material advantage compounds fast.
 - random mirrors run ~158 turns with ~46% draws on the big board.
+- **Obelisks add gentle resolution pressure**: greedy-mirror stalemates
+  dipped from ~53% to ~47% and seats stayed balanced (148 vs 115). Obelisk
+  budget gets drawn in about a third of greedy mirrors — most often earth
+  (evolve) and fire (attack). Bigger tiers or more central obelisk
+  placement would raise the stakes.
