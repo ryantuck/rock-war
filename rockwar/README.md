@@ -29,8 +29,10 @@ in-browser with the same stats as the CLI.
 - **Board**: 4×4 grid of 16 territories, orthogonal adjacency.
 - **Armies**: each side's sideboard holds 5×1 (scouts), 3×2 (warriors),
   2×3 (chieftains), 1×5 (warlord) — 22 points total.
-- **Placement**: snake order (A B B A, repeating), one scout per slot onto any
-  empty territory, until all 10 scouts are down. Then A moves first.
+- **Placement**: snake order (A B B A), one scout per slot onto any empty
+  territory, until each army has placed `initialScouts` (default 2). Remaining
+  sideboard pieces — including the other scouts — enter play by spawning and
+  evolving. Then A moves first.
 - **Territories** hold at most 2 pieces, which must be fibonacci-adjacent:
   (1,1), (1,2), (2,3), (3,5), (5,8).
 - **Contingents**: a maximal contiguous group of one army's territories.
@@ -76,6 +78,7 @@ box or via `--config file.json` on the CLI:
 | combat resolution | ≥ total | attacker destroys non-retreated defenders iff its piece value ≥ their sum, else repelled |
 | destroyed pieces | removed | destroyed pieces leave the game entirely (they do *not* return to the sideboard) |
 | capture on attack | yes | if the defended territory empties out, the attacker advances into it |
+| `initialScouts` | 2 | scouts each army places in the placement phase (capped at scout supply) |
 | `maxTurns` | 200 | draw backstop so batch runs always terminate |
 | `supply` | 5/3/2/1 | change piece mix freely; placement uses the scout count |
 
@@ -104,7 +107,8 @@ engine can't corrupt game state.
 ## Current observations (seed 42, 500 games, seats swapped)
 
 - greedy beats random ~98%.
-- greedy mirror: ~13% draws, and a sizable first-mover advantage
-  (seat A won 275 of 437 decided games) — worth watching as rules evolve.
-- random mirror games run long (~72 turns avg) but still mostly end in
+- greedy mirror: ~12% draws, and a *large* first-mover advantage — with only
+  2 initial scouts, seat A won 391 of 440 decided games. The opening tempo
+  (first spawn/evolve) dominates; a prime target for rule iteration.
+- random mirror games run long (~81 turns avg) but still mostly end in
   elimination, so the rules don't deadlock on their own.
