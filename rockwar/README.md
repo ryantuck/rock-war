@@ -26,9 +26,10 @@ in-browser with the same stats as the CLI.
 
 ## Rules as implemented
 
-- **Board**: 4×4 grid of 16 territories, orthogonal adjacency.
-- **Armies**: each side's sideboard holds 5×1 (scouts), 3×2 (warriors),
-  2×3 (chieftains), 1×5 (warlord) — 22 points total.
+- **Board**: 5×5 grid of 25 territories, orthogonal adjacency.
+- **Armies**: each side's sideboard holds 8×1 (scouts), 5×2 (warriors),
+  3×3 (chieftains), 2×5 (warlords), 1×8 (behemoth) — fibonacci counts of
+  fibonacci values, 45 points total.
 - **Placement**: snake order (A B B A), one scout per slot onto any empty
   territory, until each army has placed `initialScouts` (default 2). Remaining
   sideboard pieces — including the other scouts — enter play by spawning and
@@ -91,7 +92,8 @@ box or via `--config file.json` on the CLI:
 | simultaneous wipe | draw | mutual destruction can empty both boards at once → draw |
 | `initialScouts` | 2 | scouts each army places in the placement phase (capped at scout supply) |
 | `maxTurns` | 200 | draw backstop so batch runs always terminate |
-| `supply` | 5/3/2/1 | change piece mix freely; placement uses the scout count |
+| `supply` | 8/5/3/2/1 | change piece mix freely; placement uses the scout count |
+| `width`/`height` | 5×5 | any board size; the frontend adapts |
 
 ## Engines
 
@@ -117,26 +119,27 @@ Add an engine by implementing three functions and registering it in
 Engines only ever pick from engine-generated legal-action lists, so a buggy
 engine can't corrupt game state.
 
-## Current observations (seed 42/7/99, 500 games, seats swapped)
+## Current observations (seed 42/7/99, 500 games, seats swapped, 5×5 board)
 
-- greedy beats random 95% under margin combat — profitable attacks exist again
-  (kill a smaller stack, keep your piece, take the territory), so skill
-  dominates. Under pure `'mutual'` combat the gap collapsed to 55/26 because
-  aggression was never materially profitable.
-- **Turn-1 tempo is knife-edged in mirrors, but scout pacifism helps.** With
-  a full first turn and scouts able to attack, seat A won ~91% of decided
-  greedy mirrors; capping turn 1 to one action flipped it to ~94% seat B.
-  Banning scout attacks (`minAttackValue: 2`) pulled it back to ~75% seat A
-  (286 vs 94, 24% draws) — the best balance so far, since the opening scout
-  skirmish was part of the snowball. Still worth sweeping; candidates: a
-  turn-1 fib *budget* cap, or a pie rule.
+- greedy beats random 94% — the skill gradient survived the bigger board.
+- **The 5×5 board fixed the seat imbalance.** Greedy mirrors are now
+  essentially even (109 vs 125 seat wins) where the 4×4 board swung as far
+  as ~91% toward one seat under various turn-1 rules. More space dilutes the
+  opening tempo edge; `firstTurnContingents`/`firstTurnActions` (still 1/1)
+  plus no scout attacks complete the picture.
+- **But mirrors stalemate half the time.** ~53% of greedy mirrors hit the
+  turn cap, and raising `maxTurns` from 200 to 800 doesn't change that —
+  they're genuine fortress standoffs, not truncated games. At material
+  parity, greedy refuses losing trades, and connecting attacks require
+  committing a piece ≥ the defense, so neither side moves first. If draws
+  bother you, candidates: a turn-limit tiebreak (most board strength wins),
+  attrition (upkeep), or shrinking-board pressure.
 - **Scout-only remnants get smothered.** With scouts unable to attack,
-  `immobilized` endings appear (~4–11% of games): an army reduced to scouts
+  `immobilized` endings appear (~2–5% of games): an army reduced to scouts
   can be cornered — every adjacent cell enemy-held or stacking-blocked — and
   loses without a final battle.
 - Engine lessons that generalize to human play: avoid "spawn-lock" (a board
   of lone 3s/5s can never spawn again — scouts only stack with 1s and 2s),
   and note that exact-tie attacks are the only way to trade evenly, so
   material advantage compounds fast.
-- random mirrors run long (~115 turns, ~20% draws) — with scouts pacifist,
-  random's pressure drops and games grind.
+- random mirrors run ~158 turns with ~46% draws on the big board.

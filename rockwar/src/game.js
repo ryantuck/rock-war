@@ -19,10 +19,11 @@ export function fibAdjacent(a, b) {
 
 export function defaultConfig() {
   return {
-    width: 4,
-    height: 4,
-    // Per-army sideboard: value -> count. 5x1 + 3x2 + 2x3 + 1x5.
-    supply: { 1: 5, 2: 3, 3: 2, 5: 1 },
+    width: 5,
+    height: 5,
+    // Per-army sideboard: value -> count. 8 scouts, 5 warriors, 3 chieftains,
+    // 2 warlords, 1 behemoth — fibonacci counts of fibonacci values, 45 pts.
+    supply: { 1: 8, 2: 5, 3: 3, 5: 2, 8: 1 },
     // Scouts each army places during the snake-placement phase; the rest of
     // the sideboard (including remaining scouts) enters play via spawning.
     initialScouts: 2,
