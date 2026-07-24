@@ -35,13 +35,20 @@ export function defaultConfig() {
     // Per attack, how many scouts may retreat into EMPTY territories.
     // (Retreats into own-occupied territories are always free.)
     scoutRetreatBudget: 1,
-    // When an attack connects (attacker value >= non-retreated defenders'
-    // sum), the attacking piece dies too. Set false for the older rule where
-    // the attacker survives and advances.
-    mutualDestruction: true,
+    // How a connecting attack (attacker value >= non-retreated defenders'
+    // sum) resolves:
+    //   'margin'            — defenders die; the attacker dies too only on an
+    //                         exact tie (3 vs (2,1) kills all three, but 3 vs
+    //                         (2) kills only the 2 and the attacker advances)
+    //   'mutual'            — the attacker always dies with the defenders
+    //   'attacker-survives' — the attacker always survives and advances
+    combatRule: 'margin',
     // First-turn handicap: the first player acts with at most this many
     // contingents on turn 1 (their engine chooses which). null = no handicap.
     firstTurnContingents: 1,
+    // First-turn handicap: each acting contingent takes at most this many
+    // actions on turn 1. null = no cap beyond maxActionsPerContingent.
+    firstTurnActions: 1,
     // Game is a draw after this many turns (one turn = one army's contingents acting).
     maxTurns: 200,
   };
@@ -49,6 +56,15 @@ export function defaultConfig() {
 
 export function other(army) {
   return army === 'A' ? 'B' : 'A';
+}
+
+// Resolves the combat rule, honoring the legacy mutualDestruction boolean
+// from older saved configs.
+export function combatRuleOf(config) {
+  if (config.combatRule) return config.combatRule;
+  if (config.mutualDestruction === true) return 'mutual';
+  if (config.mutualDestruction === false) return 'attacker-survives';
+  return 'margin';
 }
 
 export function idx(config, x, y) {
@@ -348,8 +364,10 @@ function resolveAttack(state, army, action, engines, rng) {
       destroyed = [...remaining];
       defCell.pieces = [];
       defCell.army = null;
-      if (config.mutualDestruction) {
-        // Combat annihilates both sides: the attacker dies with the defenders.
+      const rule = combatRuleOf(config);
+      const attackerDies =
+        rule === 'mutual' || (rule === 'margin' && action.piece === defSum);
+      if (attackerDies) {
         removePiece(state, action.from, action.piece);
         pushLog(state, `${army} ${action.piece} and ${defArmy} [${destroyed.join(',')}] destroy each other at ${fmtCell(config, action.to)}`);
         return { advanced: false, destroyed };
@@ -472,10 +490,15 @@ export function playTurn(state, engines, rng) {
     pushLog(state, `${army} first-turn handicap: ${acting.length} of ${conts.length} contingents may act`);
   }
 
+  // First-turn handicap: cap actions per contingent on turn 1.
+  const maxActions = state.turn === 1
+    ? Math.min(config.maxActionsPerContingent, config.firstTurnActions ?? Infinity)
+    : config.maxActionsPerContingent;
+
   for (const cont of acting) {
     let remaining = cont.strength;
     let taken = 0;
-    while (taken < config.maxActionsPerContingent && state.phase === 'play') {
+    while (taken < maxActions && state.phase === 'play') {
       const acts = legalActions(state, cont, remaining, taken);
       if (acts.length === 0) break;
       const choice = engines[army].chooseAction(

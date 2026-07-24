@@ -2,7 +2,7 @@
 // No search — just material, tempo, and position heuristics. Weights are
 // exposed so you can tune behavior while iterating on rules.
 
-import { legalPlacements, neighbors, xy, other, armyPieceCount, armyStrengthOnBoard, canAddPiece } from '../game.js';
+import { legalPlacements, neighbors, xy, other, armyPieceCount, armyStrengthOnBoard, canAddPiece, combatRuleOf } from '../game.js';
 
 const DEFAULT_WEIGHTS = {
   killPerPoint: 12,     // per point of enemy material destroyed
@@ -87,9 +87,11 @@ export function makeGreedyEngine(opts = {}) {
         if (a.type === 'attack') {
           const defCell = state.cells[a.to];
           const defSum = defCell.pieces.reduce((s, p) => s + p, 0);
+          const rule = combatRuleOf(state.config);
+          const attackerDies = rule === 'mutual' || (rule === 'margin' && a.piece === defSum);
           if (a.piece < defSum) {
             score -= 100; // attack would be repelled — never worth it
-          } else if (state.config.mutualDestruction) {
+          } else if (attackerDies) {
             // We die with them: value the trade by material delta, and only
             // seek trades from a position of strength — when ahead on total
             // material, simplifying wins; when behind, it loses.
@@ -148,14 +150,18 @@ export function makeGreedyEngine(opts = {}) {
     },
 
     // If the attack would connect (attacker >= our total), save what we can,
-    // biggest pieces first. Under mutual destruction, deliberately leave the
-    // smallest piece behind — it takes the attacker down with it. Otherwise
-    // stand and repel the attack.
+    // biggest pieces first. Under 'mutual', deliberately leave the smallest
+    // piece behind — it takes the attacker down with it. Under 'margin', an
+    // exact tie kills the attacker, so stand and trade; partial retreats only
+    // hand the attacker a free kill (its margin grows as pieces leave).
+    // Otherwise stand only when the attack would be repelled.
     planRetreats(state, attackInfo, options, rng) {
       const total = options.reduce((s, o) => s + o.piece, 0);
       if (attackInfo.piece < total) return []; // attack fails; don't budge
+      const rule = combatRuleOf(state.config);
+      if (rule === 'margin' && attackInfo.piece === total) return []; // even trade, deny tempo
       const sorted = [...options].sort((a, b) => b.piece - a.piece);
-      const retreaters = state.config.mutualDestruction ? sorted.slice(0, -1) : sorted;
+      const retreaters = rule === 'mutual' ? sorted.slice(0, -1) : sorted;
       const plan = [];
       for (const opt of retreaters) {
         const dest = opt.dests[0] ?? opt.emptyDests[0];
