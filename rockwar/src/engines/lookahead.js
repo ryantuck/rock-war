@@ -1,0 +1,231 @@
+// Lookahead engine: one-ply search over a position evaluator.
+//
+// For every legal action it clones the state, actually applies the action
+// (using the real rules engine, including combat), evaluates the resulting
+// position, and subtracts the opponent's best immediate attack threat.
+// This fixes greedy's two blind spots: walking into next-turn attacks, and
+// not noticing when an action swings obelisk control.
+
+import {
+  legalPlacements, legalActions, applyAction, contingents, neighbors, xy,
+  other, armyPieceCount, armyStrengthOnBoard, canAddPiece, obeliskBonuses,
+  combatRuleOf,
+} from '../game.js';
+
+const DEFAULT_WEIGHTS = {
+  material: 10,     // per point of deployable strength difference
+  pieces: 3,        // per board piece difference
+  fighting: 4,      // per point of attack-capable board material (>= minAttackValue)
+  territory: 1.5,   // per occupied territory difference
+  obelisk: 6,       // per point of obelisk bonus budget difference
+  potential: 2,     // per point of evolve-ready pairs (sum in sideboard)
+  threat: 3,        // per point the enemy's best reply attack would win
+  myThreat: 6,      // per point our own best attack would win (keep pressure on)
+  advance: 1.2,     // pull toward the enemy (avg distance, negated)
+  spawnLock: 15,    // penalty for having scouts but nowhere to spawn them
+  costPenalty: 0.3, // budget spent is tempo spent
+  passMargin: -3,   // act unless clearly harmful — passing doesn't freeze the
+                    // game, the opponent moves next, so idling has real cost
+  jitter: 0.05,     // random tiebreak
+};
+
+// Deployable strength: board material plus sideboard scouts (bigger sideboard
+// pieces are frozen assets without scouts to evolve from). Spawn-locked
+// armies count their sideboard scouts as ZERO — if no cell can accept a
+// scout, that material is entombed, possibly forever (a lone 3 can never
+// re-open spawning: moving its only piece just relocates the lock).
+function deployable(state, army) {
+  const scouts = spawnLocked(state, army) ? 0 : (state.sideboard[army][1] || 0);
+  return armyStrengthOnBoard(state, army) + scouts;
+}
+
+function territoryCount(state, army) {
+  return state.cells.filter((c) => c.army === army).length;
+}
+
+// Attack-capable board material — scouts can't attack, so an army of scouts
+// has zero fighting strength no matter its total value.
+function fightingStrength(state, army) {
+  const minAtk = state.config.minAttackValue ?? 1;
+  let s = 0;
+  for (const c of state.cells) {
+    if (c.army === army) for (const p of c.pieces) if (p >= minAtk) s += p;
+  }
+  return s;
+}
+
+function obeliskPower(state, army) {
+  return Object.values(obeliskBonuses(state, army)).reduce((s, n) => s + n, 0);
+}
+
+// Evolve-ready pairs: cells whose two pieces could combine right now (the
+// result is in the sideboard). This is how a one-ply evaluator learns that
+// spawning next to a scout is a step toward building an attacker.
+function evolvePotential(state, army) {
+  let s = 0;
+  for (const c of state.cells) {
+    if (c.army !== army || c.pieces.length !== 2) continue;
+    const sum = c.pieces[0] + c.pieces[1];
+    if ((state.sideboard[army][sum] || 0) > 0) s += sum;
+  }
+  return s;
+}
+
+function avgDistToEnemy(state, army) {
+  const mine = [];
+  const theirs = [];
+  state.cells.forEach((c, i) => {
+    if (c.army === army) mine.push(i);
+    else if (c.army === other(army)) theirs.push(i);
+  });
+  if (!mine.length || !theirs.length) return 0;
+  let sum = 0;
+  for (const m of mine) {
+    const [x1, y1] = xy(state.config, m);
+    let best = Infinity;
+    for (const t of theirs) {
+      const [x2, y2] = xy(state.config, t);
+      best = Math.min(best, Math.abs(x1 - x2) + Math.abs(y1 - y2));
+    }
+    sum += best;
+  }
+  return sum / mine.length;
+}
+
+// Spawn-locked means no cell can accept a scout AND no evolve could free
+// space either. A full (1,1) cell is only transiently blocked — evolving it
+// reopens spawning — but a board of lone 3s/5s is entombed for good.
+function spawnLocked(state, army) {
+  if ((state.sideboard[army][1] || 0) === 0) return false;
+  for (const c of state.cells) {
+    if (c.army !== army) continue;
+    if (canAddPiece(state.config, c, 1)) return false;
+    if (c.pieces.length === 2 && (state.sideboard[army][c.pieces[0] + c.pieces[1]] || 0) > 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Best material swing the enemy could get with a single attack right now
+// (no-retreat approximation; under margin rules an exact tie is an even
+// trade, so only strict up-attacks count as threats).
+function maxAttackThreat(state, enemy, W) {
+  const { config } = state;
+  const rule = combatRuleOf(config);
+  const minAtk = config.minAttackValue ?? 1;
+  const pool = obeliskBonuses(state, enemy);
+  let best = 0;
+  for (const cont of contingents(state, enemy)) {
+    const budget = cont.strength + (pool.attack || 0);
+    for (const t of cont.terrs) {
+      const cell = state.cells[t];
+      if (cell.army !== enemy) continue;
+      for (const p of new Set(cell.pieces)) {
+        if (p < minAtk || p > budget) continue;
+        for (const n of neighbors(config, t)) {
+          const nc = state.cells[n];
+          if (!nc.army || nc.army === enemy) continue;
+          const defSum = nc.pieces.reduce((s, x) => s + x, 0);
+          if (p > defSum) best = Math.max(best, defSum);
+          else if (p === defSum && rule === 'attacker-survives') best = Math.max(best, defSum);
+        }
+      }
+    }
+  }
+  return best;
+}
+
+function evaluate(state, me, W) {
+  const enemy = other(me);
+  const myPieces = armyPieceCount(state, me);
+  const theirPieces = armyPieceCount(state, enemy);
+  if (theirPieces === 0 && myPieces > 0) return 1e6;
+  if (myPieces === 0 && theirPieces > 0) return -1e6;
+  if (myPieces === 0 && theirPieces === 0) return 0;
+  let score = 0;
+  score += W.material * (deployable(state, me) - deployable(state, enemy));
+  score += W.pieces * (myPieces - theirPieces);
+  score += W.fighting * (fightingStrength(state, me) - fightingStrength(state, enemy));
+  score += W.territory * (territoryCount(state, me) - territoryCount(state, enemy));
+  score += W.obelisk * (obeliskPower(state, me) - obeliskPower(state, enemy));
+  score += W.potential * (evolvePotential(state, me) - evolvePotential(state, enemy));
+  score -= W.advance * avgDistToEnemy(state, me);
+  if (spawnLocked(state, me)) score -= W.spawnLock;
+  if (spawnLocked(state, enemy)) score += W.spawnLock;
+  score -= W.threat * maxAttackThreat(state, enemy, W);
+  score += W.myThreat * maxAttackThreat(state, me, W);
+  return score;
+}
+
+// Principled defender policy used both when this engine defends for real and
+// for the defenders inside simulations: stand when the attack fails or is an
+// exact-tie trade (margin rule), otherwise save what can be saved — and under
+// 'mutual', leave the smallest piece to take the attacker down.
+function retreatPolicy(state, attackInfo, options) {
+  const total = options.reduce((s, o) => s + o.piece, 0);
+  if (attackInfo.piece < total) return [];
+  const rule = combatRuleOf(state.config);
+  if (rule === 'margin' && attackInfo.piece === total) return [];
+  const sorted = [...options].sort((a, b) => b.piece - a.piece);
+  const retreaters = rule === 'mutual' ? sorted.slice(0, -1) : sorted;
+  const plan = [];
+  for (const opt of retreaters) {
+    const dest = opt.dests[0] ?? opt.emptyDests[0];
+    if (dest !== undefined) plan.push({ piece: opt.piece, dest });
+  }
+  return plan;
+}
+
+export function makeLookaheadEngine(opts = {}) {
+  const W = { ...DEFAULT_WEIGHTS, ...opts };
+  const simStub = { planRetreats: (s, info, options) => retreatPolicy(s, info, options) };
+  const simEngines = { A: simStub, B: simStub };
+
+  return {
+    name: 'lookahead',
+
+    // Same opening as greedy: clustered scouts near the center.
+    placeScout(state, army, rng) {
+      const { config } = state;
+      const cx = (config.width - 1) / 2;
+      const cy = (config.height - 1) / 2;
+      let best = null;
+      let bestScore = -Infinity;
+      for (const i of legalPlacements(state)) {
+        const [x, y] = xy(config, i);
+        let score = -(Math.abs(x - cx) + Math.abs(y - cy));
+        for (const n of neighbors(config, i)) {
+          if (state.cells[n].army === army) score += 2;
+          if (state.cells[n].army === other(army)) score -= 0.5;
+        }
+        score += rng() * 0.1;
+        if (score > bestScore) { bestScore = score; best = i; }
+      }
+      return best;
+    },
+
+    chooseAction(state, ctx, acts, rng) {
+      const me = ctx.army;
+      const baseline = evaluate(state, me, W) + W.passMargin;
+      let best = null;
+      let bestScore = baseline;
+      for (const a of acts) {
+        const clone = structuredClone({ ...state, log: [] });
+        applyAction(clone, me, a, simEngines, rng);
+        const s = evaluate(clone, me, W) - W.costPenalty * a.cost + rng() * W.jitter;
+        if (W.debug) console.log('  cand', JSON.stringify(a), '->', s.toFixed(2), '(baseline', baseline.toFixed(2) + ')');
+        if (s > bestScore) { bestScore = s; best = a; }
+      }
+      return best;
+    },
+
+    planRetreats(state, attackInfo, options, rng) {
+      return retreatPolicy(state, attackInfo, options);
+    },
+
+    chooseContingents(state, conts, limit, rng) {
+      return [...conts].sort((a, b) => b.strength - a.strength).slice(0, limit);
+    },
+  };
+}

@@ -118,6 +118,13 @@ box or via `--config file.json` on the CLI:
   (kills ≫ evolves > advancing > spawning) and retreats only when standing
   would lose pieces. Weights are overridable via the factory in
   `src/engines/greedy.js`.
+- **lookahead** — one-ply search: clones the state, actually applies each
+  candidate action through the real rules engine (combat included), and
+  evaluates the resulting position — material, fighting strength, evolve
+  potential, territory, obelisk power, spawn-lock, minus the enemy's best
+  immediate attack threat. Beats greedy ~8:1 in decided games. ~40× slower
+  than greedy (still ~33ms/game). Weights overridable; pass `debug: true`
+  to log candidate scores.
 
 Add an engine by implementing three functions and registering it in
 `src/engines/index.js`:
@@ -137,6 +144,13 @@ engine can't corrupt game state.
 
 ## Current observations (seed 42/7/99, 500 games, seats swapped, 5×5 board)
 
+- **Engine ladder**: lookahead > greedy > random. Lookahead beats greedy
+  46.8% to 5.8% (47% draws) and random 73% to 8%; greedy beats random ~93%.
+  Lessons from building lookahead: a one-ply evaluator needs an
+  "evolve-ready pairs" term to see development chains, must treat
+  spawn-locked scouts as dead material (but not transient full-cell locks),
+  and must price passing as losing tempo — the biggest single improvement
+  was letting it act unless an action is *clearly* harmful.
 - greedy beats random 94% — the skill gradient survived the bigger board.
 - **The 5×5 board fixed the seat imbalance.** Greedy mirrors are now
   essentially even (109 vs 125 seat wins) where the 4×4 board swung as far
