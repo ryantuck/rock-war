@@ -49,21 +49,23 @@ function startGame() {
   rng = mulberry32(parseInt($('seed').value, 10) || 1);
   engines = { A: makeEngine($('engineA').value), B: makeEngine($('engineB').value) };
   state = newGame(config);
-  // Run the whole placement phase up front so stepping starts at turn 1.
-  while (state.phase === 'placement') {
+  render();
+}
+
+// One click advances the game by exactly one army's worth of activity:
+// during placement, one scout placement; during play, one army's turn.
+function stepTurn() {
+  if (!state || state.phase === 'over') return;
+  if (state.phase === 'placement') {
     const army = state.placementQueue[0];
     let i = engines[army].placeScout(state, army, rng);
     if (typeof i !== 'number' || !state.cells[i] || state.cells[i].pieces.length !== 0) {
       i = legalPlacements(state)[0];
     }
     applyPlacement(state, army, i);
+  } else {
+    playTurn(state, engines, rng);
   }
-  render();
-}
-
-function stepTurn() {
-  if (!state || state.phase !== 'play') return;
-  playTurn(state, engines, rng);
   render();
 }
 
@@ -76,11 +78,11 @@ $('newGame').onclick = startGame;
 $('step').onclick = () => { stopAuto(); stepTurn(); };
 $('auto').onclick = () => {
   if (autoTimer) { stopAuto(); return; }
-  if (!state || state.phase !== 'play') startGame();
+  if (!state || state.phase === 'over') startGame();
   $('auto').textContent = '⏸ Pause';
   autoTimer = setInterval(() => {
     stepTurn();
-    if (!state || state.phase !== 'play') stopAuto();
+    if (!state || state.phase === 'over') stopAuto();
   }, 350);
 };
 
@@ -120,7 +122,12 @@ function render() {
   }
 
   const status = $('status');
-  if (state.phase === 'over') {
+  if (state.phase === 'placement') {
+    const army = state.placementQueue[0];
+    status.innerHTML =
+      `Placement — <span class="winner ${army}">Army ${army}</span> places a scout` +
+      `<br>${state.placementQueue.length} placement${state.placementQueue.length === 1 ? '' : 's'} remaining`;
+  } else if (state.phase === 'over') {
     if (state.winner === 'draw') {
       status.innerHTML = `Turn ${state.turn} — <span class="winner">draw</span> (${state.reason})`;
     } else {

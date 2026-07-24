@@ -23,6 +23,9 @@ export function defaultConfig() {
     height: 4,
     // Per-army sideboard: value -> count. 5x1 + 3x2 + 2x3 + 1x5.
     supply: { 1: 5, 2: 3, 3: 2, 5: 1 },
+    // Scouts each army places during the snake-placement phase; the rest of
+    // the sideboard (including remaining scouts) enters play via spawning.
+    initialScouts: 2,
     maxPiecesPerTerritory: 2,
     // Each contingent takes at most this many actions per turn...
     maxActionsPerContingent: 2,
@@ -59,10 +62,10 @@ export function neighbors(config, i) {
   return out;
 }
 
-// Snake placement order: A B B A A B B A ... one scout per slot,
-// until both armies have placed all their scouts.
+// Snake placement order: A B B A ... one scout per slot,
+// until both armies have placed their initial scouts.
 export function placementOrder(config) {
-  const perArmy = config.supply[1];
+  const perArmy = Math.min(config.initialScouts ?? config.supply[1], config.supply[1]);
   const order = [];
   let a = 0, b = 0;
   const pattern = ['A', 'B', 'B', 'A'];
