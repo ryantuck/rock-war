@@ -53,12 +53,15 @@ in-browser with the same stats as the CLI.
     co-located pieces into their fibonacci sum (1+1→2, 1+2→3, 2+3→5). Both
     constituents return to the sideboard; the new piece must be available there.
   - *Attack* (cost = attacking piece's value): strike an adjacent enemy
-    territory with one piece. **Scouts cannot attack** (`minAttackValue: 2`).
+    territory with one piece. **Scouts cannot attack** (`minAttackValue: 2`),
+    and attacking requires the piece's value to be **≥ the target
+    territory's total** — weaker attacks could never connect, so they are
+    simply illegal.
 - **Combat**: the defender may retreat each piece for free into an adjacent
   territory it occupies (respecting stacking limits), plus up to 1 scout per
   attack may retreat into an adjacent *empty* territory. Then, against the
-  pieces that stayed (margin rule):
-  - attacker value **<** defenders' sum → repelled, no effect (cost still paid)
+  pieces that stayed (margin rule; note a legal attack always starts ≥ the
+  full stack, and retreats only lower the defense):
   - attacker value **=** defenders' sum → all pieces die, attacker included
     (a 3 attacking a (2,1) kills all three)
   - attacker value **>** defenders' sum → only the defenders die; the attacker

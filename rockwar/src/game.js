@@ -365,8 +365,11 @@ export function legalActions(state, cont, remainingBudget, actionsTaken, bonusPo
           }
         } else {
           // Attack: cost equals the attacking piece's value. Pieces below
-          // minAttackValue (scouts by default) cannot attack.
-          if (p >= (config.minAttackValue ?? 1) && afford('attack', p)) {
+          // minAttackValue (scouts by default) cannot attack, and attacking
+          // requires value >= the target territory's total — a weaker attack
+          // could never connect (defenders would simply stand and repel it).
+          const defSum = nc.pieces.reduce((s, x) => s + x, 0);
+          if (p >= (config.minAttackValue ?? 1) && p >= defSum && afford('attack', p)) {
             acts.push({ type: 'attack', from: t, piece: p, to: n, cost: p });
           }
         }
