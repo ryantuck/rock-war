@@ -1,11 +1,13 @@
 import { makeRandomEngine } from './random.js';
 import { makeGreedyEngine } from './greedy.js';
+import { makeLookaheadEngine } from './lookahead.js';
 
 // Registry of available engines. Add new engines here and they show up in
 // both the CLI simulator and the frontend.
 export const engineFactories = {
   random: makeRandomEngine,
   greedy: makeGreedyEngine,
+  lookahead: makeLookaheadEngine,
 };
 
 export function makeEngine(name, opts) {

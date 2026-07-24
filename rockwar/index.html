@@ -38,7 +38,26 @@
   #board {
     display: grid; gap: 6px;
     grid-template-columns: repeat(4, 84px);
+    position: relative;
   }
+  .obelisk {
+    position: absolute; z-index: 2;
+    width: 20px; height: 20px; border-radius: 4px;
+    transform: rotate(45deg);
+    display: flex; align-items: center; justify-content: center;
+    border: 2px solid transparent;
+    box-shadow: 0 0 6px rgba(0,0,0,0.6);
+  }
+  .obelisk span {
+    transform: rotate(-45deg);
+    font-size: 10px; font-weight: 700; color: #0e1013;
+  }
+  .obelisk.fire  { background: #e05252; }
+  .obelisk.earth { background: #58b368; }
+  .obelisk.water { background: #4a9fe0; }
+  .obelisk.air   { background: #e0c94a; }
+  .obelisk.ctrl-A { border-color: var(--army-a); box-shadow: 0 0 8px var(--army-a); }
+  .obelisk.ctrl-B { border-color: var(--army-b); box-shadow: 0 0 8px var(--army-b); }
   .cell {
     width: 84px; height: 84px; border-radius: 8px;
     background: var(--empty); border: 1px solid var(--line);
@@ -119,7 +138,7 @@
 </head>
 <body>
   <h1>Rock War</h1>
-  <div class="sub">4×4 territory war — watch engines play, or batch-run hundreds of games while iterating on rules.</div>
+  <div class="sub">Territory war — watch engines play, or batch-run hundreds of games while iterating on rules.</div>
 
   <div class="layout">
     <div class="panel">

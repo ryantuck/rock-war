@@ -3,7 +3,7 @@
 
 import {
   newGame, defaultConfig, playTurn, playGame, applyPlacement, legalPlacements,
-  armyStrengthOnBoard, fmtCell,
+  armyStrengthOnBoard, fmtCell, obeliskStatus,
 } from './game.js';
 import { engineFactories, makeEngine } from './engines/index.js';
 import { mulberry32 } from './rng.js';
@@ -112,6 +112,25 @@ function render() {
     board.appendChild(cell);
   });
 
+  // Obelisks sit on the corner points between cells (cell 84px + gap 6px).
+  const pitch = 90;
+  for (const ob of config.obelisks ?? []) {
+    const st = obeliskStatus(state, ob);
+    const el = document.createElement('div');
+    el.className = `obelisk ${ob.element}` + (st.controller ? ` ctrl-${st.controller}` : '');
+    el.style.left = `${ob.corner[0] * pitch - 3 - 12}px`;
+    el.style.top = `${ob.corner[1] * pitch - 3 - 12}px`;
+    el.title = `${ob.element} → ${st.action}` +
+      (st.controller ? `: ${st.controller} +${st.bonus}` : ' (uncontrolled)') +
+      ` | adjacent value A ${st.score.A} · B ${st.score.B}`;
+    if (st.controller) {
+      const label = document.createElement('span');
+      label.textContent = `+${st.bonus}`;
+      el.appendChild(label);
+    }
+    board.appendChild(el);
+  }
+
   for (const army of ['A', 'B']) {
     const row = $(`side${army}`);
     row.innerHTML = '';
@@ -134,9 +153,17 @@ function render() {
       status.innerHTML = `Turn ${state.turn} — <span class="winner ${state.winner}">Army ${state.winner} wins</span> (${state.reason})`;
     }
   } else {
+    const obSummary = ['A', 'B'].map((army) => {
+      const held = (state.config.obelisks ?? [])
+        .map((ob) => obeliskStatus(state, ob))
+        .filter((st) => st.controller === army)
+        .map((st) => `${st.element}+${st.bonus}`);
+      return held.length ? `${army}: ${held.join(' ')}` : null;
+    }).filter(Boolean).join(' · ');
     status.innerHTML =
       `Turn ${state.turn} — <span class="winner ${state.toMove}">Army ${state.toMove}</span> to move` +
-      `<br>strength on board: A ${armyStrengthOnBoard(state, 'A')} · B ${armyStrengthOnBoard(state, 'B')}`;
+      `<br>strength on board: A ${armyStrengthOnBoard(state, 'A')} · B ${armyStrengthOnBoard(state, 'B')}` +
+      (obSummary ? `<br>obelisks — ${obSummary}` : '');
   }
 
   const log = $('log');

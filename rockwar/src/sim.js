@@ -82,6 +82,7 @@ console.log(`  ${name1.padEnd(12)} ${String(stats.wins[name1]).padStart(5)}  ${p
 console.log(`  ${name2.padEnd(12)} ${String(stats.wins[name2]).padStart(5)}  ${pct(stats.wins[name2])}`);
 console.log(`  ${'draws'.padEnd(12)} ${String(stats.wins.draw).padStart(5)}  ${pct(stats.wins.draw)}`);
 console.log(`  seat A wins ${stats.seatWins.A}, seat B wins ${stats.seatWins.B} (first-mover check)`);
+const totalSupply = Object.entries(config.supply).reduce((s, [v, n]) => s + Number(v) * n, 0);
 console.log(`  avg game length: ${avg(stats.turns)} turns`);
-console.log(`  avg winner surviving strength: ${avg(stats.winnerSurvivingStrength)} / 22`);
+console.log(`  avg winner surviving strength: ${avg(stats.winnerSurvivingStrength)} / ${totalSupply}`);
 console.log(`  endings: ${Object.entries(stats.reasons).map(([k, v]) => `${k}=${v}`).join(', ')}`);

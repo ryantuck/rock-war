@@ -26,9 +26,10 @@ in-browser with the same stats as the CLI.
 
 ## Rules as implemented
 
-- **Board**: 4×4 grid of 16 territories, orthogonal adjacency.
-- **Armies**: each side's sideboard holds 5×1 (scouts), 3×2 (warriors),
-  2×3 (chieftains), 1×5 (warlord) — 22 points total.
+- **Board**: 5×5 grid of 25 territories, orthogonal adjacency.
+- **Armies**: each side's sideboard holds 8×1 (scouts), 5×2 (warriors),
+  3×3 (chieftains), 2×5 (warlords), 1×8 (behemoth) — fibonacci counts of
+  fibonacci values, 45 points total.
 - **Placement**: snake order (A B B A), one scout per slot onto any empty
   territory, until each army has placed `initialScouts` (default 2). Remaining
   sideboard pieces — including the other scouts — enter play by spawning and
@@ -66,6 +67,20 @@ in-browser with the same stats as the CLI.
 - **First-turn handicap**: on turn 1, the opening player acts with only one
   contingent (their engine chooses which) and it takes only one action.
   Tunable via `firstTurnContingents` / `firstTurnActions`.
+- **Obelisks**: four elemental obelisks sit on corner points where four
+  territories meet — fire (red) at [1,1], earth (green) at [4,1], air
+  (yellow) at [1,4], water (blue) at [4,4]. Each maps to a mechanic:
+  fire → attack, earth → evolve, air → move, water → spawn. An army
+  *controls* an obelisk by occupying **at least 2** of its adjacent
+  territories with the **strictly greatest** total adjacent piece value of
+  **at least 3**. Control grants bonus budget for that mechanic, scaling
+  fibonacci with adjacent value: ≥3 → +1, ≥5 → +2, ≥8 → +3, ≥13 → +5,
+  ≥21 → +8, … The bonus is an army-wide per-turn pool that refreshes each
+  turn while control holds, and it **breaks the 2-action cap**: after a
+  contingent's normal actions, it may keep taking extra actions whose full
+  cost is covered by the matching pool — e.g. with fire control, spawn,
+  evolve, then attack on the fire kicker. (Within the cap, actions spend
+  contingent budget first so the kicker stays available for extras.)
 - **Winning**: eliminate all enemy pieces from the board, or leave the enemy
   with no legal action on their turn. If a combat wipes both boards at once,
   the game is a draw (`mutual-elimination`). Games also draw at the turn limit.
@@ -86,12 +101,15 @@ box or via `--config file.json` on the CLI:
 | `firstTurnContingents` | 1 | contingents the opening player may act with on turn 1 (0 = skip turn 1, null = no handicap) |
 | `firstTurnActions` | 1 | actions per contingent on turn 1 (null = normal 2) |
 | `minAttackValue` | 2 | minimum piece value that may attack — scouts can't (1 = anyone can) |
+| `obelisks` | 4 corners | element + corner position per obelisk; empty array disables them |
+| `obeliskTiers` | 3/5/8/13/21/34 | adjacent-value thresholds granting +1/+2/+3/+5/+8/+13 bonus budget |
 | destroyed pieces | removed | destroyed pieces leave the game entirely (they do *not* return to the sideboard) |
 | capture on retreat | yes | if all defenders retreat, the attacker advances into the vacated territory |
 | simultaneous wipe | draw | mutual destruction can empty both boards at once → draw |
 | `initialScouts` | 2 | scouts each army places in the placement phase (capped at scout supply) |
 | `maxTurns` | 200 | draw backstop so batch runs always terminate |
-| `supply` | 5/3/2/1 | change piece mix freely; placement uses the scout count |
+| `supply` | 8/5/3/2/1 | change piece mix freely; placement uses the scout count |
+| `width`/`height` | 5×5 | any board size; the frontend adapts |
 
 ## Engines
 
@@ -100,6 +118,13 @@ box or via `--config file.json` on the CLI:
   (kills ≫ evolves > advancing > spawning) and retreats only when standing
   would lose pieces. Weights are overridable via the factory in
   `src/engines/greedy.js`.
+- **lookahead** — one-ply search: clones the state, actually applies each
+  candidate action through the real rules engine (combat included), and
+  evaluates the resulting position — material, fighting strength, evolve
+  potential, territory, obelisk power, spawn-lock, minus the enemy's best
+  immediate attack threat. Beats greedy ~8:1 in decided games. ~40× slower
+  than greedy (still ~33ms/game). Weights overridable; pass `debug: true`
+  to log candidate scores.
 
 Add an engine by implementing three functions and registering it in
 `src/engines/index.js`:
@@ -117,26 +142,39 @@ Add an engine by implementing three functions and registering it in
 Engines only ever pick from engine-generated legal-action lists, so a buggy
 engine can't corrupt game state.
 
-## Current observations (seed 42/7/99, 500 games, seats swapped)
+## Current observations (seed 42/7/99, 500 games, seats swapped, 5×5 board)
 
-- greedy beats random 95% under margin combat — profitable attacks exist again
-  (kill a smaller stack, keep your piece, take the territory), so skill
-  dominates. Under pure `'mutual'` combat the gap collapsed to 55/26 because
-  aggression was never materially profitable.
-- **Turn-1 tempo is knife-edged in mirrors, but scout pacifism helps.** With
-  a full first turn and scouts able to attack, seat A won ~91% of decided
-  greedy mirrors; capping turn 1 to one action flipped it to ~94% seat B.
-  Banning scout attacks (`minAttackValue: 2`) pulled it back to ~75% seat A
-  (286 vs 94, 24% draws) — the best balance so far, since the opening scout
-  skirmish was part of the snowball. Still worth sweeping; candidates: a
-  turn-1 fib *budget* cap, or a pie rule.
+- **Engine ladder**: lookahead > greedy > random. Lookahead beats greedy
+  46.8% to 5.8% (47% draws) and random 73% to 8%; greedy beats random ~93%.
+  Lessons from building lookahead: a one-ply evaluator needs an
+  "evolve-ready pairs" term to see development chains, must treat
+  spawn-locked scouts as dead material (but not transient full-cell locks),
+  and must price passing as losing tempo — the biggest single improvement
+  was letting it act unless an action is *clearly* harmful.
+- greedy beats random 94% — the skill gradient survived the bigger board.
+- **The 5×5 board fixed the seat imbalance.** Greedy mirrors are now
+  essentially even (109 vs 125 seat wins) where the 4×4 board swung as far
+  as ~91% toward one seat under various turn-1 rules. More space dilutes the
+  opening tempo edge; `firstTurnContingents`/`firstTurnActions` (still 1/1)
+  plus no scout attacks complete the picture.
+- **But mirrors stalemate half the time.** ~53% of greedy mirrors hit the
+  turn cap, and raising `maxTurns` from 200 to 800 doesn't change that —
+  they're genuine fortress standoffs, not truncated games. At material
+  parity, greedy refuses losing trades, and connecting attacks require
+  committing a piece ≥ the defense, so neither side moves first. If draws
+  bother you, candidates: a turn-limit tiebreak (most board strength wins),
+  attrition (upkeep), or shrinking-board pressure.
 - **Scout-only remnants get smothered.** With scouts unable to attack,
-  `immobilized` endings appear (~4–11% of games): an army reduced to scouts
+  `immobilized` endings appear (~2–5% of games): an army reduced to scouts
   can be cornered — every adjacent cell enemy-held or stacking-blocked — and
   loses without a final battle.
 - Engine lessons that generalize to human play: avoid "spawn-lock" (a board
   of lone 3s/5s can never spawn again — scouts only stack with 1s and 2s),
   and note that exact-tie attacks are the only way to trade evenly, so
   material advantage compounds fast.
-- random mirrors run long (~115 turns, ~20% draws) — with scouts pacifist,
-  random's pressure drops and games grind.
+- random mirrors run ~158 turns with ~46% draws on the big board.
+- **Obelisks add gentle resolution pressure**: greedy-mirror stalemates
+  dipped from ~53% to ~47% and seats stayed balanced (148 vs 115). Obelisk
+  budget gets drawn in about a third of greedy mirrors — most often earth
+  (evolve) and fire (attack). Bigger tiers or more central obelisk
+  placement would raise the stakes.
