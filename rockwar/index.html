@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rock War</title>
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --bg: #14161a;
+    --panel: #1d2026;
+    --line: #2c313a;
+    --text: #e6e8ec;
+    --muted: #8b93a1;
+    --army-a: #5b8def;
+    --army-a-dim: #2a3a5c;
+    --army-b: #e2984a;
+    --army-b-dim: #54402a;
+    --empty: #23272e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px;
+    background: var(--bg); color: var(--text);
+    font: 14px/1.5 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin-bottom: 20px; }
+  .layout { display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start; }
+  .panel {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 16px;
+  }
+  .panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--muted); margin: 0 0 12px; }
+
+  /* board */
+  #board {
+    display: grid; gap: 6px;
+    grid-template-columns: repeat(4, 84px);
+  }
+  .cell {
+    width: 84px; height: 84px; border-radius: 8px;
+    background: var(--empty); border: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+    position: relative;
+  }
+  .cell .coord {
+    position: absolute; top: 3px; left: 6px;
+    font-size: 10px; color: var(--muted); opacity: 0.6;
+  }
+  .cell.army-A { background: var(--army-a-dim); border-color: var(--army-a); }
+  .cell.army-B { background: var(--army-b-dim); border-color: var(--army-b); }
+  .piece {
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-weight: 700; color: #0e1013;
+  }
+  .piece.A { background: var(--army-a); }
+  .piece.B { background: var(--army-b); }
+  .p1 { width: 24px; height: 24px; font-size: 12px; }
+  .p2 { width: 30px; height: 30px; font-size: 14px; }
+  .p3 { width: 36px; height: 36px; font-size: 15px; }
+  .p5 { width: 44px; height: 44px; font-size: 17px; }
+  .p8 { width: 52px; height: 52px; font-size: 18px; }
+
+  /* sideboards */
+  .sideboards { display: flex; gap: 16px; margin-top: 14px; }
+  .sideboard { flex: 1; }
+  .sideboard .label { font-size: 12px; margin-bottom: 6px; }
+  .sideboard .label.A { color: var(--army-a); }
+  .sideboard .label.B { color: var(--army-b); }
+  .sideboard .row { display: flex; gap: 6px; flex-wrap: wrap; min-height: 32px; align-items: center; }
+  .sideboard .piece { opacity: 0.9; }
+
+  /* controls */
+  .controls { width: 320px; }
+  .controls label { display: block; color: var(--muted); font-size: 12px; margin: 10px 0 3px; }
+  .controls select, .controls input, .controls textarea {
+    width: 100%; background: var(--bg); color: var(--text);
+    border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px;
+    font: inherit;
+  }
+  .controls textarea { height: 150px; font-size: 12px; resize: vertical; }
+  .btnrow { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  button {
+    background: #2b3040; color: var(--text);
+    border: 1px solid var(--line); border-radius: 6px;
+    padding: 7px 14px; font: inherit; cursor: pointer;
+  }
+  button:hover { border-color: var(--muted); }
+  button.primary { background: #3a4a6b; border-color: var(--army-a); }
+  button:disabled { opacity: 0.4; cursor: default; }
+  #status { margin-top: 12px; min-height: 40px; }
+  #status .winner { font-weight: 700; }
+  #status .winner.A { color: var(--army-a); }
+  #status .winner.B { color: var(--army-b); }
+
+  /* log */
+  .logpanel { width: 340px; }
+  #log {
+    height: 420px; overflow-y: auto; font-size: 12px;
+    display: flex; flex-direction: column;
+  }
+  #log .entry { padding: 1px 0; color: var(--muted); }
+  #log .entry.recent { color: var(--text); }
+  #log .turn { color: #566070; margin-right: 6px; }
+
+  /* batch */
+  .batch { margin-top: 24px; width: 100%; max-width: 760px; }
+  .batch .row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+  .batch .field label { display: block; color: var(--muted); font-size: 12px; margin-bottom: 3px; }
+  .batch input, .batch select {
+    background: var(--bg); color: var(--text); border: 1px solid var(--line);
+    border-radius: 6px; padding: 6px 8px; font: inherit; width: 110px;
+  }
+  #batchOut { margin-top: 14px; white-space: pre; font-size: 13px; color: var(--text); }
+  #batchProgress { color: var(--muted); margin-left: 12px; }
+</style>
+</head>
+<body>
+  <h1>Rock War</h1>
+  <div class="sub">4×4 territory war — watch engines play, or batch-run hundreds of games while iterating on rules.</div>
+
+  <div class="layout">
+    <div class="panel">
+      <h2>Board</h2>
+      <div id="board"></div>
+      <div class="sideboards">
+        <div class="sideboard"><div class="label A">Army A sideboard</div><div class="row" id="sideA"></div></div>
+        <div class="sideboard"><div class="label B">Army B sideboard</div><div class="row" id="sideB"></div></div>
+      </div>
+    </div>
+
+    <div class="panel controls">
+      <h2>Game</h2>
+      <label>Engine A</label>
+      <select id="engineA"></select>
+      <label>Engine B</label>
+      <select id="engineB"></select>
+      <label>Seed</label>
+      <input id="seed" type="number" value="1">
+      <div class="btnrow">
+        <button id="newGame" class="primary">New game</button>
+        <button id="step">Step turn</button>
+        <button id="auto">▶ Auto</button>
+      </div>
+      <div id="status"></div>
+      <label>Rules config (applies on New game)</label>
+      <textarea id="config" spellcheck="false"></textarea>
+    </div>
+
+    <div class="panel logpanel">
+      <h2>Log</h2>
+      <div id="log"></div>
+    </div>
+  </div>
+
+  <div class="panel batch">
+    <h2>Batch simulation</h2>
+    <div class="row">
+      <div class="field"><label>Engine 1</label><select id="batchA"></select></div>
+      <div class="field"><label>Engine 2</label><select id="batchB"></select></div>
+      <div class="field"><label>Games</label><input id="batchN" type="number" value="500"></div>
+      <div class="field"><label>Seed</label><input id="batchSeed" type="number" value="42"></div>
+      <button id="runBatch" class="primary">Run batch</button>
+      <span id="batchProgress"></span>
+    </div>
+    <div id="batchOut"></div>
+  </div>
+
+  <script type="module" src="./src/ui.js"></script>
+</body>
+</html>
