@@ -73,11 +73,14 @@ in-browser with the same stats as the CLI.
   fire → attack, earth → evolve, air → move, water → spawn. An army
   *controls* an obelisk by occupying **at least 2** of its adjacent
   territories with the **strictly greatest** total adjacent piece value of
-  **at least 3**. Control grants bonus budget for that mechanic, tiered by
-  adjacent value: ≥3 → +1, ≥5 → +2, ≥8 → +3, ≥13 → +4, … The bonus is an
-  army-wide per-turn pool: any contingent may draw from it when paying for
-  an action of that type (bonus is spent before contingent budget), and it
-  refreshes each turn while control holds.
+  **at least 3**. Control grants bonus budget for that mechanic, scaling
+  fibonacci with adjacent value: ≥3 → +1, ≥5 → +2, ≥8 → +3, ≥13 → +5,
+  ≥21 → +8, … The bonus is an army-wide per-turn pool that refreshes each
+  turn while control holds, and it **breaks the 2-action cap**: after a
+  contingent's normal actions, it may keep taking extra actions whose full
+  cost is covered by the matching pool — e.g. with fire control, spawn,
+  evolve, then attack on the fire kicker. (Within the cap, actions spend
+  contingent budget first so the kicker stays available for extras.)
 - **Winning**: eliminate all enemy pieces from the board, or leave the enemy
   with no legal action on their turn. If a combat wipes both boards at once,
   the game is a draw (`mutual-elimination`). Games also draw at the turn limit.
@@ -99,7 +102,7 @@ box or via `--config file.json` on the CLI:
 | `firstTurnActions` | 1 | actions per contingent on turn 1 (null = normal 2) |
 | `minAttackValue` | 2 | minimum piece value that may attack — scouts can't (1 = anyone can) |
 | `obelisks` | 4 corners | element + corner position per obelisk; empty array disables them |
-| `obeliskTiers` | 3/5/8/13/21/34 | adjacent-value thresholds for +1/+2/+3/… bonus budget |
+| `obeliskTiers` | 3/5/8/13/21/34 | adjacent-value thresholds granting +1/+2/+3/+5/+8/+13 bonus budget |
 | destroyed pieces | removed | destroyed pieces leave the game entirely (they do *not* return to the sideboard) |
 | capture on retreat | yes | if all defenders retreat, the attacker advances into the vacated territory |
 | simultaneous wipe | draw | mutual destruction can empty both boards at once → draw |

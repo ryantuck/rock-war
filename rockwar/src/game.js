@@ -64,7 +64,8 @@ export function defaultConfig() {
     ],
     // Control requires occupying >= 2 of the obelisk's adjacent territories
     // with the strictly greatest total adjacent piece value, which must reach
-    // the first tier. Tiers: value >= 3 → +1 budget, >= 5 → +2, >= 8 → +3, ...
+    // the first tier. Bonuses scale fibonacci with the tier reached:
+    // value >= 3 → +1 budget, >= 5 → +2, >= 8 → +3, >= 13 → +5, >= 21 → +8.
     obeliskTiers: [3, 5, 8, 13, 21, 34],
     // Game is a draw after this many turns (one turn = one army's contingents acting).
     maxTurns: 200,
@@ -138,7 +139,8 @@ export function obeliskStatus(state, ob) {
   }
   let bonus = 0;
   if (controller) {
-    for (let i = 0; i < tiers.length; i++) if (score[controller] >= tiers[i]) bonus = i + 1;
+    // Fibonacci scaling: tier thresholds [3,5,8,13,...] grant [1,2,3,5,...].
+    for (let i = 0; i < tiers.length; i++) if (score[controller] >= tiers[i]) bonus = FIBS[i];
   }
   return { element: ob.element, action: ELEMENT_ACTIONS[ob.element], controller, bonus, score, count };
 }
@@ -311,14 +313,19 @@ export function evolveCostOf(config, a, b) {
 // All legal actions for `cont` given the remaining fib budget and actions taken.
 // Actions carry their cost. Contingent membership (cont.terrs) may have been
 // extended mid-turn by moves/attacks — callers keep cont.terrs updated.
-// bonusPool holds obelisk bonus budget by action type ({ attack: 1, ... });
-// an action is affordable if cost <= remainingBudget + its type's bonus.
-export function legalActions(state, cont, remainingBudget, actionsTaken, bonusPool = {}) {
-  const { config } = state;
+// bonusPool holds obelisk bonus budget by action type ({ attack: 1, ... }).
+// Within the action cap, an action is affordable from budget + type bonus.
+// BEYOND the cap, obelisk bonuses grant extra actions: an action is legal
+// only if its full cost is covered by its type's bonus pool.
+export function legalActions(state, cont, remainingBudget, actionsTaken, bonusPool = {},
+                             actionCap = state.config.maxActionsPerContingent) {
   const acts = [];
-  if (actionsTaken >= config.maxActionsPerContingent) return acts;
+  const { config } = state;
   const army = cont.army;
-  const afford = (type, cost) => cost <= remainingBudget + (bonusPool[type] || 0);
+  const beyondCap = actionsTaken >= actionCap;
+  const afford = (type, cost) => beyondCap
+    ? cost <= (bonusPool[type] || 0)
+    : cost <= remainingBudget + (bonusPool[type] || 0);
 
   for (const t of cont.terrs) {
     const cell = state.cells[t];
@@ -576,8 +583,11 @@ export function playTurn(state, engines, rng) {
   for (const cont of acting) {
     let remaining = cont.strength;
     let taken = 0;
-    while (taken < maxActions && state.phase === 'play') {
-      const acts = legalActions(state, cont, remaining, taken, bonusPool);
+    // Loop past maxActions: obelisk bonuses fund extra actions beyond the cap
+    // (legalActions only offers fully-bonus-funded actions there), so a
+    // contingent can e.g. spawn, evolve, then attack on the fire kicker.
+    while (state.phase === 'play') {
+      const acts = legalActions(state, cont, remaining, taken, bonusPool, maxActions);
       if (acts.length === 0) break;
       const choice = engines[army].chooseAction(
         state,
@@ -589,13 +599,15 @@ export function playTurn(state, engines, rng) {
       // Only accept an action from the legal list.
       const match = acts.find((a) => JSON.stringify(a) === JSON.stringify(choice));
       if (!match) break;
+      const beyondCap = taken >= maxActions;
       const res = applyAction(state, army, match, engines, rng);
       if (res.capturedTerritory !== undefined) cont.terrs.add(res.capturedTerritory);
-      // Pay with the action type's obelisk bonus first, then contingent budget.
-      const drawn = Math.min(bonusPool[match.type] || 0, match.cost);
+      // Payment: within the cap, contingent budget first so the kicker stays
+      // available for extra actions; beyond the cap, entirely bonus-funded.
+      const drawn = beyondCap ? match.cost : Math.max(0, match.cost - remaining);
       if (drawn > 0) {
         bonusPool[match.type] -= drawn;
-        pushLog(state, `${army} draws ${drawn} obelisk ${match.type} budget`);
+        pushLog(state, `${army} draws ${drawn} obelisk ${match.type} budget${beyondCap ? ' (extra action)' : ''}`);
       }
       remaining -= match.cost - drawn;
       taken++;
