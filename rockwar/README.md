@@ -59,14 +59,21 @@ in-browser with the same stats as the CLI.
     simply illegal.
 - **Combat**: the defender may retreat each piece for free into an adjacent
   territory it occupies (respecting stacking limits), plus up to 1 scout per
-  attack may retreat into an adjacent *empty* territory. Then, against the
-  pieces that stayed (margin rule; note a legal attack always starts ≥ the
-  full stack, and retreats only lower the defense):
-  - attacker value **=** defenders' sum → all pieces die, attacker included
-    (a 3 attacking a (2,1) kills all three)
-  - attacker value **>** defenders' sum → only the defenders die; the attacker
-    survives and advances (a 3 attacking a (2) kills just the 2)
-  If every defender retreats, no combat happens and the attacker advances.
+  attack may retreat into an adjacent *empty* territory. Then the defenders
+  that stayed all die (a legal attack always starts ≥ the full stack, and
+  retreats only lower the defense), and the attacker's fate depends on how
+  stiff the broken defense was (devolve rule):
+  - defense **> ½** the attacker's value → the attacker **devolves** into its
+    fibonacci constituents (3→2+1, 5→3+2, 8→5+3, 2→1+1), exchanged through
+    the sideboard like evolution in reverse. A 3 attacking a (2) kills the 2
+    and lands as a (2,1); a 3 attacking a (2,1) kills both and likewise
+    devolves. Value is conserved — the price is concentration and the tempo
+    to re-evolve. (If the sideboard lacks a constituent, that part is lost.)
+  - defense **≤ ½** the attacker's value → the attacker survives intact
+    (a 3 attacking a lone (1): the 1 just dies).
+  Either way the attacker advances into the captured territory (every
+  constituent pair is fib-adjacent, so it fits). If every defender retreats,
+  no combat happens and the attacker advances whole.
 - **First-turn handicap**: on turn 1, the opening player acts with only one
   contingent (their engine chooses which) and it takes only one action.
   Tunable via `firstTurnContingents` / `firstTurnActions`.
@@ -100,7 +107,8 @@ box or via `--config file.json` on the CLI:
 | budget | ≤ strength | action costs sum *up to* strength (exact sums are usually impossible with 2 fib values) |
 | `evolveCost` | `'smaller'` | evolve's cost wasn't specified; also supports `'larger'` and `'result'` |
 | `scoutRetreatBudget` | 1 | read as *1 scout per attack* may flee to an empty territory |
-| `combatRule` | `'margin'` | attacker dies only on an exact-value tie; `'mutual'` = attacker always dies with the defenders; `'attacker-survives'` = attacker never does |
+| `combatRule` | `'devolve'` | attacker devolves through stiff defense; also `'margin'` (dies on exact tie), `'mutual'` (always dies), `'attacker-survives'` (never dies) |
+| `devolveThreshold` | 0.5 | devolution triggers when defense > this fraction of the attacker |
 | `firstTurnContingents` | 1 | contingents the opening player may act with on turn 1 (0 = skip turn 1, null = no handicap) |
 | `firstTurnActions` | 1 | actions per contingent on turn 1 (null = normal 2) |
 | `minAttackValue` | 2 | minimum piece value that may attack — scouts can't (1 = anyone can) |
@@ -145,16 +153,29 @@ Add an engine by implementing three functions and registering it in
 Engines only ever pick from engine-generated legal-action lists, so a buggy
 engine can't corrupt game state.
 
-## Current observations (seed 42/7/99, 500 games, seats swapped, 5×5 board)
+## Current observations (300-game matchups, seats swapped, 5×5, devolve combat)
 
-- **Engine ladder**: lookahead > greedy > random. Lookahead beats greedy
-  46.8% to 5.8% (47% draws) and random 73% to 8%; greedy beats random ~93%.
-  Lessons from building lookahead: a one-ply evaluator needs an
+- **Devolution made aggression profitable and broke the fortress meta.**
+  A connecting attack now conserves the attacker's material (it devolves
+  rather than dies through stiff defense), so attacking whenever legal is
+  close to correct play. Greedy mirrors went from ~50% fortress draws under
+  the old tie-death rule to **16% draws** with games resolving in ~66 turns.
+  Greedy vs random jumped back to 98%.
+- **The engine gap collapsed** — by the rules getting healthier. Lookahead's
+  edge over greedy shrank from ~12:1 to under 2:1 (31.7% vs 17.3%, 51%
+  draws): careful threat-avoidance mattered enormously when any attack
+  could be a blunder, and matters much less now that attacks conserve
+  value. Lookahead mirrors still draw ~61% — its caution, not the rules,
+  is now the bottleneck.
+- **Watch the seat balance**: greedy mirrors show a second-player advantage
+  again (seat B won 178 of 251 decided games) — the tempo dynamics of the
+  turn-1 handicap shift with every combat-rule change; worth re-sweeping
+  `firstTurnActions`/`firstTurnContingents` under devolve.
+- Lessons from building lookahead: a one-ply evaluator needs an
   "evolve-ready pairs" term to see development chains, must treat
   spawn-locked scouts as dead material (but not transient full-cell locks),
   and must price passing as losing tempo — the biggest single improvement
   was letting it act unless an action is *clearly* harmful.
-- greedy beats random 94% — the skill gradient survived the bigger board.
 - **The 5×5 board fixed the seat imbalance.** Greedy mirrors are now
   essentially even (109 vs 125 seat wins) where the 4×4 board swung as far
   as ~91% toward one seat under various turn-1 rules. More space dilutes the
