@@ -147,7 +147,9 @@ function maxAttackThreat(state, enemy, W) {
           if (!nc.army || nc.army === enemy) continue;
           const defSum = nc.pieces.reduce((s, x) => s + x, 0);
           if (p > defSum) best = Math.max(best, defSum);
-          else if (p === defSum && rule === 'attacker-survives') best = Math.max(best, defSum);
+          else if (p === defSum && (rule === 'attacker-survives' || rule === 'devolve')) {
+            best = Math.max(best, defSum);
+          }
         }
       }
     }
@@ -179,8 +181,9 @@ function evaluate(state, me, W) {
 
 // Principled defender policy used both when this engine defends for real and
 // for the defenders inside simulations: stand when the attack fails or is an
-// exact-tie trade (margin rule), otherwise save what can be saved — and under
-// 'mutual', leave the smallest piece to take the attacker down.
+// exact-tie trade (margin rule), otherwise save what can be saved — under
+// 'mutual', leave the smallest piece to take the attacker down; under
+// 'devolve' the attacker survives regardless, so material comes first.
 function retreatPolicy(state, attackInfo, options) {
   const total = options.reduce((s, o) => s + o.piece, 0);
   if (attackInfo.piece < total) return [];

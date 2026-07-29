@@ -8,6 +8,15 @@ export function isFib(n) {
   return FIBS.includes(n);
 }
 
+// Fibonacci constituents of a piece: what it devolves into (and what evolves
+// into it). Every constituent pair is fib-adjacent, so it fits one territory.
+export function fibParts(p) {
+  if (p === 2) return [1, 1];
+  const i = FIBS.indexOf(p);
+  if (i <= 0) return []; // scouts have no constituents
+  return [FIBS[i - 1], FIBS[i - 2]];
+}
+
 // Two pieces may share a territory only if they are fibonacci-adjacent:
 // (1,1), (1,2), (2,3), (3,5), (5,8), ...
 export function fibAdjacent(a, b) {
@@ -38,12 +47,20 @@ export function defaultConfig() {
     scoutRetreatBudget: 1,
     // How a connecting attack (attacker value >= non-retreated defenders'
     // sum) resolves:
-    //   'margin'            — defenders die; the attacker dies too only on an
-    //                         exact tie (3 vs (2,1) kills all three, but 3 vs
-    //                         (2) kills only the 2 and the attacker advances)
+    //   'devolve'           — defenders die; if their sum exceeds
+    //                         devolveThreshold x attacker, the attacker
+    //                         devolves into its fibonacci constituents
+    //                         (3→2+1, 5→3+2, 8→5+3, 2→1+1) via the sideboard;
+    //                         otherwise it survives intact. Either way it
+    //                         advances. E.g. 3 vs (2): the 2 dies and the 3
+    //                         lands as (2,1); 3 vs (1): the 1 just dies.
+    //   'margin'            — defenders die; the attacker dies only on an
+    //                         exact tie
     //   'mutual'            — the attacker always dies with the defenders
     //   'attacker-survives' — the attacker always survives and advances
-    combatRule: 'margin',
+    combatRule: 'devolve',
+    // Devolution triggers when defense > this fraction of the attacker.
+    devolveThreshold: 0.5,
     // Minimum piece value that may attack: scouts (1) cannot attack.
     minAttackValue: 2,
     // First-turn handicap: the first player acts with at most this many
@@ -365,8 +382,11 @@ export function legalActions(state, cont, remainingBudget, actionsTaken, bonusPo
           }
         } else {
           // Attack: cost equals the attacking piece's value. Pieces below
-          // minAttackValue (scouts by default) cannot attack.
-          if (p >= (config.minAttackValue ?? 1) && afford('attack', p)) {
+          // minAttackValue (scouts by default) cannot attack, and attacking
+          // requires value >= the target territory's total — a weaker attack
+          // could never connect (defenders would simply stand and repel it).
+          const defSum = nc.pieces.reduce((s, x) => s + x, 0);
+          if (p >= (config.minAttackValue ?? 1) && p >= defSum && afford('attack', p)) {
             acts.push({ type: 'attack', from: t, piece: p, to: n, cost: p });
           }
         }
@@ -440,18 +460,34 @@ function resolveAttack(state, army, action, engines, rng) {
   const remaining = defCell.pieces;
   const defSum = remaining.reduce((s, p) => s + p, 0);
   let destroyed = [];
+  const rule = combatRuleOf(config);
   if (remaining.length > 0) {
     if (action.piece >= defSum) {
       destroyed = [...remaining];
       defCell.pieces = [];
       defCell.army = null;
-      const rule = combatRuleOf(config);
       const attackerDies =
         rule === 'mutual' || (rule === 'margin' && action.piece === defSum);
       if (attackerDies) {
         removePiece(state, action.from, action.piece);
         pushLog(state, `${army} ${action.piece} and ${defArmy} [${destroyed.join(',')}] destroy each other at ${fmtCell(config, action.to)}`);
         return { advanced: false, destroyed };
+      }
+      // Devolution: breaking a defense worth more than half the attacker
+      // splits the attacker into its fibonacci constituents (via sideboard).
+      if (rule === 'devolve' && defSum > action.piece * (config.devolveThreshold ?? 0.5)) {
+        removePiece(state, action.from, action.piece);
+        state.sideboard[army][action.piece] = (state.sideboard[army][action.piece] || 0) + 1;
+        const placed = [];
+        for (const part of fibParts(action.piece)) {
+          if ((state.sideboard[army][part] || 0) > 0) {
+            state.sideboard[army][part]--;
+            addPiece(state, action.to, army, part);
+            placed.push(part);
+          }
+        }
+        pushLog(state, `${army} ${action.piece} destroys [${destroyed.join(',')}] and devolves to (${placed.join(',') || 'nothing'}) at ${fmtCell(config, action.to)}`);
+        return { advanced: placed.length > 0, destroyed };
       }
       pushLog(state, `${army} ${action.piece} destroys [${destroyed.join(',')}] at ${fmtCell(config, action.to)}`);
     } else {

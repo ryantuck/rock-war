@@ -8,6 +8,7 @@ const DEFAULT_WEIGHTS = {
   killPerPoint: 12,     // per point of enemy material destroyed
   capture: 6,           // taking an enemy territory
   trade: 8,             // base value of forcing combat (mutual destruction)
+  devolvePenalty: 5,    // attacking through a stiff defense splits our piece
   evolve: 10,           // consolidating into a bigger piece
   evolvePerPoint: 3,
   advancePerStep: 5,    // moving one step closer to the nearest enemy
@@ -119,6 +120,12 @@ export function makeGreedyEngine(opts = {}) {
           const attackerDies = rule === 'mutual' || (rule === 'margin' && a.piece === defSum);
           if (a.piece < defSum) {
             score -= 100; // attack would be repelled — never worth it
+          } else if (rule === 'devolve') {
+            // Defenders die and we keep our value (possibly split into
+            // constituents) — attacking is material-profitable; devolution
+            // only costs concentration and the tempo to re-evolve.
+            const devolves = defSum > a.piece * (state.config.devolveThreshold ?? 0.5);
+            score += defSum * W.killPerPoint + W.capture - (devolves ? W.devolvePenalty : 0);
           } else if (attackerDies) {
             // We die with them: value the trade by material delta, and only
             // seek trades from a position of strength — when ahead on total
@@ -180,11 +187,11 @@ export function makeGreedyEngine(opts = {}) {
     },
 
     // If the attack would connect (attacker >= our total), save what we can,
-    // biggest pieces first. Under 'mutual', deliberately leave the smallest
-    // piece behind — it takes the attacker down with it. Under 'margin', an
-    // exact tie kills the attacker, so stand and trade; partial retreats only
-    // hand the attacker a free kill (its margin grows as pieces leave).
-    // Otherwise stand only when the attack would be repelled.
+    // biggest pieces first. Under 'devolve' the attacker survives in some
+    // form no matter what, so saving material always comes first. Under
+    // 'mutual', deliberately leave the smallest piece behind — it takes the
+    // attacker down with it. Under 'margin', an exact tie kills the attacker,
+    // so stand and trade. Otherwise stand only when the attack is repelled.
     planRetreats(state, attackInfo, options, rng) {
       const total = options.reduce((s, o) => s + o.piece, 0);
       if (attackInfo.piece < total) return []; // attack fails; don't budge
