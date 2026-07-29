@@ -165,8 +165,12 @@ engine can't corrupt game state.
   edge over greedy shrank from ~12:1 to under 2:1 (31.7% vs 17.3%, 51%
   draws): careful threat-avoidance mattered enormously when any attack
   could be a blunder, and matters much less now that attacks conserve
-  value. Lookahead mirrors still draw ~61% — its caution, not the rules,
-  is now the bottleneck.
+  value. Lookahead needed two endgame terms to convert won games — obelisk
+  annuities that *fade* with enemy strength (an army once sat on its corner
+  bonuses at 26-vs-2 rather than finish) and a *hunt drive* that turns
+  material dominance into pressure to close distance. With them it beats
+  random 98% (was 89%) and mirror draws fall to ~50% — the rest are genuine
+  parity standoffs.
 - **Watch the seat balance**: greedy mirrors show a second-player advantage
   again (seat B won 178 of 251 decided games) — the tempo dynamics of the
   turn-1 handicap shift with every combat-rule change; worth re-sweeping

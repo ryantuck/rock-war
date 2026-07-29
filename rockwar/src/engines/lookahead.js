@@ -22,6 +22,11 @@ const DEFAULT_WEIGHTS = {
   obeliskProgress: 0.5, // per point of adjacency-margin toward each obelisk,
                     // so partial progress (first cell, more value) pays too
   obeliskFoothold: 2,   // having the 2-territory foothold at an obelisk
+  obeliskFadeAt: 12, // obelisk terms reach full value only while the enemy
+                    // has at least this much deployable strength — budget
+                    // annuities are worthless against a nearly-dead opponent
+  hunt: 2,          // extra advance pressure per point of material dominance
+  huntCap: 4,       // ...capped, so the hunt drive can't dwarf everything
   potential: 2,     // per point of evolve-ready pairs (sum in sideboard)
   threat: 3,        // per point the enemy's best reply attack would win
   myThreat: 6,      // per point our own best attack would win (keep pressure on)
@@ -164,14 +169,21 @@ function evaluate(state, me, W) {
   if (theirPieces === 0 && myPieces > 0) return 1e6;
   if (myPieces === 0 && theirPieces > 0) return -1e6;
   if (myPieces === 0 && theirPieces === 0) return 0;
+  const myDep = deployable(state, me);
+  const enemyDep = deployable(state, enemy);
   let score = 0;
-  score += W.material * (deployable(state, me) - deployable(state, enemy));
+  score += W.material * (myDep - enemyDep);
   score += W.pieces * (myPieces - theirPieces);
   score += W.fighting * (fightingStrength(state, me) - fightingStrength(state, enemy));
   score += W.territory * (territoryCount(state, me) - territoryCount(state, enemy));
-  score += obeliskGradient(state, me, W);
+  // Obelisk annuities fade as the enemy fades — against a nearly-dead
+  // opponent, holding budget bonuses must never outbid finishing the game.
+  score += Math.min(1, enemyDep / W.obeliskFadeAt) * obeliskGradient(state, me, W);
   score += W.potential * (evolvePotential(state, me) - evolvePotential(state, enemy));
-  score -= W.advance * avgDistToEnemy(state, me);
+  // Hunt drive: material dominance converts into pressure to close distance
+  // and finish, so a won game gets won instead of drifting to the turn cap.
+  const hunt = W.hunt * Math.min(W.huntCap, Math.max(0, myDep / Math.max(1, enemyDep) - 1));
+  score -= (W.advance + hunt) * avgDistToEnemy(state, me);
   if (spawnLocked(state, me)) score -= W.spawnLock;
   if (spawnLocked(state, enemy)) score += W.spawnLock;
   score -= W.threat * maxAttackThreat(state, enemy, W);
