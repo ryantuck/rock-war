@@ -122,6 +122,15 @@ board can never drift from the real state. Sims ignore the stream.
   fuel scout). The once-per-obelisk ledger is per player-turn, so an
   element can fire once during your turn and once as a reaction during
   theirs. Disable everything with `obeliskAbilities: false`.
+- **Obelisk passive powers**: while control holds, obelisks also project
+  army-wide defensive auras (magnitudes scale with the bonus tier):
+  - *air*: your scout-retreat-into-empty budget on each attack against you
+    is increased by the air bonus.
+  - *water*: your pieces that would die in combat **return to your
+    sideboard** instead of leaving the game.
+  - *earth*: attacking your territories costs the attacker piece value
+    **plus the earth bonus**.
+  Disable with `obeliskPowers: false`.
 - **Winning**: eliminate all enemy pieces from the board, or leave the enemy
   with no legal action on their turn. If a combat wipes both boards at once,
   the game is a draw (`mutual-elimination`). Games also draw at the turn limit.
@@ -145,6 +154,7 @@ box or via `--config file.json` on the CLI:
 | `minAttackValue` | 2 | minimum piece value that may attack — scouts can't (1 = anyone can) |
 | `obelisks` | 4 corners | element + corner position per obelisk; empty array disables them |
 | `obeliskAbilities` | `true` | controlled obelisks grant their active ability |
+| `obeliskPowers` | `true` | passive auras: air retreat budget, water combat saves, earth attack tax |
 | `obeliskTiers` | 3/5/8/13/21/34 | adjacent-value thresholds granting +1/+2/+3/+5/+8/+13 bonus budget |
 | destroyed pieces | removed | destroyed pieces leave the game entirely (they do *not* return to the sideboard) |
 | capture on retreat | yes | if all defenders retreat, the attacker advances into the vacated territory |

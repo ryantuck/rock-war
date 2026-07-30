@@ -90,6 +90,15 @@ export function defaultConfig() {
     //   air   — return the scout to displace ANY enemy piece into an
     //           adjacent legal territory of your choice
     obeliskAbilities: true,
+    // Controlled obelisks also project passive defensive powers, army-wide,
+    // while control holds (magnitudes scale with the obelisk's bonus tier):
+    //   air   — the defender's scout-retreat-into-empty budget is increased
+    //           by the air bonus on every attack against them
+    //   water — the defender's pieces that would die in combat return to
+    //           their sideboard instead
+    //   earth — attacking the earth-holder's territories costs the attacker
+    //           piece value + the earth bonus
+    obeliskPowers: true,
     // Control requires occupying >= 2 of the obelisk's adjacent territories
     // with the strictly greatest total adjacent piece value, which must reach
     // the first tier. Bonuses scale fibonacci with the tier reached:
@@ -171,6 +180,18 @@ export function obeliskStatus(state, ob) {
     for (let i = 0; i < tiers.length; i++) if (score[controller] >= tiers[i]) bonus = FIBS[i];
   }
   return { element: ob.element, action: ELEMENT_ACTIONS[ob.element], controller, bonus, score, count };
+}
+
+// Bonus tier of `element` if `army` controls it, else 0. Used by the passive
+// obelisk powers (air retreat budget, water combat saves, earth attack tax).
+export function obeliskElementBonus(state, army, element) {
+  if (state.config.obeliskPowers === false) return 0;
+  for (const ob of state.config.obelisks ?? []) {
+    if (ob.element !== element) continue;
+    const st = obeliskStatus(state, ob);
+    if (st.controller === army) return st.bonus;
+  }
+  return 0;
 }
 
 // Per-turn bonus budget pools by action type for `army`, e.g. { attack: 1 }.
@@ -376,6 +397,8 @@ export function legalActions(state, cont, remainingBudget, actionsTaken, bonusPo
   const afford = (type, cost) => beyondCap
     ? cost <= (bonusPool[type] || 0)
     : cost <= remainingBudget + (bonusPool[type] || 0);
+  // Earth power: attacking the earth-holder's territories costs extra.
+  const earthTax = obeliskElementBonus(state, other(army), 'earth');
 
   for (const t of cont.terrs) {
     const cell = state.cells[t];
@@ -419,8 +442,8 @@ export function legalActions(state, cont, remainingBudget, actionsTaken, bonusPo
           // requires value >= the target territory's total — a weaker attack
           // could never connect (defenders would simply stand and repel it).
           const defSum = nc.pieces.reduce((s, x) => s + x, 0);
-          if (p >= (config.minAttackValue ?? 1) && p >= defSum && afford('attack', p)) {
-            acts.push({ type: 'attack', from: t, piece: p, to: n, cost: p });
+          if (p >= (config.minAttackValue ?? 1) && p >= defSum && afford('attack', p + earthTax)) {
+            acts.push({ type: 'attack', from: t, piece: p, to: n, cost: p + earthTax });
           }
         }
       }
@@ -521,7 +544,9 @@ function resolveAttack(state, army, action, engines, rng) {
   }
 
   // Validate and apply retreats sequentially against the evolving state.
-  let scoutBudget = config.scoutRetreatBudget;
+  // Air power: the defender's empty-territory retreat budget grows with
+  // their air-obelisk bonus.
+  let scoutBudget = (config.scoutRetreatBudget ?? 1) + obeliskElementBonus(state, defArmy, 'air');
   for (const r of plan) {
     if (!r) continue;
     if (!defCell.pieces.includes(r.piece)) continue;
@@ -547,6 +572,20 @@ function resolveAttack(state, army, action, engines, rng) {
   const defSum = remaining.reduce((s, p) => s + p, 0);
   let destroyed = [];
   const rule = combatRuleOf(config);
+  // Water power: the defender's fallen pieces return to their sideboard
+  // instead of leaving the game.
+  const waterSave = obeliskElementBonus(state, defArmy, 'water') > 0;
+  const fellDefenders = () => {
+    if (!waterSave) {
+      emitEvent(state, { type: 'destroyed', army: defArmy, pieces: destroyed, at: action.to });
+      return 'destroys';
+    }
+    for (const p of destroyed) {
+      state.sideboard[defArmy][p]++;
+      emitEvent(state, { type: 'toSideboard', army: defArmy, piece: p, from: action.to });
+    }
+    return 'breaks (water returns)';
+  };
   if (remaining.length > 0) {
     if (action.piece >= defSum) {
       destroyed = [...remaining];
@@ -556,15 +595,15 @@ function resolveAttack(state, army, action, engines, rng) {
         rule === 'mutual' || (rule === 'margin' && action.piece === defSum);
       if (attackerDies) {
         removePiece(state, action.from, action.piece);
-        emitEvent(state, { type: 'destroyed', army: defArmy, pieces: destroyed, at: action.to });
+        const verb = fellDefenders();
         emitEvent(state, { type: 'destroyed', army, pieces: [action.piece], at: action.from });
-        pushLog(state, `${army} ${action.piece} and ${defArmy} [${destroyed.join(',')}] destroy each other at ${fmtCell(config, action.to)}`);
+        pushLog(state, `${army} ${action.piece} ${verb} [${destroyed.join(',')}] at ${fmtCell(config, action.to)} and dies`);
         return { advanced: false, destroyed };
       }
       // Devolution: breaking a defense worth more than half the attacker
       // splits the attacker into its fibonacci constituents (via sideboard).
       if (rule === 'devolve' && defSum > action.piece * (config.devolveThreshold ?? 0.5)) {
-        emitEvent(state, { type: 'destroyed', army: defArmy, pieces: destroyed, at: action.to });
+        const verb = fellDefenders();
         removePiece(state, action.from, action.piece);
         state.sideboard[army][action.piece] = (state.sideboard[army][action.piece] || 0) + 1;
         const placed = [];
@@ -576,11 +615,11 @@ function resolveAttack(state, army, action, engines, rng) {
           }
         }
         emitEvent(state, { type: 'attackDevolve', army, piece: action.piece, from: action.from, to: action.to, parts: placed });
-        pushLog(state, `${army} ${action.piece} destroys [${destroyed.join(',')}] and devolves to (${placed.join(',') || 'nothing'}) at ${fmtCell(config, action.to)}`);
+        pushLog(state, `${army} ${action.piece} ${verb} [${destroyed.join(',')}] and devolves to (${placed.join(',') || 'nothing'}) at ${fmtCell(config, action.to)}`);
         return { advanced: placed.length > 0, destroyed };
       }
-      emitEvent(state, { type: 'destroyed', army: defArmy, pieces: destroyed, at: action.to });
-      pushLog(state, `${army} ${action.piece} destroys [${destroyed.join(',')}] at ${fmtCell(config, action.to)}`);
+      const verb = fellDefenders();
+      pushLog(state, `${army} ${action.piece} ${verb} [${destroyed.join(',')}] at ${fmtCell(config, action.to)}`);
     } else {
       pushLog(state, `${army} ${action.piece} attack on ${fmtCell(config, action.to)} repelled (def ${defSum})`);
       return { advanced: false, destroyed };

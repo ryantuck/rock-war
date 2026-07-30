@@ -9,7 +9,7 @@
 import {
   legalPlacements, legalActions, applyAction, contingents, neighbors, xy,
   other, armyPieceCount, armyStrengthOnBoard, canAddPiece, obeliskBonuses,
-  obeliskStatus, obeliskCells, combatRuleOf,
+  obeliskStatus, obeliskCells, obeliskElementBonus, combatRuleOf,
 } from '../game.js';
 
 const DEFAULT_WEIGHTS = {
@@ -151,6 +151,10 @@ function maxAttackThreat(state, enemy, W) {
   const rule = combatRuleOf(config);
   const minAtk = config.minAttackValue ?? 1;
   const pool = obeliskBonuses(state, enemy);
+  // Earth taxes the enemy's attacks on us; water halves what a loss costs us
+  // (our fallen pieces return to the sideboard instead of dying).
+  const earthTax = obeliskElementBonus(state, other(enemy), 'earth');
+  const waterScale = obeliskElementBonus(state, other(enemy), 'water') > 0 ? 0.5 : 1;
   let best = 0;
   for (const cont of contingents(state, enemy)) {
     const budget = cont.strength + (pool.attack || 0);
@@ -158,14 +162,14 @@ function maxAttackThreat(state, enemy, W) {
       const cell = state.cells[t];
       if (cell.army !== enemy) continue;
       for (const p of new Set(cell.pieces)) {
-        if (p < minAtk || p > budget) continue;
+        if (p < minAtk || p + earthTax > budget) continue;
         for (const n of neighbors(config, t)) {
           const nc = state.cells[n];
           if (!nc.army || nc.army === enemy) continue;
           const defSum = nc.pieces.reduce((s, x) => s + x, 0);
-          if (p > defSum) best = Math.max(best, defSum);
+          if (p > defSum) best = Math.max(best, defSum * waterScale);
           else if (p === defSum && (rule === 'attacker-survives' || rule === 'devolve')) {
-            best = Math.max(best, defSum);
+            best = Math.max(best, defSum * waterScale);
           }
         }
       }
