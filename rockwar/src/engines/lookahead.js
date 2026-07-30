@@ -248,7 +248,7 @@ export function makeLookaheadEngine(opts = {}) {
       let best = null;
       let bestScore = baseline;
       for (const a of acts) {
-        const clone = structuredClone({ ...state, log: [] });
+        const clone = structuredClone({ ...state, log: [], events: null, captureSnapshots: false });
         applyAction(clone, me, a, simEngines, rng);
         const s = evaluate(clone, me, W) - W.costPenalty * a.cost + rng() * W.jitter;
         if (W.debug) console.log('  cand', JSON.stringify(a), '->', s.toFixed(2), '(baseline', baseline.toFixed(2) + ')');
@@ -269,7 +269,7 @@ export function makeLookaheadEngine(opts = {}) {
       let best = null;
       let bestScore = baseline;
       for (const o of opts) {
-        const clone = structuredClone({ ...state, log: [] });
+        const clone = structuredClone({ ...state, log: [], events: null, captureSnapshots: false });
         applyAction(clone, army, o, simEngines, rng);
         const s = evaluate(clone, army, W) + rng() * W.jitter;
         if (s > bestScore) { bestScore = s; best = o; }

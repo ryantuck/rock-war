@@ -58,6 +58,19 @@
   .obelisk.air   { background: #e0c94a; }
   .obelisk.ctrl-A { border-color: var(--army-a); box-shadow: 0 0 8px var(--army-a); }
   .obelisk.ctrl-B { border-color: var(--army-b); box-shadow: 0 0 8px var(--army-b); }
+
+  /* animation */
+  .piece.ghost {
+    position: absolute; z-index: 60; margin: 0;
+    pointer-events: none; will-change: transform, opacity;
+  }
+  .cell.hitflash { animation: hitflash 420ms ease; }
+  @keyframes hitflash {
+    0% { box-shadow: inset 0 0 0 40px rgba(224, 82, 82, 0); }
+    35% { box-shadow: inset 0 0 0 40px rgba(224, 82, 82, 0.45); }
+    100% { box-shadow: inset 0 0 0 40px rgba(224, 82, 82, 0); }
+  }
+  .replaying { color: var(--muted); font-size: 12px; }
   .cell {
     width: 84px; height: 84px; border-radius: 8px;
     background: var(--empty); border: 1px solid var(--line);
@@ -160,9 +173,15 @@
       <input id="seed" type="number" value="1">
       <div class="btnrow">
         <button id="newGame" class="primary">New game</button>
-        <button id="step">Step</button>
+        <button id="step">Step action</button>
         <button id="auto">▶ Auto</button>
       </div>
+      <label>Animation speed</label>
+      <select id="speed">
+        <option value="slow">Slow</option>
+        <option value="normal" selected>Normal</option>
+        <option value="fast">Fast</option>
+      </select>
       <div id="status"></div>
       <label>Rules config (applies on New game)</label>
       <textarea id="config" spellcheck="false"></textarea>

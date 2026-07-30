@@ -20,9 +20,20 @@ python3 -m http.server 8000
 # then open http://localhost:8000
 ```
 
-The frontend lets you watch games turn-by-turn or auto-play, edit the rules
-config as JSON (applies on New game), and run batches of hundreds of games
-in-browser with the same stats as the CLI.
+The frontend lets you watch games **action-by-action with animated pieces**
+— moves and retreats fly between territories, spawns fly in from the
+sideboard, returns/bounces fly back to it, destroyed pieces flash and fade,
+evolves merge in place. Step advances one action (an attack plays out its
+retreats and destruction as one sequence); Auto plays continuously with a
+speed selector. You can also edit the rules config as JSON (applies on New
+game) and run batches of hundreds of games in-browser with the same stats
+as the CLI.
+
+Under the hood the rules engine emits a structured event stream
+(`state.events`, grouped by action `seq`, with post-event snapshots when
+`state.captureSnapshots` is set) — the UI replays events with ghost-piece
+animations and renders the exact snapshot after each, so the displayed
+board can never drift from the real state. Sims ignore the stream.
 
 ## Rules as implemented
 

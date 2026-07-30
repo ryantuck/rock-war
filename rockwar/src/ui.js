@@ -1,5 +1,12 @@
-// Frontend controller: watch single games turn-by-turn or auto-play, and run
-// large batches in-browser. Same engine code as the CLI simulator.
+// Frontend controller: watch games play out action-by-action with animated
+// pieces, or run large batches in-browser. Same engine code as the CLI.
+//
+// How stepping works: the rules engine emits a structured event stream
+// (state.events) with per-action sequence numbers and post-event snapshots
+// (state.captureSnapshots). The UI advances the real game a full turn at a
+// time, queues that turn's events, and each Step click replays ONE action's
+// events with ghost-piece animations, rendering the matching snapshot after
+// each event so the board is always exact.
 
 import {
   newGame, defaultConfig, playTurn, playGame, applyPlacement, legalPlacements,
@@ -32,7 +39,10 @@ $('config').value = JSON.stringify(defaultConfig(), null, 2);
 let state = null;
 let engines = null;
 let rng = null;
-let autoTimer = null;
+let queue = [];          // events of the in-progress turn, grouped by seq
+let animating = false;
+let autoRunning = false;
+let shownSeq = Infinity; // log entries with seq beyond this are hidden
 
 function readConfig() {
   try {
@@ -45,17 +55,21 @@ function readConfig() {
 
 function startGame() {
   stopAuto();
+  queue = [];
+  shownSeq = Infinity;
   const config = readConfig();
   rng = mulberry32(parseInt($('seed').value, 10) || 1);
   engines = { A: makeEngine($('engineA').value), B: makeEngine($('engineB').value) };
   state = newGame(config);
+  state.captureSnapshots = true;
   render();
 }
 
-// One click advances the game by exactly one army's worth of activity:
-// during placement, one scout placement; during play, one army's turn.
-function stepTurn() {
+// Advance the real game by one placement or one full turn, and queue the
+// events it produced for animated replay.
+function fillQueue() {
   if (!state || state.phase === 'over') return;
+  const before = state.events.length;
   if (state.phase === 'placement') {
     const army = state.placementQueue[0];
     let i = engines[army].placeScout(state, army, rng);
@@ -66,25 +80,160 @@ function stepTurn() {
   } else {
     playTurn(state, engines, rng);
   }
-  render();
+  queue = state.events.slice(before);
+}
+
+// One Step = one action: replay every event sharing the next seq.
+async function stepAction() {
+  if (!state || animating) return;
+  if (queue.length === 0) fillQueue();
+  if (queue.length === 0) { render(); return; }
+  animating = true;
+  const seq = queue[0].seq;
+  while (queue.length && queue[0].seq === seq) {
+    const ev = queue.shift();
+    shownSeq = ev.seq;
+    try { await animateEvent(ev); } catch (e) { console.error('animation error', e); }
+    render(ev.after);
+  }
+  if (queue.length === 0) { shownSeq = Infinity; render(); }
+  animating = false;
 }
 
 function stopAuto() {
-  if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+  autoRunning = false;
   $('auto').textContent = '▶ Auto';
 }
 
 $('newGame').onclick = startGame;
-$('step').onclick = () => { stopAuto(); stepTurn(); };
-$('auto').onclick = () => {
-  if (autoTimer) { stopAuto(); return; }
-  if (!state || state.phase === 'over') startGame();
+$('step').onclick = () => { stopAuto(); stepAction(); };
+$('auto').onclick = async () => {
+  if (autoRunning) { stopAuto(); return; }
+  if (!state || (state.phase === 'over' && queue.length === 0)) startGame();
+  autoRunning = true;
   $('auto').textContent = '⏸ Pause';
-  autoTimer = setInterval(() => {
-    stepTurn();
-    if (!state || state.phase === 'over') stopAuto();
-  }, 350);
+  while (autoRunning && state && (state.phase !== 'over' || queue.length > 0)) {
+    await stepAction();
+    await new Promise((r) => setTimeout(r, 60));
+  }
+  stopAuto();
 };
+
+// --- animation --------------------------------------------------------------
+
+const SPEEDS = { slow: 650, normal: 340, fast: 130 };
+const dur = () => SPEEDS[$('speed').value] ?? 340;
+
+function pageRect(el) {
+  const r = el.getBoundingClientRect();
+  return { x: r.left + window.scrollX, y: r.top + window.scrollY, w: r.width, h: r.height };
+}
+
+function cellRect(i) {
+  const el = document.querySelector(`#board .cell[data-i="${i}"]`);
+  return el ? pageRect(el) : null;
+}
+
+function sideRect(army) {
+  return pageRect($(`side${army}`));
+}
+
+// Hide the matching rendered piece so its ghost isn't doubled during flight.
+function hideSourcePiece(cellIdx, army, value) {
+  const cell = document.querySelector(`#board .cell[data-i="${cellIdx}"]`);
+  if (!cell) return;
+  for (const p of cell.querySelectorAll('.piece')) {
+    if (p.textContent === String(value) && p.classList.contains(army)) {
+      p.style.visibility = 'hidden';
+      return;
+    }
+  }
+}
+
+function makeGhost(army, value, rect) {
+  const g = pieceEl(army, value);
+  g.classList.add('ghost');
+  document.body.appendChild(g);
+  const size = g.getBoundingClientRect();
+  g.style.left = `${rect.x + rect.w / 2 - size.width / 2}px`;
+  g.style.top = `${rect.y + rect.h / 2 - size.height / 2}px`;
+  return g;
+}
+
+// Fly a ghost piece between two page rects.
+function fly(army, value, from, to, { fadeOut = false, hide = null } = {}) {
+  return new Promise((resolve) => {
+    if (!from || !to) return resolve();
+    if (hide !== null) hideSourcePiece(hide, army, value);
+    const g = makeGhost(army, value, from);
+    const dx = (to.x + to.w / 2) - (from.x + from.w / 2);
+    const dy = (to.y + to.h / 2) - (from.y + from.h / 2);
+    g.style.transition = `transform ${dur()}ms ease, opacity ${dur()}ms ease`;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      g.style.transform = `translate(${dx}px, ${dy}px)`;
+      if (fadeOut) g.style.opacity = '0.15';
+    }));
+    setTimeout(() => { g.remove(); resolve(); }, dur() + 50);
+  });
+}
+
+// Fade a piece out in place (destruction, sacrifice, devolution).
+function fade(army, value, cellIdx) {
+  return new Promise((resolve) => {
+    const rect = cellRect(cellIdx);
+    if (!rect) return resolve();
+    hideSourcePiece(cellIdx, army, value);
+    const g = makeGhost(army, value, rect);
+    g.style.transition = `transform ${dur()}ms ease, opacity ${dur()}ms ease`;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      g.style.opacity = '0';
+      g.style.transform = 'scale(1.7)';
+    }));
+    setTimeout(() => { g.remove(); resolve(); }, dur() + 50);
+  });
+}
+
+function flash(cellIdx) {
+  const el = document.querySelector(`#board .cell[data-i="${cellIdx}"]`);
+  if (!el) return;
+  el.classList.add('hitflash');
+  setTimeout(() => el.classList.remove('hitflash'), 450);
+}
+
+async function animateEvent(ev) {
+  switch (ev.type) {
+    case 'place':
+    case 'spawn':
+      return fly(ev.army, 1, sideRect(ev.army), cellRect(ev.to));
+    case 'move':
+    case 'retreat':
+      return fly(ev.army, ev.piece, cellRect(ev.from), cellRect(ev.to), { hide: ev.from });
+    case 'toSideboard':
+      return fly(ev.army, ev.piece, cellRect(ev.from), sideRect(ev.army), { hide: ev.from, fadeOut: true });
+    case 'evolve': {
+      flash(ev.at);
+      await Promise.all(ev.parts.map((p) => fade(ev.army, p, ev.at)));
+      return;
+    }
+    case 'destroyed': {
+      flash(ev.at);
+      await Promise.all(ev.pieces.map((p) => fade(ev.army, p, ev.at)));
+      return;
+    }
+    case 'sacrifice':
+      return fade(ev.army, ev.piece, ev.at);
+    case 'devolved': {
+      flash(ev.at);
+      return fade(ev.army, ev.piece, ev.at);
+    }
+    case 'attackDevolve': {
+      flash(ev.to);
+      return fly(ev.army, ev.piece, cellRect(ev.from), cellRect(ev.to), { hide: ev.from });
+    }
+    default:
+      return;
+  }
+}
 
 // --- rendering --------------------------------------------------------------
 
@@ -95,15 +244,21 @@ function pieceEl(army, value) {
   return el;
 }
 
-function render() {
+// Render the board from a snapshot (mid-replay) or the live state.
+function render(after = null) {
   if (!state) return;
   const { config } = state;
+  const cells = after ? after.cells : state.cells;
+  const sideboard = after ? after.sideboard : state.sideboard;
+  const view = { ...state, cells, sideboard };
+
   const board = $('board');
   board.style.gridTemplateColumns = `repeat(${config.width}, 84px)`;
   board.innerHTML = '';
-  state.cells.forEach((c, i) => {
+  cells.forEach((c, i) => {
     const cell = document.createElement('div');
     cell.className = 'cell' + (c.army ? ` army-${c.army}` : '');
+    cell.dataset.i = i;
     const coord = document.createElement('span');
     coord.className = 'coord';
     coord.textContent = fmtCell(config, i);
@@ -115,7 +270,7 @@ function render() {
   // Obelisks sit on the corner points between cells (cell 84px + gap 6px).
   const pitch = 90;
   for (const ob of config.obelisks ?? []) {
-    const st = obeliskStatus(state, ob);
+    const st = obeliskStatus(view, ob);
     const el = document.createElement('div');
     el.className = `obelisk ${ob.element}` + (st.controller ? ` ctrl-${st.controller}` : '');
     el.style.left = `${ob.corner[0] * pitch - 3 - 12}px`;
@@ -134,19 +289,20 @@ function render() {
   for (const army of ['A', 'B']) {
     const row = $(`side${army}`);
     row.innerHTML = '';
-    const sb = state.sideboard[army];
+    const sb = sideboard[army];
     for (const v of Object.keys(sb).map(Number).sort((a, b) => a - b)) {
       for (let k = 0; k < sb[v]; k++) row.appendChild(pieceEl(army, v));
     }
   }
 
   const status = $('status');
+  const replaying = queue.length > 0 || after !== null;
   if (state.phase === 'placement') {
     const army = state.placementQueue[0];
     status.innerHTML =
       `Placement — <span class="winner ${army}">Army ${army}</span> places a scout` +
       `<br>${state.placementQueue.length} placement${state.placementQueue.length === 1 ? '' : 's'} remaining`;
-  } else if (state.phase === 'over') {
+  } else if (state.phase === 'over' && !replaying) {
     if (state.winner === 'draw') {
       status.innerHTML = `Turn ${state.turn} — <span class="winner">draw</span> (${state.reason})`;
     } else {
@@ -154,21 +310,23 @@ function render() {
     }
   } else {
     const obSummary = ['A', 'B'].map((army) => {
-      const held = (state.config.obelisks ?? [])
-        .map((ob) => obeliskStatus(state, ob))
+      const held = (config.obelisks ?? [])
+        .map((ob) => obeliskStatus(view, ob))
         .filter((st) => st.controller === army)
         .map((st) => `${st.element}+${st.bonus}`);
       return held.length ? `${army}: ${held.join(' ')}` : null;
     }).filter(Boolean).join(' · ');
+    const strengths = `A ${armyStrengthOnBoard(view, 'A')} · B ${armyStrengthOnBoard(view, 'B')}`;
     status.innerHTML =
       `Turn ${state.turn} — <span class="winner ${state.toMove}">Army ${state.toMove}</span> to move` +
-      `<br>strength on board: A ${armyStrengthOnBoard(state, 'A')} · B ${armyStrengthOnBoard(state, 'B')}` +
+      (replaying ? ' <span class="replaying">· playing out turn…</span>' : '') +
+      `<br>strength on board: ${strengths}` +
       (obSummary ? `<br>obelisks — ${obSummary}` : '');
   }
 
   const log = $('log');
   log.innerHTML = '';
-  const entries = state.log.slice(-120);
+  const entries = state.log.filter((e) => (e.seq ?? 0) <= shownSeq).slice(-120);
   entries.forEach((e, k) => {
     const div = document.createElement('div');
     div.className = 'entry' + (k >= entries.length - 8 ? ' recent' : '');
@@ -198,7 +356,6 @@ $('runBatch').onclick = async () => {
 
   $('runBatch').disabled = true;
   const t0 = performance.now();
-  // Chunked so the UI stays responsive on big runs.
   for (let g = 0; g < n; g++) {
     const swapped = g % 2 === 1;
     const gameEngines = swapped ? { A: e2, B: e1 } : { A: e1, B: e2 };

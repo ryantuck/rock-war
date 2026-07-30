@@ -222,12 +222,31 @@ export function newGame(config = defaultConfig()) {
     reason: null, // 'elimination' | 'immobilized' | 'max-turns'
     abilitiesUsedThisTurn: [], // obelisk elements whose ability fired this turn
     log: [],
+    // Structured event stream for frontends: one entry per visual step,
+    // grouped into actions by `seq`. When captureSnapshots is set on the
+    // state, each event also carries an `after` board snapshot.
+    events: [],
+    eventSeq: 0,
   };
 }
 
 function pushLog(state, text) {
-  state.log.push({ turn: state.turn, text });
+  state.log.push({ turn: state.turn, text, seq: state.eventSeq ?? 0 });
   if (state.log.length > 400) state.log.splice(0, state.log.length - 400);
+}
+
+// Emit a structured event (see newGame). Events power the frontend's
+// per-action animation; sims simply ignore them.
+function emitEvent(state, ev) {
+  if (!state.events) return;
+  ev.seq = state.eventSeq ?? 0;
+  if (state.captureSnapshots) {
+    ev.after = {
+      cells: state.cells.map((c) => ({ army: c.army, pieces: [...c.pieces] })),
+      sideboard: { A: { ...state.sideboard.A }, B: { ...state.sideboard.B } },
+    };
+  }
+  state.events.push(ev);
 }
 
 export function armyStrengthOnBoard(state, army) {
@@ -280,8 +299,10 @@ export function applyPlacement(state, army, i) {
   if (state.placementQueue[0] !== army) throw new Error(`not ${army}'s placement`);
   if (state.cells[i].pieces.length !== 0) throw new Error(`territory ${i} not empty`);
   if (state.sideboard[army][1] <= 0) throw new Error(`${army} has no scouts left`);
+  state.eventSeq = (state.eventSeq ?? 0) + 1;
   state.sideboard[army][1]--;
   addPiece(state, i, army, 1);
+  emitEvent(state, { type: 'place', army, to: i });
   state.placementQueue.shift();
   pushLog(state, `${army} places scout at ${fmtCell(state.config, i)}`);
   if (state.placementQueue.length === 0) {
@@ -516,6 +537,7 @@ function resolveAttack(state, army, action, engines, rng) {
     }
     removePiece(state, action.to, r.piece);
     addPiece(state, r.dest, defArmy, r.piece);
+    emitEvent(state, { type: 'retreat', army: defArmy, piece: r.piece, from: action.to, to: r.dest });
     pushLog(state, `${defArmy} retreats ${r.piece} ${fmtCell(config, action.to)}→${fmtCell(config, r.dest)}`);
   }
 
@@ -534,12 +556,15 @@ function resolveAttack(state, army, action, engines, rng) {
         rule === 'mutual' || (rule === 'margin' && action.piece === defSum);
       if (attackerDies) {
         removePiece(state, action.from, action.piece);
+        emitEvent(state, { type: 'destroyed', army: defArmy, pieces: destroyed, at: action.to });
+        emitEvent(state, { type: 'destroyed', army, pieces: [action.piece], at: action.from });
         pushLog(state, `${army} ${action.piece} and ${defArmy} [${destroyed.join(',')}] destroy each other at ${fmtCell(config, action.to)}`);
         return { advanced: false, destroyed };
       }
       // Devolution: breaking a defense worth more than half the attacker
       // splits the attacker into its fibonacci constituents (via sideboard).
       if (rule === 'devolve' && defSum > action.piece * (config.devolveThreshold ?? 0.5)) {
+        emitEvent(state, { type: 'destroyed', army: defArmy, pieces: destroyed, at: action.to });
         removePiece(state, action.from, action.piece);
         state.sideboard[army][action.piece] = (state.sideboard[army][action.piece] || 0) + 1;
         const placed = [];
@@ -550,9 +575,11 @@ function resolveAttack(state, army, action, engines, rng) {
             placed.push(part);
           }
         }
+        emitEvent(state, { type: 'attackDevolve', army, piece: action.piece, from: action.from, to: action.to, parts: placed });
         pushLog(state, `${army} ${action.piece} destroys [${destroyed.join(',')}] and devolves to (${placed.join(',') || 'nothing'}) at ${fmtCell(config, action.to)}`);
         return { advanced: placed.length > 0, destroyed };
       }
+      emitEvent(state, { type: 'destroyed', army: defArmy, pieces: destroyed, at: action.to });
       pushLog(state, `${army} ${action.piece} destroys [${destroyed.join(',')}] at ${fmtCell(config, action.to)}`);
     } else {
       pushLog(state, `${army} ${action.piece} attack on ${fmtCell(config, action.to)} repelled (def ${defSum})`);
@@ -563,6 +590,7 @@ function resolveAttack(state, army, action, engines, rng) {
   // Territory is now empty (by retreat and/or destruction): attacker advances.
   removePiece(state, action.from, action.piece);
   addPiece(state, action.to, army, action.piece);
+  emitEvent(state, { type: 'move', army, piece: action.piece, from: action.from, to: action.to });
   if (destroyed.length === 0) {
     pushLog(state, `${army} ${action.piece} captures ${fmtCell(config, action.to)}`);
   }
@@ -598,7 +626,9 @@ function resolveAbility(state, army, action) {
     case 'fire': {
       // Sacrifice a scout to slay an enemy scout anywhere. Both leave the game.
       removePiece(state, action.from, 1);
+      emitEvent(state, { type: 'sacrifice', army, piece: 1, at: action.from });
       removePiece(state, action.target, 1);
+      emitEvent(state, { type: 'destroyed', army: enemy, pieces: [1], at: action.target });
       pushLog(state, `${army} fire ability: sacrifices scout at ${fmtCell(config, action.from)} to slay ${enemy} scout at ${fmtCell(config, action.target)}`);
       return;
     }
@@ -606,8 +636,10 @@ function resolveAbility(state, army, action) {
       // Return a scout home to bounce an enemy piece (<=2) to its sideboard.
       removePiece(state, action.from, 1);
       state.sideboard[army][1]++;
+      emitEvent(state, { type: 'toSideboard', army, piece: 1, from: action.from });
       removePiece(state, action.target, action.piece);
       state.sideboard[enemy][action.piece]++;
+      emitEvent(state, { type: 'toSideboard', army: enemy, piece: action.piece, from: action.target });
       pushLog(state, `${army} water ability: returns scout at ${fmtCell(config, action.from)}, bouncing ${enemy} ${action.piece} at ${fmtCell(config, action.target)} to sideboard`);
       return;
     }
@@ -615,7 +647,9 @@ function resolveAbility(state, army, action) {
       // Return a scout home to devolve an enemy warrior where it stands.
       removePiece(state, action.from, 1);
       state.sideboard[army][1]++;
+      emitEvent(state, { type: 'toSideboard', army, piece: 1, from: action.from });
       const placed = devolveInPlace(state, enemy, action.target, 2);
+      emitEvent(state, { type: 'devolved', army: enemy, piece: 2, at: action.target, parts: placed });
       pushLog(state, `${army} earth ability: returns scout at ${fmtCell(config, action.from)}, devolving ${enemy} warrior at ${fmtCell(config, action.target)} to (${placed.join(',') || 'sideboard'})`);
       return;
     }
@@ -623,8 +657,10 @@ function resolveAbility(state, army, action) {
       // Return a scout home to displace any enemy piece one territory.
       removePiece(state, action.from, 1);
       state.sideboard[army][1]++;
+      emitEvent(state, { type: 'toSideboard', army, piece: 1, from: action.from });
       removePiece(state, action.target, action.piece);
       addPiece(state, action.dest, enemy, action.piece);
+      emitEvent(state, { type: 'move', army: enemy, piece: action.piece, from: action.target, to: action.dest });
       pushLog(state, `${army} air ability: returns scout at ${fmtCell(config, action.from)}, displacing ${enemy} ${action.piece} ${fmtCell(config, action.target)}→${fmtCell(config, action.dest)}`);
       return;
     }
@@ -641,12 +677,14 @@ export function applyAction(state, army, action, engines, rng) {
     case 'spawn': {
       state.sideboard[army][1]--;
       addPiece(state, action.to, army, 1);
+      emitEvent(state, { type: 'spawn', army, to: action.to });
       pushLog(state, `${army} spawns scout at ${fmtCell(config, action.to)}`);
       return {};
     }
     case 'move': {
       removePiece(state, action.from, action.piece);
       addPiece(state, action.to, army, action.piece);
+      emitEvent(state, { type: 'move', army, piece: action.piece, from: action.from, to: action.to });
       pushLog(state, `${army} moves ${action.piece} ${fmtCell(config, action.from)}→${fmtCell(config, action.to)} (cost ${action.cost})`);
       return { capturedTerritory: action.to };
     }
@@ -658,6 +696,7 @@ export function applyAction(state, army, action, engines, rng) {
       state.sideboard[army][lo]++;
       state.sideboard[army][sum]--;
       cell.pieces = [sum];
+      emitEvent(state, { type: 'evolve', army, at: action.at, parts: [hi, lo], result: sum });
       pushLog(state, `${army} evolves ${lo}+${hi}→${sum} at ${fmtCell(config, action.at)}`);
       return {};
     }
@@ -711,6 +750,7 @@ function offerReactions(state, reactor, engines, rng) {
     if (!choice) return;
     const match = opts.find((o) => JSON.stringify(o) === JSON.stringify(choice));
     if (!match) return;
+    state.eventSeq = (state.eventSeq ?? 0) + 1;
     applyAction(state, reactor, match, engines, rng);
     if (checkElimination(state)) return;
   }
@@ -788,6 +828,7 @@ export function playTurn(state, engines, rng) {
       const match = acts.find((a) => JSON.stringify(a) === JSON.stringify(choice));
       if (!match) break;
       const beyondCap = taken >= maxActions;
+      state.eventSeq = (state.eventSeq ?? 0) + 1;
       const res = applyAction(state, army, match, engines, rng);
       if (res.capturedTerritory !== undefined) cont.terrs.add(res.capturedTerritory);
       // Payment: within the cap, contingent budget first so the kicker stays
