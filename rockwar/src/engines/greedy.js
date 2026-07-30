@@ -9,6 +9,7 @@ const DEFAULT_WEIGHTS = {
   capture: 6,           // taking an enemy territory
   trade: 8,             // base value of forcing combat (mutual destruction)
   devolvePenalty: 5,    // attacking through a stiff defense splits our piece
+  ability: { fire: 8, water: 10, earth: 8, air: 4 }, // base scores per obelisk ability
   evolve: 10,           // consolidating into a bigger piece
   evolvePerPoint: 3,
   advancePerStep: 5,    // moving one step closer to the nearest enemy
@@ -177,6 +178,10 @@ export function makeGreedyEngine(opts = {}) {
           const decay = Math.max(0, 1 - state.turn / W.spawnDecayTurns);
           score += Math.max(W.spawn * decay, W.spawnFloor);
           score += obeliskPull(state, army, a.to, 1, W);
+        } else if (a.type === 'ability') {
+          // Water bounces cost us nothing permanent; fire is an even trade at
+          // range; earth neutralizes an attacker; air repositions.
+          score += W.ability[a.element] ?? 5;
         }
 
         if (score > bestScore) { bestScore = score; best = a; }

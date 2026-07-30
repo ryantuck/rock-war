@@ -91,6 +91,19 @@ in-browser with the same stats as the CLI.
   cost is covered by the matching pool — e.g. with fire control, spawn,
   evolve, then attack on the fire kicker. (Within the cap, actions spend
   contingent budget first so the kicker stays available for extras.)
+- **Obelisk abilities**: each controlled obelisk also grants an active
+  ability, once per obelisk per turn. Abilities cost no budget — the piece
+  spent is the price — but count as actions, and have unlimited range:
+  - *fire*: sacrifice one of your scouts to slay an enemy scout in any
+    territory (both leave the game).
+  - *water*: return one of your scouts to your sideboard to bounce an enemy
+    piece of strength ≤ 2 back to its owner's sideboard.
+  - *earth*: devolve one of your lone warriors (in place, to (1,1)) to
+    devolve an enemy lone warrior the same way.
+  - *air*: return one of your warriors to your sideboard to displace an
+    enemy piece of strength ≤ 2 into an adjacent legal territory of your
+    choice.
+  Disable with `obeliskAbilities: false`.
 - **Winning**: eliminate all enemy pieces from the board, or leave the enemy
   with no legal action on their turn. If a combat wipes both boards at once,
   the game is a draw (`mutual-elimination`). Games also draw at the turn limit.
@@ -113,6 +126,7 @@ box or via `--config file.json` on the CLI:
 | `firstTurnActions` | 1 | actions per contingent on turn 1 (null = normal 2) |
 | `minAttackValue` | 2 | minimum piece value that may attack — scouts can't (1 = anyone can) |
 | `obelisks` | 4 corners | element + corner position per obelisk; empty array disables them |
+| `obeliskAbilities` | `true` | controlled obelisks grant their active ability |
 | `obeliskTiers` | 3/5/8/13/21/34 | adjacent-value thresholds granting +1/+2/+3/+5/+8/+13 bonus budget |
 | destroyed pieces | removed | destroyed pieces leave the game entirely (they do *not* return to the sideboard) |
 | capture on retreat | yes | if all defenders retreat, the attacker advances into the vacated territory |
@@ -175,6 +189,13 @@ engine can't corrupt game state.
   again (seat B won 178 of 251 decided games) — the tempo dynamics of the
   turn-1 handicap shift with every combat-rule change; worth re-sweeping
   `firstTurnActions`/`firstTurnContingents` under devolve.
+- **Ability usage is lopsided** (60 strong-engine games: water 157, fire 47,
+  earth 2, air 1). Water's bounce is quietly brutal — a returned 2 can only
+  redeploy via evolve — and abilities overall *reduced* draws (~8 points in
+  strong matchups) by giving stuck positions a removal tool. Earth barely
+  fires (lone-warrior-vs-lone-warrior geometry is rare) and air's
+  positional value is invisible to these engines — both candidates for
+  buffs or rework.
 - Lessons from building lookahead: a one-ply evaluator needs an
   "evolve-ready pairs" term to see development chains, must treat
   spawn-locked scouts as dead material (but not transient full-cell locks),
