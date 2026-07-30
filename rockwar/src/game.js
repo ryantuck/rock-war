@@ -80,14 +80,15 @@ export function defaultConfig() {
       { element: 'water', corner: [4, 4] },
     ],
     // Controlled obelisks also grant an active ability, once per obelisk per
-    // turn (no budget cost — the piece spent is the price):
-    //   fire  — sacrifice a scout to slay an enemy scout in any territory
-    //   water — return a scout to your sideboard to bounce an enemy piece of
-    //           strength <= 2 back to its owner's sideboard
-    //   earth — devolve one of your lone warriors to devolve an enemy lone
-    //           warrior (both become (1,1) in place, via sideboards)
-    //   air   — return a warrior to your sideboard to displace an enemy piece
-    //           of strength <= 2 into an adjacent legal territory you choose
+    // turn (no budget cost — the piece spent is the price). The fuel is
+    // always one of YOUR SCOUTS standing in a territory adjacent to that
+    // obelisk; targets can be anywhere:
+    //   fire  — sacrifice the scout to slay an enemy scout in any territory
+    //   water — return the scout to bounce an enemy piece of strength <= 2
+    //           back to its owner's sideboard
+    //   earth — return the scout to devolve any enemy warrior in place
+    //   air   — return the scout to displace ANY enemy piece into an
+    //           adjacent legal territory of your choice
     obeliskAbilities: true,
     // Control requires occupying >= 2 of the obelisk's adjacent territories
     // with the strictly greatest total adjacent piece value, which must reach
@@ -413,11 +414,12 @@ export function legalActions(state, cont, remainingBudget, actionsTaken, bonusPo
     for (const ob of config.obelisks ?? []) {
       if ((state.abilitiesUsedThisTurn ?? []).includes(ob.element)) continue;
       if (obeliskStatus(state, ob).controller !== army) continue;
-      const fuelValue = ob.element === 'fire' || ob.element === 'water' ? 1 : 2;
+      // Fuel: one of our scouts standing adjacent to THIS obelisk.
+      const adj = obeliskCells(config, ob.corner);
       for (const t of cont.terrs) {
+        if (!adj.includes(t)) continue;
         const cell = state.cells[t];
-        if (cell.army !== army || !cell.pieces.includes(fuelValue)) continue;
-        if (ob.element === 'earth' && cell.pieces.length !== 1) continue; // must devolve in place
+        if (cell.army !== army || !cell.pieces.includes(1)) continue;
         state.cells.forEach((ec, e) => {
           if (ec.army !== enemy) return;
           if (ob.element === 'fire') {
@@ -429,12 +431,11 @@ export function legalActions(state, cont, remainingBudget, actionsTaken, bonusPo
               if (v <= 2) acts.push({ type: 'ability', element: 'water', from: t, target: e, piece: v, cost: 0 });
             }
           } else if (ob.element === 'earth') {
-            if (ec.pieces.length === 1 && ec.pieces[0] === 2) {
+            if (ec.pieces.includes(2)) {
               acts.push({ type: 'ability', element: 'earth', from: t, target: e, cost: 0 });
             }
           } else if (ob.element === 'air') {
             for (const v of new Set(ec.pieces)) {
-              if (v > 2) continue;
               for (const d of neighbors(config, e)) {
                 const dc = state.cells[d];
                 if ((dc.army === null || dc.army === enemy) && canAddPiece(config, dc, v)) {
@@ -567,7 +568,11 @@ function devolveInPlace(state, army, cellIdx, piece) {
   state.sideboard[army][piece] = (state.sideboard[army][piece] || 0) + 1;
   const placed = [];
   for (const part of fibParts(piece)) {
-    if ((state.sideboard[army][part] || 0) > 0) {
+    // Constituents deploy only where the sideboard has them AND the cell can
+    // legally hold them (a 2 devolving next to a 3 can't seat its 1s — those
+    // parts stay in the sideboard as stock instead).
+    if ((state.sideboard[army][part] || 0) > 0 &&
+        canAddPiece(state.config, state.cells[cellIdx], part)) {
       state.sideboard[army][part]--;
       addPiece(state, cellIdx, army, part);
       placed.push(part);
@@ -598,19 +603,20 @@ function resolveAbility(state, army, action) {
       return;
     }
     case 'earth': {
-      // Devolve our lone warrior to devolve an enemy lone warrior, in place.
-      devolveInPlace(state, army, action.from, 2);
-      devolveInPlace(state, enemy, action.target, 2);
-      pushLog(state, `${army} earth ability: devolves warrior at ${fmtCell(config, action.from)} and ${enemy} warrior at ${fmtCell(config, action.target)}`);
+      // Return a scout home to devolve an enemy warrior where it stands.
+      removePiece(state, action.from, 1);
+      state.sideboard[army][1]++;
+      const placed = devolveInPlace(state, enemy, action.target, 2);
+      pushLog(state, `${army} earth ability: returns scout at ${fmtCell(config, action.from)}, devolving ${enemy} warrior at ${fmtCell(config, action.target)} to (${placed.join(',') || 'sideboard'})`);
       return;
     }
     case 'air': {
-      // Return a warrior home to displace an enemy piece (<=2) one territory.
-      removePiece(state, action.from, 2);
-      state.sideboard[army][2]++;
+      // Return a scout home to displace any enemy piece one territory.
+      removePiece(state, action.from, 1);
+      state.sideboard[army][1]++;
       removePiece(state, action.target, action.piece);
       addPiece(state, action.dest, enemy, action.piece);
-      pushLog(state, `${army} air ability: returns warrior at ${fmtCell(config, action.from)}, displacing ${enemy} ${action.piece} ${fmtCell(config, action.target)}→${fmtCell(config, action.dest)}`);
+      pushLog(state, `${army} air ability: returns scout at ${fmtCell(config, action.from)}, displacing ${enemy} ${action.piece} ${fmtCell(config, action.target)}→${fmtCell(config, action.dest)}`);
       return;
     }
     default:

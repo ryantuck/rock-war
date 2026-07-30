@@ -92,17 +92,19 @@ in-browser with the same stats as the CLI.
   evolve, then attack on the fire kicker. (Within the cap, actions spend
   contingent budget first so the kicker stays available for extras.)
 - **Obelisk abilities**: each controlled obelisk also grants an active
-  ability, once per obelisk per turn. Abilities cost no budget — the piece
-  spent is the price — but count as actions, and have unlimited range:
-  - *fire*: sacrifice one of your scouts to slay an enemy scout in any
-    territory (both leave the game).
-  - *water*: return one of your scouts to your sideboard to bounce an enemy
+  ability, once per obelisk per turn. The fuel is always one of your
+  **scouts standing adjacent to that obelisk**; abilities cost no budget —
+  the scout spent is the price — but count as actions, and targets can be
+  anywhere on the board:
+  - *fire*: **sacrifice** the scout (it leaves the game) to slay an enemy
+    scout in any territory.
+  - *water*: **return** the scout to your sideboard to bounce an enemy
     piece of strength ≤ 2 back to its owner's sideboard.
-  - *earth*: devolve one of your lone warriors (in place, to (1,1)) to
-    devolve an enemy lone warrior the same way.
-  - *air*: return one of your warriors to your sideboard to displace an
-    enemy piece of strength ≤ 2 into an adjacent legal territory of your
-    choice.
+  - *earth*: **return** the scout to devolve any enemy warrior where it
+    stands (constituents that can't legally seat stay in the owner's
+    sideboard as stock).
+  - *air*: **return** the scout to displace **any** enemy piece into an
+    adjacent legal territory of your choice.
   Disable with `obeliskAbilities: false`.
 - **Winning**: eliminate all enemy pieces from the board, or leave the enemy
   with no legal action on their turn. If a combat wipes both boards at once,
@@ -189,13 +191,15 @@ engine can't corrupt game state.
   again (seat B won 178 of 251 decided games) — the tempo dynamics of the
   turn-1 handicap shift with every combat-rule change; worth re-sweeping
   `firstTurnActions`/`firstTurnContingents` under devolve.
-- **Ability usage is lopsided** (60 strong-engine games: water 157, fire 47,
-  earth 2, air 1). Water's bounce is quietly brutal — a returned 2 can only
-  redeploy via evolve — and abilities overall *reduced* draws (~8 points in
-  strong matchups) by giving stuck positions a removal tool. Earth barely
-  fires (lone-warrior-vs-lone-warrior geometry is rare) and air's
-  positional value is invisible to these engines — both candidates for
-  buffs or rework.
+- **Abilities are live and keep cutting draws.** With scout-fueled,
+  obelisk-adjacent casting (60 strong-engine games): water 119, earth 111,
+  fire 32, air 9. Earth went from dead (2 uses under the old
+  lone-warrior-for-lone-warrior form) to a staple — returning a scout to
+  shatter any warrior is great tempo. Water's bounce remains the best
+  single effect. Air still barely fires: its value is positional and these
+  engines can't see it (a searcher with deeper lookahead, or an eval term
+  for formation disruption, would use it). Draw rates fell again across
+  the board — greedy mirrors 12.7%, lookahead mirrors 37.7%.
 - Lessons from building lookahead: a one-ply evaluator needs an
   "evolve-ready pairs" term to see development chains, must treat
   spawn-locked scouts as dead material (but not transient full-cell locks),
