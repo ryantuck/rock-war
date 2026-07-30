@@ -152,6 +152,19 @@
   }
   #batchOut { margin-top: 14px; white-space: pre; font-size: 13px; color: var(--text); }
   #batchProgress { color: var(--muted); margin-left: 12px; }
+
+  /* rules overview */
+  .rules { margin-top: 24px; max-width: 1060px; }
+  .rulescols { display: flex; gap: 32px; flex-wrap: wrap; }
+  .rulescols > div { flex: 1; min-width: 320px; }
+  .rules h3 { font-size: 13px; margin: 14px 0 4px; color: var(--text); }
+  .rules p, .rules li { color: var(--muted); font-size: 13px; }
+  .rules ul { margin: 6px 0; padding-left: 18px; }
+  .rules b { color: var(--text); font-weight: 600; }
+  .rules a { color: var(--army-a); }
+  .ob { font-weight: 700; }
+  .ob.fire { color: #e05252; } .ob.earth { color: #58b368; }
+  .ob.water { color: #4a9fe0; } .ob.air { color: #e0c94a; }
 </style>
 </head>
 <body>
@@ -211,6 +224,65 @@
     <div id="batchOut"></div>
   </div>
 
-  <script type="module" src="./src/ui.js"></script>
+  <div class="panel rules">
+    <h2>Rules overview</h2>
+    <div class="rulescols">
+      <div>
+        <h3>Setup</h3>
+        <p>5×5 board of territories. Each army fields <b>8×1 scouts, 5×2
+        warriors, 3×3 chieftains, 2×5 warlords, 1×8 behemoth</b> (45 pts).
+        Placement snakes A&nbsp;B&nbsp;B&nbsp;A — two scouts each onto empty
+        territories; everything else deploys later by spawning and evolving.</p>
+        <h3>Territories &amp; contingents</h3>
+        <p>A territory holds at most <b>2 pieces</b>, and they must be
+        fibonacci-adjacent: (1,1) (1,2) (2,3) (3,5) (5,8). A
+        <b>contingent</b> is a contiguous group of one army's territories;
+        its strength is the sum of its pieces.</p>
+        <h3>Turns &amp; actions</h3>
+        <p>Each of your contingents takes up to <b>2 actions</b> whose
+        fibonacci-valued costs sum to at most its strength. On turn&nbsp;1 the
+        opener acts with one contingent, one action.</p>
+        <ul>
+          <li><b>Spawn</b> (1): place a scout from your sideboard into a
+          contingent territory.</li>
+          <li><b>Move</b> (cost = |mover − occupant|, scouts always 1): step
+          to an adjacent empty or friendly territory.</li>
+          <li><b>Evolve</b> (cost = smaller piece): merge a territory's pair
+          into its fibonacci sum — 1+1→2, 1+2→3, 2+3→5, 3+5→8 — via the
+          sideboard.</li>
+          <li><b>Attack</b> (cost = attacker's value): strike an adjacent
+          enemy territory. Scouts can't attack, and the attacker must be
+          ≥ the territory's total.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Combat</h3>
+        <p>Defenders may retreat free into adjacent friendly territories
+        (plus one scout per attack into an empty one). The rest die. If they
+        were worth more than <b>half the attacker</b>, the attacker
+        <b>devolves</b> into its constituents (3→2+1, 5→3+2, 8→5+3) as it
+        advances; weaker defense dies cleanly.</p>
+        <h3>Obelisks</h3>
+        <p>Four elemental obelisks sit on corner intersections:
+        <span class="ob fire">fire</span>→attack,
+        <span class="ob earth">earth</span>→evolve,
+        <span class="ob air">air</span>→move,
+        <span class="ob water">water</span>→spawn. Control one by occupying
+        ≥2 adjacent territories with the strictly greatest adjacent value ≥3.
+        Control grants bonus budget for that mechanic (3→+1, 5→+2, 8→+3,
+        13→+5 …) that can even fund <b>extra actions past the cap</b> — and
+        an <b>ability</b>, once per obelisk per turn, castable on either
+        player's turn, fueled by a scout adjacent to the obelisk:
+        fire snipes an enemy scout anywhere; water bounces a piece ≤2 to its
+        sideboard; earth devolves a warrior; air displaces any piece.</p>
+        <h3>Winning</h3>
+        <p>Eliminate the enemy's board pieces, or leave them with no legal
+        action. Full rules, tunable knobs, and sim findings live in
+        <a href="https://github.com/ryantuck/rock-war/blob/master/rockwar/README.md">rockwar/README.md</a>.</p>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./rockwar/src/ui.js"></script>
 </body>
 </html>

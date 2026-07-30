@@ -15,8 +15,8 @@ node src/sim.js --games 500 --a greedy --b greedy
 node src/sim.js --games 100 --a greedy --b random --verbose   # per-game lines
 node src/sim.js --games 500 --a greedy --b random --config my-rules.json
 
-# Frontend (ES modules need a server; any static server works)
-python3 -m http.server 8000
+# Frontend (index.html lives at the repo root; ES modules need a server)
+cd .. && python3 -m http.server 8000
 # then open http://localhost:8000
 ```
 
