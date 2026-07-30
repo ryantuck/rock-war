@@ -406,46 +406,55 @@ export function legalActions(state, cont, remainingBudget, actionsTaken, bonusPo
     }
   }
 
-  // Obelisk abilities: once per controlled obelisk per turn, budget-free
-  // (the spent piece is the price), fueled by a piece from this contingent.
+  // Obelisk abilities: once per controlled obelisk per player-turn,
+  // budget-free (the spent scout is the price), fueled from this contingent.
   // Not available as bonus-funded extra actions — they respect the cap.
-  if (config.obeliskAbilities && !beyondCap) {
-    const enemy = other(army);
-    for (const ob of config.obelisks ?? []) {
-      if ((state.abilitiesUsedThisTurn ?? []).includes(ob.element)) continue;
-      if (obeliskStatus(state, ob).controller !== army) continue;
-      // Fuel: one of our scouts standing adjacent to THIS obelisk.
-      const adj = obeliskCells(config, ob.corner);
-      for (const t of cont.terrs) {
-        if (!adj.includes(t)) continue;
-        const cell = state.cells[t];
-        if (cell.army !== army || !cell.pieces.includes(1)) continue;
-        state.cells.forEach((ec, e) => {
-          if (ec.army !== enemy) return;
-          if (ob.element === 'fire') {
-            if (ec.pieces.includes(1)) {
-              acts.push({ type: 'ability', element: 'fire', from: t, target: e, cost: 0 });
-            }
-          } else if (ob.element === 'water') {
-            for (const v of new Set(ec.pieces)) {
-              if (v <= 2) acts.push({ type: 'ability', element: 'water', from: t, target: e, piece: v, cost: 0 });
-            }
-          } else if (ob.element === 'earth') {
-            if (ec.pieces.includes(2)) {
-              acts.push({ type: 'ability', element: 'earth', from: t, target: e, cost: 0 });
-            }
-          } else if (ob.element === 'air') {
-            for (const v of new Set(ec.pieces)) {
-              for (const d of neighbors(config, e)) {
-                const dc = state.cells[d];
-                if ((dc.army === null || dc.army === enemy) && canAddPiece(config, dc, v)) {
-                  acts.push({ type: 'ability', element: 'air', from: t, target: e, piece: v, dest: d, cost: 0 });
-                }
+  if (!beyondCap) acts.push(...abilityActions(state, army, cont.terrs));
+  return acts;
+}
+
+// All obelisk ability actions available to `army` right now. When cellFilter
+// (a Set of territory indices) is given, fuel scouts must stand in it — the
+// contingent restriction during the army's own turn. Without it, any
+// obelisk-adjacent scout qualifies (used for reactions on the enemy's turn).
+export function abilityActions(state, army, cellFilter = null) {
+  const { config } = state;
+  const acts = [];
+  if (!config.obeliskAbilities) return acts;
+  const enemy = other(army);
+  for (const ob of config.obelisks ?? []) {
+    if ((state.abilitiesUsedThisTurn ?? []).includes(ob.element)) continue;
+    if (obeliskStatus(state, ob).controller !== army) continue;
+    // Fuel: one of our scouts standing adjacent to THIS obelisk.
+    for (const t of obeliskCells(config, ob.corner)) {
+      if (cellFilter && !cellFilter.has(t)) continue;
+      const cell = state.cells[t];
+      if (cell.army !== army || !cell.pieces.includes(1)) continue;
+      state.cells.forEach((ec, e) => {
+        if (ec.army !== enemy) return;
+        if (ob.element === 'fire') {
+          if (ec.pieces.includes(1)) {
+            acts.push({ type: 'ability', element: 'fire', from: t, target: e, cost: 0 });
+          }
+        } else if (ob.element === 'water') {
+          for (const v of new Set(ec.pieces)) {
+            if (v <= 2) acts.push({ type: 'ability', element: 'water', from: t, target: e, piece: v, cost: 0 });
+          }
+        } else if (ob.element === 'earth') {
+          if (ec.pieces.includes(2)) {
+            acts.push({ type: 'ability', element: 'earth', from: t, target: e, cost: 0 });
+          }
+        } else if (ob.element === 'air') {
+          for (const v of new Set(ec.pieces)) {
+            for (const d of neighbors(config, e)) {
+              const dc = state.cells[d];
+              if ((dc.army === null || dc.army === enemy) && canAddPiece(config, dc, v)) {
+                acts.push({ type: 'ability', element: 'air', from: t, target: e, piece: v, dest: d, cost: 0 });
               }
             }
           }
-        });
-      }
+        }
+      });
     }
   }
   return acts;
@@ -688,6 +697,25 @@ function checkElimination(state) {
   return true;
 }
 
+// Reaction window: after each of the active player's actions, the other army
+// may fire its unused obelisk abilities (any obelisk-adjacent scout as fuel,
+// no budget or action cost). Engines opt in via chooseReaction; loop is
+// bounded by the once-per-element-per-turn ledger.
+function offerReactions(state, reactor, engines, rng) {
+  const eng = engines[reactor];
+  if (!eng || !eng.chooseReaction) return;
+  while (state.phase === 'play') {
+    const opts = abilityActions(state, reactor);
+    if (opts.length === 0) return;
+    const choice = eng.chooseReaction(state, reactor, opts, rng);
+    if (!choice) return;
+    const match = opts.find((o) => JSON.stringify(o) === JSON.stringify(choice));
+    if (!match) return;
+    applyAction(state, reactor, match, engines, rng);
+    if (checkElimination(state)) return;
+  }
+}
+
 // Plays one full turn for state.toMove: every contingent (snapshotted at turn
 // start) takes up to maxActionsPerContingent actions within its fib budget.
 export function playTurn(state, engines, rng) {
@@ -772,6 +800,9 @@ export function playTurn(state, engines, rng) {
       remaining -= match.cost - drawn;
       taken++;
       if (checkElimination(state)) return state;
+      // The other army may respond with obelisk abilities.
+      offerReactions(state, other(army), engines, rng);
+      if (state.phase !== 'play') return state;
     }
   }
 

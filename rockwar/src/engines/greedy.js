@@ -212,6 +212,18 @@ export function makeGreedyEngine(opts = {}) {
       return plan;
     },
 
+    // On the opponent's turn, fire off any ability whose flat value clears
+    // the bar — abilities cost no tempo as reactions, so use them freely.
+    chooseReaction(state, army, opts, rng) {
+      let best = null;
+      let bestScore = 6; // air (4) stays holstered; the rest are worth it
+      for (const o of opts) {
+        const s = (W.ability[o.element] ?? 5) + rng() * 0.1;
+        if (s > bestScore) { bestScore = s; best = o; }
+      }
+      return best;
+    },
+
     // First-turn handicap: act with the strongest contingent(s).
     chooseContingents(state, conts, limit, rng) {
       return [...conts].sort((a, b) => b.strength - a.strength).slice(0, limit);

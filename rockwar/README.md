@@ -105,7 +105,12 @@ in-browser with the same stats as the CLI.
     sideboard as stock).
   - *air*: **return** the scout to displace **any** enemy piece into an
     adjacent legal territory of your choice.
-  Disable with `obeliskAbilities: false`.
+  Abilities can also be cast **on the opponent's turn**: after each action
+  the active player takes, the other army gets a reaction window and may
+  fire any of its unused abilities (no budget or action cost — just the
+  fuel scout). The once-per-obelisk ledger is per player-turn, so an
+  element can fire once during your turn and once as a reaction during
+  theirs. Disable everything with `obeliskAbilities: false`.
 - **Winning**: eliminate all enemy pieces from the board, or leave the enemy
   with no legal action on their turn. If a combat wipes both boards at once,
   the game is a draw (`mutual-elimination`). Games also draw at the turn limit.
@@ -191,15 +196,14 @@ engine can't corrupt game state.
   again (seat B won 178 of 251 decided games) — the tempo dynamics of the
   turn-1 handicap shift with every combat-rule change; worth re-sweeping
   `firstTurnActions`/`firstTurnContingents` under devolve.
-- **Abilities are live and keep cutting draws.** With scout-fueled,
-  obelisk-adjacent casting (60 strong-engine games): water 119, earth 111,
-  fire 32, air 9. Earth went from dead (2 uses under the old
-  lone-warrior-for-lone-warrior form) to a staple — returning a scout to
-  shatter any warrior is great tempo. Water's bounce remains the best
-  single effect. Air still barely fires: its value is positional and these
-  engines can't see it (a searcher with deeper lookahead, or an eval term
-  for formation disruption, would use it). Draw rates fell again across
-  the board — greedy mirrors 12.7%, lookahead mirrors 37.7%.
+- **Reactive abilities balanced the elements and cut draws again.** With
+  reaction windows (60 strong-engine games): fire 51, earth 48, water 38,
+  air 15 — every element now sees play (air's positional displacements
+  finally fire because lookahead *simulates* reactions and takes only real
+  gains). Greedy mirrors are down to 9.3% draws, lookahead-vs-greedy to
+  ~32%, and games run noticeably faster. Engines opt into reactions via a
+  `chooseReaction(state, army, options, rng)` hook — random fires ~30% of
+  windows, greedy uses flat element values, lookahead simulates.
 - Lessons from building lookahead: a one-ply evaluator needs an
   "evolve-ready pairs" term to see development chains, must treat
   spawn-locked scouts as dead material (but not transient full-cell locks),
