@@ -216,10 +216,24 @@ engine can't corrupt game state.
   `chooseReaction(state, army, options, rng)` hook — random fires ~30% of
   windows, greedy uses flat element values, lookahead simulates.
 - Lessons from building lookahead: a one-ply evaluator needs an
-  "evolve-ready pairs" term to see development chains, must treat
-  spawn-locked scouts as dead material (but not transient full-cell locks),
-  and must price passing as losing tempo — the biggest single improvement
-  was letting it act unless an action is *clearly* harmful.
+  "evolve-ready pairs" term to see development chains, must price passing
+  as losing tempo, and needs a **three-tier spawn-access model**: open now /
+  unlockable in one move (small flat tempo penalty) / permanently entombed
+  (sideboard scouts count as dead). Binary versions of that term caused two
+  opposite pathologies — armies that evolved into unspawnable fortresses,
+  and armies that refused to ever fill their last scout slot.
+- **Shuttle loops are the recurring engine failure mode.** Three separate
+  bugs made engines shuffle one piece back and forth forever: a no-op
+  repelled-attack exploit, obelisk-hold annuities outbidding endgame
+  conversion, and greedy's obelisk pull double-counting a piece moving
+  within the same obelisk's adjacency (always "one move from control").
+  Every fix was found by reconstructing a stuck position from a screenshot
+  and dumping candidate scores — the `debug: true` engine option exists for
+  exactly this.
+- **Standing balance item**: with turtling gone, seat B (second player)
+  wins ~65-70% of decided mirror games across engines — the 1-contingent/
+  1-action turn-1 handicap now overshoots. Re-sweep `firstTurnActions`/
+  `firstTurnContingents` next time the rules settle.
 - **The 5×5 board fixed the seat imbalance.** Greedy mirrors are now
   essentially even (109 vs 125 seat wins) where the 4×4 board swung as far
   as ~91% toward one seat under various turn-1 rules. More space dilutes the

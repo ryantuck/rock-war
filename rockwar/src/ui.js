@@ -291,7 +291,30 @@ function render(after = null) {
     row.innerHTML = '';
     const sb = sideboard[army];
     for (const v of Object.keys(sb).map(Number).sort((a, b) => a - b)) {
-      for (let k = 0; k < sb[v]; k++) row.appendChild(pieceEl(army, v));
+      const n = sb[v];
+      if (n <= 0) continue;
+      // One compact stack per piece type: up to two peeking duplicates
+      // underneath and a ×N count beside it.
+      const stack = document.createElement('div');
+      stack.className = 'sidestack';
+      const wrap = document.createElement('div');
+      wrap.className = 'stackwrap';
+      const layers = Math.min(n, 3);
+      for (let k = layers - 1; k >= 1; k--) {
+        const p = pieceEl(army, v);
+        p.classList.add('peek');
+        p.style.transform = `translate(${k * 3}px, ${k * 3}px)`;
+        wrap.appendChild(p);
+      }
+      const top = pieceEl(army, v);
+      top.classList.add('stacktop');
+      wrap.appendChild(top);
+      stack.appendChild(wrap);
+      const count = document.createElement('span');
+      count.className = 'count';
+      count.textContent = `×${n}`;
+      stack.appendChild(count);
+      row.appendChild(stack);
     }
   }
 

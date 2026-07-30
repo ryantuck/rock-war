@@ -31,7 +31,8 @@ const DEFAULT_WEIGHTS = {
   threat: 3,        // per point the enemy's best reply attack would win
   myThreat: 6,      // per point our own best attack would win (keep pressure on)
   advance: 1.2,     // pull toward the enemy (avg distance, negated)
-  spawnLock: 15,    // penalty for having scouts but nowhere to spawn them
+  spawnLock: 15,    // penalty for scouts being permanently entombed
+  spawnTempo: 6,    // milder penalty when spawning is one unlocking move away
   costPenalty: 0.3, // budget spent is tempo spent
   passMargin: -3,   // act unless clearly harmful — passing doesn't freeze the
                     // game, the opponent moves next, so idling has real cost
@@ -39,12 +40,11 @@ const DEFAULT_WEIGHTS = {
 };
 
 // Deployable strength: board material plus sideboard scouts (bigger sideboard
-// pieces are frozen assets without scouts to evolve from). Spawn-locked
-// armies count their sideboard scouts as ZERO — if no cell can accept a
-// scout, that material is entombed, possibly forever (a lone 3 can never
-// re-open spawning: moving its only piece just relocates the lock).
+// pieces are frozen assets without scouts to evolve from). Permanently
+// spawn-locked armies count their sideboard scouts as ZERO — a lone 3 can
+// never re-open spawning; moving its only piece just relocates the lock.
 function deployable(state, army) {
-  const scouts = spawnLocked(state, army) ? 0 : (state.sideboard[army][1] || 0);
+  const scouts = spawnAccess(state, army) === 2 ? 0 : (state.sideboard[army][1] || 0);
   return armyStrengthOnBoard(state, army) + scouts;
 }
 
@@ -116,19 +116,31 @@ function avgDistToEnemy(state, army) {
   return sum / mine.length;
 }
 
-// Spawn-locked means no cell can accept a scout AND no evolve could free
-// space either. A full (1,1) cell is only transiently blocked — evolving it
-// reopens spawning — but a board of lone 3s/5s is entombed for good.
-function spawnLocked(state, army) {
-  if ((state.sideboard[army][1] || 0) === 0) return false;
-  for (const c of state.cells) {
+// How reachable is spawning? Scouts only stack with 1s and 2s, so:
+//   0 — some cell accepts a scout right now
+//   1 — one move away: a small piece (<=2) can step to an empty neighbor
+//       (landing alone it hosts scouts, and leaving a stack frees a slot),
+//       or a (1,1) can evolve into a scout-friendly 2
+//   2 — permanently entombed: an army of lone 3s/5s/8s can shuffle forever
+//       without ever creating a cell a scout may enter
+// Transient fullness costs a move of tempo; permanence kills the sideboard.
+function spawnAccess(state, army) {
+  if ((state.sideboard[army][1] || 0) === 0) return 0; // nothing to deploy
+  let oneMove = false;
+  for (let i = 0; i < state.cells.length; i++) {
+    const c = state.cells[i];
     if (c.army !== army) continue;
-    if (canAddPiece(state.config, c, 1)) return false;
-    if (c.pieces.length === 2 && (state.sideboard[army][c.pieces[0] + c.pieces[1]] || 0) > 0) {
-      return false;
+    if (canAddPiece(state.config, c, 1)) return 0;
+    if (oneMove) continue;
+    if (c.pieces.length === 2 && c.pieces[0] === 1 && c.pieces[1] === 1 &&
+        (state.sideboard[army][2] || 0) > 0) {
+      oneMove = true;
+    } else if (c.pieces.some((p) => p <= 2) &&
+               neighbors(state.config, i).some((n) => state.cells[n].army === null)) {
+      oneMove = true;
     }
   }
-  return true;
+  return oneMove ? 1 : 2;
 }
 
 // Best material swing the enemy could get with a single attack right now
@@ -184,8 +196,12 @@ function evaluate(state, me, W) {
   // and finish, so a won game gets won instead of drifting to the turn cap.
   const hunt = W.hunt * Math.min(W.huntCap, Math.max(0, myDep / Math.max(1, enemyDep) - 1));
   score -= (W.advance + hunt) * avgDistToEnemy(state, me);
-  if (spawnLocked(state, me)) score -= W.spawnLock;
-  if (spawnLocked(state, enemy)) score += W.spawnLock;
+  const accessMe = spawnAccess(state, me);
+  const accessEnemy = spawnAccess(state, enemy);
+  if (accessMe === 1) score -= W.spawnTempo;
+  else if (accessMe === 2) score -= W.spawnLock;
+  if (accessEnemy === 1) score += W.spawnTempo;
+  else if (accessEnemy === 2) score += W.spawnLock;
   score -= W.threat * maxAttackThreat(state, enemy, W);
   score += W.myThreat * maxAttackThreat(state, me, W);
   return score;
