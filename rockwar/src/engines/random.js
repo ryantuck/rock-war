@@ -25,6 +25,11 @@ export function makeRandomEngine({ passChance = 0.1 } = {}) {
       return out;
     },
 
+    // React on the opponent's turn with 30% probability per window.
+    chooseReaction(state, army, opts, rng) {
+      return rng() < 0.3 ? rng.pick(opts) : null;
+    },
+
     // Retreat each piece with 50% probability, preferring own territories.
     planRetreats(state, attackInfo, options, rng) {
       const plan = [];

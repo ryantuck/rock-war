@@ -79,6 +79,17 @@ export function defaultConfig() {
       { element: 'air', corner: [1, 4] },
       { element: 'water', corner: [4, 4] },
     ],
+    // Controlled obelisks also grant an active ability, once per obelisk per
+    // turn (no budget cost — the piece spent is the price). The fuel is
+    // always one of YOUR SCOUTS standing in a territory adjacent to that
+    // obelisk; targets can be anywhere:
+    //   fire  — sacrifice the scout to slay an enemy scout in any territory
+    //   water — return the scout to bounce an enemy piece of strength <= 2
+    //           back to its owner's sideboard
+    //   earth — return the scout to devolve any enemy warrior in place
+    //   air   — return the scout to displace ANY enemy piece into an
+    //           adjacent legal territory of your choice
+    obeliskAbilities: true,
     // Control requires occupying >= 2 of the obelisk's adjacent territories
     // with the strictly greatest total adjacent piece value, which must reach
     // the first tier. Bonuses scale fibonacci with the tier reached:
@@ -209,6 +220,7 @@ export function newGame(config = defaultConfig()) {
     turn: 0,
     winner: null, // 'A' | 'B' | 'draw'
     reason: null, // 'elimination' | 'immobilized' | 'max-turns'
+    abilitiesUsedThisTurn: [], // obelisk elements whose ability fired this turn
     log: [],
   };
 }
@@ -393,6 +405,58 @@ export function legalActions(state, cont, remainingBudget, actionsTaken, bonusPo
       }
     }
   }
+
+  // Obelisk abilities: once per controlled obelisk per player-turn,
+  // budget-free (the spent scout is the price), fueled from this contingent.
+  // Not available as bonus-funded extra actions — they respect the cap.
+  if (!beyondCap) acts.push(...abilityActions(state, army, cont.terrs));
+  return acts;
+}
+
+// All obelisk ability actions available to `army` right now. When cellFilter
+// (a Set of territory indices) is given, fuel scouts must stand in it — the
+// contingent restriction during the army's own turn. Without it, any
+// obelisk-adjacent scout qualifies (used for reactions on the enemy's turn).
+export function abilityActions(state, army, cellFilter = null) {
+  const { config } = state;
+  const acts = [];
+  if (!config.obeliskAbilities) return acts;
+  const enemy = other(army);
+  for (const ob of config.obelisks ?? []) {
+    if ((state.abilitiesUsedThisTurn ?? []).includes(ob.element)) continue;
+    if (obeliskStatus(state, ob).controller !== army) continue;
+    // Fuel: one of our scouts standing adjacent to THIS obelisk.
+    for (const t of obeliskCells(config, ob.corner)) {
+      if (cellFilter && !cellFilter.has(t)) continue;
+      const cell = state.cells[t];
+      if (cell.army !== army || !cell.pieces.includes(1)) continue;
+      state.cells.forEach((ec, e) => {
+        if (ec.army !== enemy) return;
+        if (ob.element === 'fire') {
+          if (ec.pieces.includes(1)) {
+            acts.push({ type: 'ability', element: 'fire', from: t, target: e, cost: 0 });
+          }
+        } else if (ob.element === 'water') {
+          for (const v of new Set(ec.pieces)) {
+            if (v <= 2) acts.push({ type: 'ability', element: 'water', from: t, target: e, piece: v, cost: 0 });
+          }
+        } else if (ob.element === 'earth') {
+          if (ec.pieces.includes(2)) {
+            acts.push({ type: 'ability', element: 'earth', from: t, target: e, cost: 0 });
+          }
+        } else if (ob.element === 'air') {
+          for (const v of new Set(ec.pieces)) {
+            for (const d of neighbors(config, e)) {
+              const dc = state.cells[d];
+              if ((dc.army === null || dc.army === enemy) && canAddPiece(config, dc, v)) {
+                acts.push({ type: 'ability', element: 'air', from: t, target: e, piece: v, dest: d, cost: 0 });
+              }
+            }
+          }
+        }
+      });
+    }
+  }
   return acts;
 }
 
@@ -505,6 +569,70 @@ function resolveAttack(state, army, action, engines, rng) {
   return { advanced: true, destroyed };
 }
 
+// Devolve `piece` where it stands: it returns to the sideboard and its
+// fibonacci constituents deploy in its place (parts missing from the
+// sideboard are lost). Returns the parts actually placed.
+function devolveInPlace(state, army, cellIdx, piece) {
+  removePiece(state, cellIdx, piece);
+  state.sideboard[army][piece] = (state.sideboard[army][piece] || 0) + 1;
+  const placed = [];
+  for (const part of fibParts(piece)) {
+    // Constituents deploy only where the sideboard has them AND the cell can
+    // legally hold them (a 2 devolving next to a 3 can't seat its 1s — those
+    // parts stay in the sideboard as stock instead).
+    if ((state.sideboard[army][part] || 0) > 0 &&
+        canAddPiece(state.config, state.cells[cellIdx], part)) {
+      state.sideboard[army][part]--;
+      addPiece(state, cellIdx, army, part);
+      placed.push(part);
+    }
+  }
+  return placed;
+}
+
+function resolveAbility(state, army, action) {
+  const { config } = state;
+  const enemy = other(army);
+  state.abilitiesUsedThisTurn.push(action.element);
+  switch (action.element) {
+    case 'fire': {
+      // Sacrifice a scout to slay an enemy scout anywhere. Both leave the game.
+      removePiece(state, action.from, 1);
+      removePiece(state, action.target, 1);
+      pushLog(state, `${army} fire ability: sacrifices scout at ${fmtCell(config, action.from)} to slay ${enemy} scout at ${fmtCell(config, action.target)}`);
+      return;
+    }
+    case 'water': {
+      // Return a scout home to bounce an enemy piece (<=2) to its sideboard.
+      removePiece(state, action.from, 1);
+      state.sideboard[army][1]++;
+      removePiece(state, action.target, action.piece);
+      state.sideboard[enemy][action.piece]++;
+      pushLog(state, `${army} water ability: returns scout at ${fmtCell(config, action.from)}, bouncing ${enemy} ${action.piece} at ${fmtCell(config, action.target)} to sideboard`);
+      return;
+    }
+    case 'earth': {
+      // Return a scout home to devolve an enemy warrior where it stands.
+      removePiece(state, action.from, 1);
+      state.sideboard[army][1]++;
+      const placed = devolveInPlace(state, enemy, action.target, 2);
+      pushLog(state, `${army} earth ability: returns scout at ${fmtCell(config, action.from)}, devolving ${enemy} warrior at ${fmtCell(config, action.target)} to (${placed.join(',') || 'sideboard'})`);
+      return;
+    }
+    case 'air': {
+      // Return a scout home to displace any enemy piece one territory.
+      removePiece(state, action.from, 1);
+      state.sideboard[army][1]++;
+      removePiece(state, action.target, action.piece);
+      addPiece(state, action.dest, enemy, action.piece);
+      pushLog(state, `${army} air ability: returns scout at ${fmtCell(config, action.from)}, displacing ${enemy} ${action.piece} ${fmtCell(config, action.target)}→${fmtCell(config, action.dest)}`);
+      return;
+    }
+    default:
+      throw new Error(`unknown ability element ${action.element}`);
+  }
+}
+
 // Applies a single validated action. Returns { capturedTerritory } so the
 // turn loop can extend the acting contingent's territory set.
 export function applyAction(state, army, action, engines, rng) {
@@ -537,6 +665,10 @@ export function applyAction(state, army, action, engines, rng) {
       const res = resolveAttack(state, army, action, engines, rng);
       return res.advanced ? { capturedTerritory: action.to } : {};
     }
+    case 'ability': {
+      resolveAbility(state, army, action);
+      return {};
+    }
     default:
       throw new Error(`unknown action type ${action.type}`);
   }
@@ -565,6 +697,25 @@ function checkElimination(state) {
   return true;
 }
 
+// Reaction window: after each of the active player's actions, the other army
+// may fire its unused obelisk abilities (any obelisk-adjacent scout as fuel,
+// no budget or action cost). Engines opt in via chooseReaction; loop is
+// bounded by the once-per-element-per-turn ledger.
+function offerReactions(state, reactor, engines, rng) {
+  const eng = engines[reactor];
+  if (!eng || !eng.chooseReaction) return;
+  while (state.phase === 'play') {
+    const opts = abilityActions(state, reactor);
+    if (opts.length === 0) return;
+    const choice = eng.chooseReaction(state, reactor, opts, rng);
+    if (!choice) return;
+    const match = opts.find((o) => JSON.stringify(o) === JSON.stringify(choice));
+    if (!match) return;
+    applyAction(state, reactor, match, engines, rng);
+    if (checkElimination(state)) return;
+  }
+}
+
 // Plays one full turn for state.toMove: every contingent (snapshotted at turn
 // start) takes up to maxActionsPerContingent actions within its fib budget.
 export function playTurn(state, engines, rng) {
@@ -575,6 +726,7 @@ export function playTurn(state, engines, rng) {
   if (checkElimination(state)) return state;
 
   const conts = contingents(state, army);
+  state.abilitiesUsedThisTurn = []; // each obelisk ability fires once per turn
 
   // Obelisk bonus budget pools for this turn, by action type. Army-wide:
   // contingents draw from them first-come, and they reset every turn.
@@ -648,6 +800,9 @@ export function playTurn(state, engines, rng) {
       remaining -= match.cost - drawn;
       taken++;
       if (checkElimination(state)) return state;
+      // The other army may respond with obelisk abilities.
+      offerReactions(state, other(army), engines, rng);
+      if (state.phase !== 'play') return state;
     }
   }
 

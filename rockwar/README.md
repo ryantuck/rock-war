@@ -91,6 +91,26 @@ in-browser with the same stats as the CLI.
   cost is covered by the matching pool — e.g. with fire control, spawn,
   evolve, then attack on the fire kicker. (Within the cap, actions spend
   contingent budget first so the kicker stays available for extras.)
+- **Obelisk abilities**: each controlled obelisk also grants an active
+  ability, once per obelisk per turn. The fuel is always one of your
+  **scouts standing adjacent to that obelisk**; abilities cost no budget —
+  the scout spent is the price — but count as actions, and targets can be
+  anywhere on the board:
+  - *fire*: **sacrifice** the scout (it leaves the game) to slay an enemy
+    scout in any territory.
+  - *water*: **return** the scout to your sideboard to bounce an enemy
+    piece of strength ≤ 2 back to its owner's sideboard.
+  - *earth*: **return** the scout to devolve any enemy warrior where it
+    stands (constituents that can't legally seat stay in the owner's
+    sideboard as stock).
+  - *air*: **return** the scout to displace **any** enemy piece into an
+    adjacent legal territory of your choice.
+  Abilities can also be cast **on the opponent's turn**: after each action
+  the active player takes, the other army gets a reaction window and may
+  fire any of its unused abilities (no budget or action cost — just the
+  fuel scout). The once-per-obelisk ledger is per player-turn, so an
+  element can fire once during your turn and once as a reaction during
+  theirs. Disable everything with `obeliskAbilities: false`.
 - **Winning**: eliminate all enemy pieces from the board, or leave the enemy
   with no legal action on their turn. If a combat wipes both boards at once,
   the game is a draw (`mutual-elimination`). Games also draw at the turn limit.
@@ -113,6 +133,7 @@ box or via `--config file.json` on the CLI:
 | `firstTurnActions` | 1 | actions per contingent on turn 1 (null = normal 2) |
 | `minAttackValue` | 2 | minimum piece value that may attack — scouts can't (1 = anyone can) |
 | `obelisks` | 4 corners | element + corner position per obelisk; empty array disables them |
+| `obeliskAbilities` | `true` | controlled obelisks grant their active ability |
 | `obeliskTiers` | 3/5/8/13/21/34 | adjacent-value thresholds granting +1/+2/+3/+5/+8/+13 bonus budget |
 | destroyed pieces | removed | destroyed pieces leave the game entirely (they do *not* return to the sideboard) |
 | capture on retreat | yes | if all defenders retreat, the attacker advances into the vacated territory |
@@ -175,6 +196,14 @@ engine can't corrupt game state.
   again (seat B won 178 of 251 decided games) — the tempo dynamics of the
   turn-1 handicap shift with every combat-rule change; worth re-sweeping
   `firstTurnActions`/`firstTurnContingents` under devolve.
+- **Reactive abilities balanced the elements and cut draws again.** With
+  reaction windows (60 strong-engine games): fire 51, earth 48, water 38,
+  air 15 — every element now sees play (air's positional displacements
+  finally fire because lookahead *simulates* reactions and takes only real
+  gains). Greedy mirrors are down to 9.3% draws, lookahead-vs-greedy to
+  ~32%, and games run noticeably faster. Engines opt into reactions via a
+  `chooseReaction(state, army, options, rng)` hook — random fires ~30% of
+  windows, greedy uses flat element values, lookahead simulates.
 - Lessons from building lookahead: a one-ply evaluator needs an
   "evolve-ready pairs" term to see development chains, must treat
   spawn-locked scouts as dead material (but not transient full-cell locks),

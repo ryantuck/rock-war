@@ -261,6 +261,22 @@ export function makeLookaheadEngine(opts = {}) {
       return retreatPolicy(state, attackInfo, options);
     },
 
+    // On the opponent's turn: simulate each available ability and fire the
+    // best one if it genuinely improves our position (reactions are free, but
+    // the fuel scout isn't — demand a real gain, not jitter).
+    chooseReaction(state, army, opts, rng) {
+      const baseline = evaluate(state, army, W) + 1;
+      let best = null;
+      let bestScore = baseline;
+      for (const o of opts) {
+        const clone = structuredClone({ ...state, log: [] });
+        applyAction(clone, army, o, simEngines, rng);
+        const s = evaluate(clone, army, W) + rng() * W.jitter;
+        if (s > bestScore) { bestScore = s; best = o; }
+      }
+      return best;
+    },
+
     chooseContingents(state, conts, limit, rng) {
       return [...conts].sort((a, b) => b.strength - a.strength).slice(0, limit);
     },
