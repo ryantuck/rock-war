@@ -50,14 +50,18 @@ function totalStrength(state, army) {
 // Score the obelisk value of putting `pieceValue` onto cell `target`:
 // a pull toward any obelisk we don't yet control, plus a big bonus when the
 // action would complete control (>=2 cells, >= first tier, strictly ahead).
-// Approximation: a move between two cells adjacent to the same obelisk
-// slightly overcounts the new adjacency value; fine for a heuristic.
-function obeliskPull(state, army, target, pieceValue, W) {
+// A move that starts from a cell adjacent to the same obelisk contributes no
+// pull at all — shuttling within the adjacency set is not progress, and
+// crediting it created engines that shuffled one piece forever chasing
+// phantom control.
+function obeliskPull(state, army, target, pieceValue, W, from = null) {
   const { config } = state;
   const tiers = config.obeliskTiers ?? [3, 5, 8, 13, 21, 34];
   let s = 0;
   for (const ob of config.obelisks ?? []) {
-    if (!obeliskCells(config, ob.corner).includes(target)) continue;
+    const adj = obeliskCells(config, ob.corner);
+    if (!adj.includes(target)) continue;
+    if (from !== null && adj.includes(from)) continue; // shuttle, not progress
     const st = obeliskStatus(state, ob);
     if (st.controller === army) continue; // already ours
     s += W.obeliskAdj;
@@ -156,7 +160,7 @@ export function makeGreedyEngine(opts = {}) {
           const before = distToNearestEnemy(state, army, a.from);
           const after = distToNearestEnemy(state, army, a.to);
           score += (before - after) * W.advancePerStep;
-          score += obeliskPull(state, army, a.to, a.piece, W);
+          score += obeliskPull(state, army, a.to, a.piece, W, a.from);
           const target = state.cells[a.to];
           if (target.pieces.length > 0) {
             // Stacking is only worth it if it sets up an available evolve and
