@@ -193,11 +193,11 @@ function fade(army, value, cellIdx) {
   });
 }
 
-function flash(cellIdx) {
+function flash(cellIdx, cls = 'hitflash') {
   const el = document.querySelector(`#board .cell[data-i="${cellIdx}"]`);
   if (!el) return;
-  el.classList.add('hitflash');
-  setTimeout(() => el.classList.remove('hitflash'), 450);
+  el.classList.add(cls);
+  setTimeout(() => el.classList.remove(cls), 450);
 }
 
 async function animateEvent(ev) {
@@ -211,7 +211,7 @@ async function animateEvent(ev) {
     case 'toSideboard':
       return fly(ev.army, ev.piece, cellRect(ev.from), sideRect(ev.army), { hide: ev.from, fadeOut: true });
     case 'evolve': {
-      flash(ev.at);
+      flash(ev.at, 'evolveflash');
       await Promise.all(ev.parts.map((p) => fade(ev.army, p, ev.at)));
       return;
     }
