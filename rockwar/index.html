@@ -101,8 +101,13 @@
   .sideboard .label { font-size: 12px; margin-bottom: 6px; }
   .sideboard .label.A { color: var(--army-a); }
   .sideboard .label.B { color: var(--army-b); }
-  .sideboard .row { display: flex; gap: 6px; flex-wrap: wrap; min-height: 32px; align-items: center; }
+  .sideboard .row { display: flex; gap: 14px; flex-wrap: wrap; min-height: 36px; align-items: center; }
   .sideboard .piece { opacity: 0.9; }
+  .sidestack { display: inline-flex; align-items: center; gap: 5px; }
+  .stackwrap { position: relative; }
+  .stackwrap .piece.peek { position: absolute; left: 0; top: 0; opacity: 0.45; }
+  .stackwrap .piece.stacktop { position: relative; z-index: 2; }
+  .sidestack .count { font-size: 11px; color: var(--muted); }
 
   /* controls */
   .controls { width: 320px; }
