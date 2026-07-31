@@ -744,10 +744,12 @@ function resolveCoordAttack(state, army, action, engines, rng) {
     byTarget.get(st.to).push(st);
   }
 
-  // Retreat phase across the whole assault.
-  let scoutBudget = (config.scoutRetreatBudget ?? 1) + obeliskElementBonus(state, defArmy, 'air');
+  // Retreat phase across the whole assault. Attacked territories are denied
+  // as destinations; the scout empty-retreat budget is PER TERRITORY (as in
+  // a single attack) — the squeeze comes from geometry, not a shared quota.
   const eng = engines && engines[defArmy];
   for (const [t, strikes] of byTarget) {
+    let scoutBudget = (config.scoutRetreatBudget ?? 1) + obeliskElementBonus(state, defArmy, 'air');
     const S = strikes.reduce((s, x) => s + x.piece, 0);
     const options = retreatOptions(state, t, defArmy, attacked);
     let plan = [];

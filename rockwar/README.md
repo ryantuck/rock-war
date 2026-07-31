@@ -76,9 +76,11 @@ board can never drift from the real state. Sims ignore the stream.
     attacker: ties annihilate every striker, stiff defense devolves them
     all in place, clean breaks advance the largest striker). Because the
     strikes are simultaneous, **defenders cannot retreat into any territory
-    under attack**, and the scout retreat-to-empty budget is shared across
-    the whole assault — two scouts side by side can no longer shelter each
-    other. Strikers may come from **different contingents**: each contingent
+    under attack** — two scouts side by side can no longer shelter each
+    other, and a 2 can't retreat into an also-attacked 1's territory. The
+    scout retreat-to-empty budget stays **per territory**, so the squeeze
+    comes from geometry: scouts against a wall have nowhere to go.
+    Strikers may come from **different contingents**: each contingent
     pays its own strikers' share from its budget and spends one of its
     actions on the assault. `coordinatedAttacks` knob; engines generate
     pairs.
