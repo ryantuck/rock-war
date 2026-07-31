@@ -66,6 +66,11 @@ export function defaultConfig() {
     devolveThreshold: 0.5,
     // Minimum piece value that may attack: scouts (1) cannot attack.
     minAttackValue: 2,
+    // Coordinated attacks: one action in which several pieces strike
+    // simultaneously — at different territories or combining their values
+    // against one. Defenders cannot retreat into ANY territory under attack,
+    // and the scout retreat-to-empty budget is shared across the assault.
+    coordinatedAttacks: true,
     // First-turn handicap: the first player acts with at most this many
     // contingents on turn 1 (their engine chooses which). null = no handicap.
     firstTurnContingents: 1,
@@ -463,6 +468,57 @@ export function legalActions(state, cont, remainingBudget, actionsTaken, bonusPo
     }
   }
 
+  // Coordinated attacks: pairs of attack-capable pieces striking at once —
+  // two different territories (each strike must individually connect) or
+  // one territory jointly (their combined value must connect). One action,
+  // cost = sum of piece values (+ earth tax per strike).
+  if (config.coordinatedAttacks !== false) {
+    const minAtk = config.minAttackValue ?? 1;
+    const units = [];
+    for (const t of cont.terrs) {
+      const cell = state.cells[t];
+      if (cell.army !== army) continue;
+      cell.pieces.forEach((p, slot) => {
+        if (p < minAtk) return;
+        const targets = [];
+        for (const n of neighbors(config, t)) {
+          const nc = state.cells[n];
+          if (nc.army !== null && nc.army !== army) {
+            targets.push({ to: n, defSum: nc.pieces.reduce((s, x) => s + x, 0) });
+          }
+        }
+        if (targets.length) units.push({ from: t, slot, piece: p, targets });
+      });
+    }
+    for (let i = 0; i < units.length; i++) {
+      for (let j = i + 1; j < units.length; j++) {
+        const a = units[i];
+        const b = units[j];
+        const cost = a.piece + b.piece + 2 * earthTax;
+        if (!afford('attack', cost)) continue;
+        for (const ta of a.targets) {
+          for (const tb of b.targets) {
+            if (ta.to === tb.to) {
+              // Joint strike: combined value must connect.
+              if (a.piece + b.piece >= ta.defSum) {
+                acts.push({
+                  type: 'coordAttack', cost,
+                  strikes: [{ from: a.from, piece: a.piece, to: ta.to }, { from: b.from, piece: b.piece, to: tb.to }],
+                });
+              }
+            } else if (a.piece >= ta.defSum && b.piece >= tb.defSum) {
+              // Twin strike on two territories: each must connect on its own.
+              acts.push({
+                type: 'coordAttack', cost,
+                strikes: [{ from: a.from, piece: a.piece, to: ta.to }, { from: b.from, piece: b.piece, to: tb.to }],
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+
   // Obelisk abilities: once per controlled obelisk per player-turn,
   // budget-free (the spent scout is the price), fueled from this contingent.
   // Not available as bonus-funded extra actions — they respect the cap.
@@ -522,13 +578,14 @@ export function abilityActions(state, army, cellFilter = null) {
 // Returns one entry per defending piece (by index into cell.pieces):
 // { piece, dests: [terr indices into own-occupied cells],
 //   emptyDests: [empty terr indices, scouts only] }
-export function retreatOptions(state, t, army) {
+export function retreatOptions(state, t, army, excluded = null) {
   const { config } = state;
   const cell = state.cells[t];
   return cell.pieces.map((piece) => {
     const dests = [];
     const emptyDests = [];
     for (const n of neighbors(config, t)) {
+      if (excluded && excluded.has(n)) continue; // territory is also under attack
       const nc = state.cells[n];
       if (nc.army === army && canAddPiece(config, nc, piece)) dests.push(n);
       else if (nc.army === null && piece === 1) emptyDests.push(n);
@@ -651,6 +708,111 @@ function resolveAttack(state, army, action, engines, rng) {
   return { advanced: true, destroyed };
 }
 
+// Resolve a coordinated attack: all strikes are simultaneous, so defenders
+// of every attacked territory plan retreats first (attacked territories are
+// excluded as destinations, and the scout empty-retreat budget is shared),
+// then each territory resolves against the combined value striking it.
+function resolveCoordAttack(state, army, action, engines, rng) {
+  const { config } = state;
+  const rule = combatRuleOf(config);
+  const defArmy = other(army);
+  const attacked = new Set(action.strikes.map((s) => s.to));
+  const byTarget = new Map();
+  for (const st of action.strikes) {
+    if (!byTarget.has(st.to)) byTarget.set(st.to, []);
+    byTarget.get(st.to).push(st);
+  }
+
+  // Retreat phase across the whole assault.
+  let scoutBudget = (config.scoutRetreatBudget ?? 1) + obeliskElementBonus(state, defArmy, 'air');
+  const eng = engines && engines[defArmy];
+  for (const [t, strikes] of byTarget) {
+    const S = strikes.reduce((s, x) => s + x.piece, 0);
+    const options = retreatOptions(state, t, defArmy, attacked);
+    let plan = [];
+    if (eng && eng.planRetreats) {
+      plan = eng.planRetreats(
+        state,
+        { attacker: army, defender: defArmy, to: t, piece: S, coordinated: [...attacked] },
+        options, rng
+      ) || [];
+    }
+    for (const r of plan) {
+      if (!r) continue;
+      const defCell = state.cells[t];
+      if (!defCell.pieces.includes(r.piece)) continue;
+      if (!neighbors(config, t).includes(r.dest)) continue;
+      if (attacked.has(r.dest)) continue; // can't retreat into the assault
+      const destCell = state.cells[r.dest];
+      if (destCell.army === defArmy) {
+        if (!canAddPiece(config, destCell, r.piece)) continue;
+      } else if (destCell.army === null) {
+        if (r.piece !== 1 || scoutBudget <= 0) continue;
+        scoutBudget--;
+      } else {
+        continue;
+      }
+      removePiece(state, t, r.piece);
+      addPiece(state, r.dest, defArmy, r.piece);
+      emitEvent(state, { type: 'retreat', army: defArmy, piece: r.piece, from: t, to: r.dest });
+      pushLog(state, `${defArmy} retreats ${r.piece} ${fmtCell(config, t)}→${fmtCell(config, r.dest)}`);
+    }
+  }
+
+  // Resolution per territory.
+  const waterSave = obeliskElementBonus(state, defArmy, 'water') > 0;
+  const captured = [];
+  for (const [t, strikes] of byTarget) {
+    const defCell = state.cells[t];
+    const S = strikes.reduce((s, x) => s + x.piece, 0);
+    const label = strikes.map((x) => x.piece).join('+');
+    const remaining = defCell.pieces;
+    const D = remaining.reduce((s, p) => s + p, 0);
+    if (remaining.length > 0) {
+      const destroyed = [...remaining];
+      defCell.pieces = [];
+      defCell.army = null;
+      let verb;
+      if (waterSave) {
+        for (const p of destroyed) {
+          state.sideboard[defArmy][p]++;
+          emitEvent(state, { type: 'toSideboard', army: defArmy, piece: p, from: t });
+        }
+        verb = 'breaks (water returns)';
+      } else {
+        emitEvent(state, { type: 'destroyed', army: defArmy, pieces: destroyed, at: t });
+        verb = 'destroys';
+      }
+      const attackersDie =
+        rule === 'mutual' || ((rule === 'margin' || rule === 'devolve') && S === D);
+      if (attackersDie) {
+        for (const st of strikes) {
+          removePiece(state, st.from, st.piece);
+          emitEvent(state, { type: 'destroyed', army, pieces: [st.piece], at: st.from });
+        }
+        pushLog(state, `${army} [${label}] ${verb} [${destroyed.join(',')}] at ${fmtCell(config, t)} and dies`);
+        continue;
+      }
+      if (rule === 'devolve' && D > S * (config.devolveThreshold ?? 0.5)) {
+        for (const st of strikes) {
+          const placed = devolveInPlace(state, army, st.from, st.piece);
+          emitEvent(state, { type: 'devolved', army, piece: st.piece, at: st.from, parts: placed });
+        }
+        pushLog(state, `${army} [${label}] ${verb} [${destroyed.join(',')}] at ${fmtCell(config, t)} and devolves in place`);
+        continue;
+      }
+      pushLog(state, `${army} [${label}] ${verb} [${destroyed.join(',')}] at ${fmtCell(config, t)}`);
+    }
+    // Territory empty: the largest striker advances.
+    const adv = strikes.reduce((x, y) => (y.piece > x.piece ? y : x));
+    removePiece(state, adv.from, adv.piece);
+    addPiece(state, t, army, adv.piece);
+    emitEvent(state, { type: 'move', army, piece: adv.piece, from: adv.from, to: t });
+    captured.push(t);
+  }
+  return { captured };
+}
+
 // Devolve `piece` where it stands: it returns to the sideboard and its
 // fibonacci constituents deploy in its place (parts missing from the
 // sideboard are lost). Returns the parts actually placed.
@@ -759,6 +921,9 @@ export function applyAction(state, army, action, engines, rng) {
     case 'attack': {
       const res = resolveAttack(state, army, action, engines, rng);
       return res.advanced ? { capturedTerritory: action.to } : {};
+    }
+    case 'coordAttack': {
+      return resolveCoordAttack(state, army, action, engines, rng);
     }
     case 'ability': {
       resolveAbility(state, army, action);
@@ -910,6 +1075,7 @@ export function playTurn(state, engines, rng) {
       state.eventSeq = (state.eventSeq ?? 0) + 1;
       const res = applyAction(state, army, match, engines, rng);
       if (res.capturedTerritory !== undefined) cont.terrs.add(res.capturedTerritory);
+      if (res.captured) for (const c of res.captured) cont.terrs.add(c);
       // Payment: within the cap, contingent budget first so the kicker stays
       // available for extra actions; beyond the cap, entirely bonus-funded.
       const drawn = beyondCap ? match.cost : Math.max(0, match.cost - remaining);

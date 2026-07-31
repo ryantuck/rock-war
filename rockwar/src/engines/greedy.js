@@ -181,6 +181,31 @@ export function makeGreedyEngine(opts = {}) {
           const decay = Math.max(0, 1 - state.turn / W.spawnDecayTurns);
           score += Math.max(W.spawn * decay, W.spawnFloor);
           score += obeliskPull(state, army, a.to, 1, W);
+        } else if (a.type === 'coordAttack') {
+          // Sum the per-territory outcomes: ties trade, breaks kill, stiff
+          // defenses devolve us. Coordination's retreat-denial upside isn't
+          // modeled here — the flat bonus stands in for it.
+          const rule = combatRuleOf(state.config);
+          const byTarget = new Map();
+          for (const st of a.strikes) {
+            byTarget.set(st.to, (byTarget.get(st.to) || 0) + st.piece);
+          }
+          let killed = 0;
+          let lost = 0;
+          let devols = 0;
+          for (const [t, S] of byTarget) {
+            const D = state.cells[t].pieces.reduce((s, x) => s + x, 0);
+            killed += D;
+            if (rule === 'mutual' || ((rule === 'margin' || rule === 'devolve') && S === D)) lost += S;
+            else if (rule === 'devolve' && D > S * (state.config.devolveThreshold ?? 0.5)) devols++;
+          }
+          score += (killed - lost) * W.killPerPoint - devols * W.devolvePenalty + W.capture;
+          if (lost > 0) {
+            const mine = totalStrength(state, army);
+            const theirs = totalStrength(state, other(army));
+            score += mine >= theirs ? W.trade : -W.trade;
+            if (armyPieceCount(state, army) <= a.strikes.length) score -= 1000;
+          }
         } else if (a.type === 'ability') {
           // Water bounces cost us nothing permanent; fire is an even trade at
           // range; earth neutralizes an attacker; air repositions.

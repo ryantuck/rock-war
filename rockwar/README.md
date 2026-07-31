@@ -69,6 +69,16 @@ board can never drift from the real state. Sims ignore the stream.
     and attacking requires the piece's value to be **≥ the target
     territory's total** — weaker attacks could never connect, so they are
     simply illegal.
+  - *Coordinated attack* (one action, cost = sum of the pieces): several of
+    a contingent's pieces strike **simultaneously** — at different
+    territories (each strike must connect on its own) or jointly at one
+    (their combined value must connect, and resolves as a single combined
+    attacker: ties annihilate every striker, stiff defense devolves them
+    all in place, clean breaks advance the largest striker). Because the
+    strikes are simultaneous, **defenders cannot retreat into any territory
+    under attack**, and the scout retreat-to-empty budget is shared across
+    the whole assault — two scouts side by side can no longer shelter each
+    other. `coordinatedAttacks` knob; engines generate pairs.
 - **Combat**: the defender may retreat each piece for free into an adjacent
   territory it occupies (respecting stacking limits), plus up to 1 scout per
   attack may retreat into an adjacent *empty* territory. Then the defenders

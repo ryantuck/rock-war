@@ -37,7 +37,9 @@ node src/sim.js --games 500 --a lookahead --b greedy --seed 42
 - **Actions**: *spawn* a scout (1) · *move* (cost = value difference, scouts
   always 1) · *evolve* a pair into its fibonacci sum (1+2→3, 2+3→5, 3+5→8)
   · *attack* an adjacent enemy territory (cost = attacker's value; scouts
-  can't attack; attacker must be ≥ the territory's total).
+  can't attack; attacker must be ≥ the territory's total) · *coordinated
+  attack*: several pieces strike simultaneously, denying retreats into any
+  attacked territory.
 - **Combat**: defenders retreat free into adjacent friendly territories or
   die. Exact-value ties are mutual destruction. A stronger attacker breaking
   a defense worth more than half its value **devolves** into its fibonacci
