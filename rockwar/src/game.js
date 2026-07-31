@@ -30,8 +30,9 @@ export function defaultConfig() {
   return {
     width: 5,
     height: 5,
-    // Per-army sideboard: value -> count. 8 scouts, 5 warriors, 3 chieftains,
+    // Per-army sideboard: value -> count. 8 scouts, 5 soldiers, 3 chieftains,
     // 2 warlords, 1 behemoth — fibonacci counts of fibonacci values, 45 pts.
+    // ('Warrior' is the generic term for any piece of value 2 or more.)
     supply: { 1: 8, 2: 5, 3: 3, 5: 2, 8: 1 },
     // Scouts each army places during the snake-placement phase; the rest of
     // the sideboard (including remaining scouts) enters play via spawning.
@@ -88,7 +89,8 @@ export function defaultConfig() {
     //   fire  — sacrifice the scout to slay an enemy scout in any territory
     //   water — return the scout to bounce an enemy piece of strength <= 2
     //           back to its owner's sideboard
-    //   earth — return the scout to devolve any enemy warrior in place
+    //   earth — return the scout to devolve any enemy warrior (piece >= 2)
+    //           in place
     //   air   — return the scout to displace ANY enemy piece into an
     //           adjacent legal territory of your choice
     obeliskAbilities: true,
@@ -496,8 +498,9 @@ export function abilityActions(state, army, cellFilter = null) {
             if (v <= 2) acts.push({ type: 'ability', element: 'water', from: t, target: e, piece: v, cost: 0 });
           }
         } else if (ob.element === 'earth') {
-          if (ec.pieces.includes(2)) {
-            acts.push({ type: 'ability', element: 'earth', from: t, target: e, cost: 0 });
+          // Any warrior — that is, any piece of value 2 or more.
+          for (const v of new Set(ec.pieces)) {
+            if (v >= 2) acts.push({ type: 'ability', element: 'earth', from: t, target: e, piece: v, cost: 0 });
           }
         } else if (ob.element === 'air') {
           for (const v of new Set(ec.pieces)) {
@@ -695,13 +698,15 @@ function resolveAbility(state, army, action) {
       return;
     }
     case 'earth': {
-      // Return a scout home to devolve an enemy warrior where it stands.
+      // Return a scout home to devolve an enemy warrior (any piece >= 2)
+      // where it stands.
+      const target = action.piece ?? 2;
       removePiece(state, action.from, 1);
       state.sideboard[army][1]++;
       emitEvent(state, { type: 'toSideboard', army, piece: 1, from: action.from });
-      const placed = devolveInPlace(state, enemy, action.target, 2);
-      emitEvent(state, { type: 'devolved', army: enemy, piece: 2, at: action.target, parts: placed });
-      pushLog(state, `${army} earth ability: returns scout at ${fmtCell(config, action.from)}, devolving ${enemy} warrior at ${fmtCell(config, action.target)} to (${placed.join(',') || 'sideboard'})`);
+      const placed = devolveInPlace(state, enemy, action.target, target);
+      emitEvent(state, { type: 'devolved', army: enemy, piece: target, at: action.target, parts: placed });
+      pushLog(state, `${army} earth ability: returns scout at ${fmtCell(config, action.from)}, devolving ${enemy} ${target} at ${fmtCell(config, action.target)} to (${placed.join(',') || 'sideboard'})`);
       return;
     }
     case 'air': {

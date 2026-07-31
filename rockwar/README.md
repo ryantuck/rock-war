@@ -38,9 +38,10 @@ board can never drift from the real state. Sims ignore the stream.
 ## Rules as implemented
 
 - **Board**: 5×5 grid of 25 territories, orthogonal adjacency.
-- **Armies**: each side's sideboard holds 8×1 (scouts), 5×2 (warriors),
+- **Armies**: each side's sideboard holds 8×1 (scouts), 5×2 (soldiers),
   3×3 (chieftains), 2×5 (warlords), 1×8 (behemoth) — fibonacci counts of
-  fibonacci values, 45 points total.
+  fibonacci values, 45 points total. Any piece of value 2 or more is a
+  **warrior**.
 - **Placement**: snake order (A B B A), one scout per slot onto any empty
   territory, until each army has placed `initialScouts` (default 2). Remaining
   sideboard pieces — including the other scouts — enter play by spawning and
@@ -114,9 +115,9 @@ board can never drift from the real state. Sims ignore the stream.
     scout in any territory.
   - *water*: **return** the scout to your sideboard to bounce an enemy
     piece of strength ≤ 2 back to its owner's sideboard.
-  - *earth*: **return** the scout to devolve any enemy warrior where it
-    stands (constituents that can't legally seat stay in the owner's
-    sideboard as stock).
+  - *earth*: **return** the scout to devolve any enemy warrior — any piece
+    ≥ 2, behemoth included — where it stands (constituents that can't
+    legally seat stay in the owner's sideboard as stock).
   - *air*: **return** the scout to displace **any** enemy piece into an
     adjacent legal territory of your choice.
   Abilities can also be cast **on the opponent's turn**: after each action
