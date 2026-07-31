@@ -330,12 +330,14 @@
         Control grants bonus budget for that mechanic (3→+1, 5→+2, 8→+3,
         13→+5 …) that can even fund <b>extra actions past the cap</b> — and
         an <b>ability</b>, once per obelisk per turn, castable on either
-        player's turn, fueled by a piece adjacent to the obelisk. Abilities
-        <b>scale with fervor</b> (your total adjacent value): higher fervor
-        permits bigger fuel, and bigger fuel bigger effects — fire deals
-        fuel-value damage to any piece, water bounces a piece ≤ fuel, earth
-        devolves one of your warriors to devolve an enemy warrior up to the
-        next fibonacci above it, air displaces fuel-count pieces.</p>
+        player's turn, fueled by <b>sacrificing</b> a piece adjacent to the
+        obelisk. Abilities <b>scale with fervor</b> (your total adjacent
+        value): higher fervor permits bigger fuel, bigger fuel bigger
+        effects — fire deals fuel-value damage split across up to
+        prevFib(fuel) territories; water bounces a piece ≤ fuel to its
+        sideboard; air exiles a piece ≤ fuel to anywhere on the board;
+        earth uses the sacrifice as remote evolution material to level up
+        one of your own pieces.</p>
         <h3>Winning</h3>
         <p>Eliminate the enemy's board pieces, leave them with no legal
         action, or <b>control any three obelisks at once</b> — the completing

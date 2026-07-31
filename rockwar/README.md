@@ -131,23 +131,23 @@ board can never drift from the real state. Sims ignore the stream.
   caps the **fuel** piece you may spend — a piece of your own standing
   adjacent to that obelisk: fervor 3 permits scout fuel, 5 a soldier, 8 a
   chieftain, 13 a warlord (max fuel value = the obelisk's bonus tier).
-  Bigger fuel, bigger effect. Abilities cost no budget — the fuel is the
-  price — count as actions, fire once per obelisk per player-turn, and
-  reach anywhere:
-  - *fire*: **sacrifice** fuel F (it leaves the game) to deal **F damage**
-    to a chosen enemy piece — value ≤ F dies outright; a bigger piece is
-    wounded down to (value − F), the survivor redeploying in place as
-    fibonacci parts drawn from its owner's sideboard (unseatable or
-    unavailable parts are lost). 2 damage turns a chieftain into a scout.
-  - *water*: **return** fuel F to bounce an enemy piece of value **≤ F**
-    back to its owner's sideboard.
-  - *earth*: **devolve** one of your warriors (fuel F ≥ 2, split in place)
-    to devolve an enemy warrior of value **≤ the next fibonacci above F**
-    where it stands — a soldier breaks a chieftain, a chieftain breaks a
-    warlord. Earth requires fervor ≥ 5 (warrior fuel) and trades your own
-    concentration for theirs.
-  - *air*: **return** fuel F to displace **F enemy pieces** (any size),
-    each into an adjacent legal territory of your choice.
+  Bigger fuel, bigger effect. Every ability **sacrifices** its fuel — the
+  piece leaves the game. Abilities cost no budget, count as actions, fire
+  once per obelisk per player-turn, and reach anywhere:
+  - *fire*: deal **F damage to enemy territories**, splittable across up to
+    prevFib(F) of them — a chieftain deals 3 damage to 2 territories, a
+    warlord 5 damage to 3. Each hit removes its damage from the
+    territory's total value; survivors redeploy in place as fibonacci
+    parts drawn from the owner's sideboard (unseatable or unavailable
+    parts are lost).
+  - *water*: bounce an enemy piece of value **≤ F** back to its owner's
+    sideboard.
+  - *air*: **exile** an enemy piece of value ≤ F to **any legal territory
+    on the board** — no adjacency, your choice of destination.
+  - *earth*: the sacrificed piece is **remote evolution material** — level
+    up one of your own pieces fib-adjacent to the fuel into their sum
+    (sacrifice a soldier to turn a chieftain into a warlord), drawn from
+    the sideboard, no co-location needed.
   Abilities can also be cast **on the opponent's turn**: after each action
   the active player takes, the other army gets a reaction window and may
   fire any of its unused abilities (no budget or action cost — just the
