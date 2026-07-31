@@ -126,20 +126,26 @@ board can never drift from the real state. Sims ignore the stream.
   cost is covered by the matching pool — e.g. with fire control, spawn,
   evolve, then attack on the fire kicker. (Within the cap, actions spend
   contingent budget first so the kicker stays available for extras.)
-- **Obelisk abilities**: each controlled obelisk also grants an active
-  ability, once per obelisk per turn. The fuel is always one of your
-  **scouts standing adjacent to that obelisk**; abilities cost no budget —
-  the scout spent is the price — but count as actions, and targets can be
-  anywhere on the board:
-  - *fire*: **sacrifice** the scout (it leaves the game) to slay an enemy
-    scout in any territory.
-  - *water*: **return** the scout to your sideboard to bounce an enemy
-    piece of strength ≤ 2 back to its owner's sideboard.
-  - *earth*: **return** the scout to devolve any enemy warrior — any piece
-    ≥ 2, behemoth included — where it stands (constituents that can't
-    legally seat stay in the owner's sideboard as stock).
-  - *air*: **return** the scout to displace **any** enemy piece into an
-    adjacent legal territory of your choice.
+- **Obelisk abilities scale with fervor** — the controller's total adjacent
+  value at that obelisk (the same score that sets the bonus tier). Fervor
+  caps the **fuel** piece you may spend — a piece of your own standing
+  adjacent to that obelisk: fervor 3 permits scout fuel, 5 a soldier, 8 a
+  chieftain, 13 a warlord (max fuel value = the obelisk's bonus tier).
+  Bigger fuel, bigger effect. Abilities cost no budget — the fuel is the
+  price — count as actions, fire once per obelisk per player-turn, and
+  reach anywhere:
+  - *fire*: **sacrifice** fuel F (it leaves the game) to deal **F damage**
+    to a chosen enemy piece — value ≤ F dies outright; a bigger piece is
+    wounded down to (value − F), the survivor redeploying in place as
+    fibonacci parts drawn from its owner's sideboard (unseatable or
+    unavailable parts are lost). 2 damage turns a chieftain into a scout.
+  - *water*: **return** fuel F to bounce an enemy piece of value **≤ F**
+    back to its owner's sideboard.
+  - *earth*: **return** fuel F to devolve an enemy warrior of value **≤ the
+    next fibonacci above F** where it stands (scout fuel devolves a
+    soldier; a soldier devolves a chieftain; …).
+  - *air*: **return** fuel F to displace **F enemy pieces** (any size),
+    each into an adjacent legal territory of your choice.
   Abilities can also be cast **on the opponent's turn**: after each action
   the active player takes, the other army gets a reaction window and may
   fire any of its unused abilities (no budget or action cost — just the

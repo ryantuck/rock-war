@@ -551,6 +551,15 @@ export function legalActions(state, cont, remainingBudget, actionsTaken, bonusPo
 // (a Set of territory indices) is given, fuel scouts must stand in it — the
 // contingent restriction during the army's own turn. Without it, any
 // obelisk-adjacent scout qualifies (used for reactions on the enemy's turn).
+// Fervor scales obelisk abilities: the controller's total adjacent value
+// (the same score that sets the bonus tier) caps the FUEL piece that may be
+// spent, and bigger fuel means bigger effects. Fervor 3 permits scout fuel,
+// fervor 5 a soldier, fervor 8 a chieftain, ... — i.e. max fuel value
+// equals the obelisk's bonus tier value.
+//   fire  — sacrifice fuel F to deal F damage to a chosen enemy piece
+//   water — return fuel F to bounce an enemy piece of value <= F
+//   earth — return fuel F to devolve an enemy warrior of value <= nextFib(F)
+//   air   — return fuel F to displace F enemy pieces (any size)
 export function abilityActions(state, army, cellFilter = null) {
   const { config } = state;
   const acts = [];
@@ -558,38 +567,72 @@ export function abilityActions(state, army, cellFilter = null) {
   const enemy = other(army);
   for (const ob of config.obelisks ?? []) {
     if ((state.abilitiesUsedThisTurn ?? []).includes(ob.element)) continue;
-    if (obeliskStatus(state, ob).controller !== army) continue;
-    // Fuel: one of our scouts standing adjacent to THIS obelisk.
+    const st = obeliskStatus(state, ob);
+    if (st.controller !== army || st.bonus === 0) continue;
+    const maxFuel = st.bonus; // fibonacci fuel cap from the fervor tier
+    // Fuel: one of our pieces (value <= maxFuel) adjacent to THIS obelisk.
     for (const t of obeliskCells(config, ob.corner)) {
       if (cellFilter && !cellFilter.has(t)) continue;
       const cell = state.cells[t];
-      if (cell.army !== army || !cell.pieces.includes(1)) continue;
-      state.cells.forEach((ec, e) => {
-        if (ec.army !== enemy) return;
-        if (ob.element === 'fire') {
-          if (ec.pieces.includes(1)) {
-            acts.push({ type: 'ability', element: 'fire', from: t, target: e, cost: 0 });
+      if (cell.army !== army) continue;
+      for (const fuel of new Set(cell.pieces)) {
+        if (fuel > maxFuel) continue;
+        if (ob.element === 'air') {
+          // Fuel value = number of displacements. Enumerate singles fully;
+          // doubles with canonical destinations; 3+ not enumerated (legal
+          // for hand-built actions, combinatorially silly to search).
+          const options = [];
+          state.cells.forEach((ec, e) => {
+            if (ec.army !== enemy) return;
+            for (const v of new Set(ec.pieces)) {
+              for (const d of neighbors(config, e)) {
+                const dc = state.cells[d];
+                if ((dc.army === null || dc.army === enemy) && canAddPiece(config, dc, v)) {
+                  options.push({ target: e, piece: v, dest: d });
+                }
+              }
+            }
+          });
+          for (const o of options) {
+            acts.push({ type: 'ability', element: 'air', from: t, fuel, moves: [o], cost: 0 });
           }
-        } else if (ob.element === 'water') {
-          for (const v of new Set(ec.pieces)) {
-            if (v <= 2) acts.push({ type: 'ability', element: 'water', from: t, target: e, piece: v, cost: 0 });
-          }
-        } else if (ob.element === 'earth') {
-          // Any warrior — that is, any piece of value 2 or more.
-          for (const v of new Set(ec.pieces)) {
-            if (v >= 2) acts.push({ type: 'ability', element: 'earth', from: t, target: e, piece: v, cost: 0 });
-          }
-        } else if (ob.element === 'air') {
-          for (const v of new Set(ec.pieces)) {
-            for (const d of neighbors(config, e)) {
-              const dc = state.cells[d];
-              if ((dc.army === null || dc.army === enemy) && canAddPiece(config, dc, v)) {
-                acts.push({ type: 'ability', element: 'air', from: t, target: e, piece: v, dest: d, cost: 0 });
+          if (fuel >= 2) {
+            const firstByPiece = [];
+            const seen = new Set();
+            for (const o of options) {
+              const key = `${o.target}:${o.piece}`;
+              if (!seen.has(key)) { seen.add(key); firstByPiece.push(o); }
+            }
+            for (let i = 0; i < firstByPiece.length; i++) {
+              for (let j = i + 1; j < firstByPiece.length; j++) {
+                const a = firstByPiece[i];
+                const b = firstByPiece[j];
+                if (a.target === b.target && a.piece === b.piece) continue;
+                acts.push({ type: 'ability', element: 'air', from: t, fuel, moves: [a, b], cost: 0 });
               }
             }
           }
+          continue;
         }
-      });
+        state.cells.forEach((ec, e) => {
+          if (ec.army !== enemy) return;
+          if (ob.element === 'fire') {
+            // F damage against a chosen piece: kills value <= F, wounds bigger.
+            for (const v of new Set(ec.pieces)) {
+              acts.push({ type: 'ability', element: 'fire', from: t, fuel, target: e, piece: v, cost: 0 });
+            }
+          } else if (ob.element === 'water') {
+            for (const v of new Set(ec.pieces)) {
+              if (v <= fuel) acts.push({ type: 'ability', element: 'water', from: t, fuel, target: e, piece: v, cost: 0 });
+            }
+          } else if (ob.element === 'earth') {
+            const cap = FIBS[FIBS.indexOf(fuel) + 1] ?? fuel;
+            for (const v of new Set(ec.pieces)) {
+              if (v >= 2 && v <= cap) acts.push({ type: 'ability', element: 'earth', from: t, fuel, target: e, piece: v, cost: 0 });
+            }
+          }
+        });
+      }
     }
   }
   return acts;
@@ -857,52 +900,87 @@ function devolveInPlace(state, army, cellIdx, piece) {
   return placed;
 }
 
+// Greedy fibonacci decomposition of n (largest parts first).
+function fibDecompose(n) {
+  const parts = [];
+  let rem = n;
+  for (let i = FIBS.length - 1; i >= 0 && rem > 0; i--) {
+    while (FIBS[i] <= rem) { parts.push(FIBS[i]); rem -= FIBS[i]; }
+  }
+  return parts;
+}
+
 function resolveAbility(state, army, action) {
   const { config } = state;
   const enemy = other(army);
+  const fuel = action.fuel ?? 1;
   state.abilitiesUsedThisTurn.push(action.element);
   switch (action.element) {
     case 'fire': {
-      // Sacrifice a scout to slay an enemy scout anywhere. Both leave the game.
-      removePiece(state, action.from, 1);
-      emitEvent(state, { type: 'sacrifice', army, piece: 1, at: action.from });
-      removePiece(state, action.target, 1);
-      emitEvent(state, { type: 'destroyed', army: enemy, pieces: [1], at: action.target });
-      pushLog(state, `${army} fire ability: sacrifices scout at ${fmtCell(config, action.from)} to slay ${enemy} scout at ${fmtCell(config, action.target)}`);
+      // Sacrifice fuel F to deal F damage to a chosen enemy piece: value up
+      // to F dies outright; a bigger piece is wounded down to (p - F), its
+      // surviving value redeploying in place as fibonacci parts drawn from
+      // the owner's sideboard (unseatable or unavailable parts are lost).
+      removePiece(state, action.from, fuel);
+      emitEvent(state, { type: 'sacrifice', army, piece: fuel, at: action.from });
+      const p = action.piece;
+      removePiece(state, action.target, p);
+      if (fuel >= p) {
+        emitEvent(state, { type: 'destroyed', army: enemy, pieces: [p], at: action.target });
+        pushLog(state, `${army} fire ability: sacrifices ${fuel} at ${fmtCell(config, action.from)} to slay ${enemy} ${p} at ${fmtCell(config, action.target)}`);
+      } else {
+        const placed = [];
+        for (const part of fibDecompose(p - fuel)) {
+          if ((state.sideboard[enemy][part] || 0) > 0 &&
+              canAddPiece(config, state.cells[action.target], part)) {
+            state.sideboard[enemy][part]--;
+            addPiece(state, action.target, enemy, part);
+            placed.push(part);
+          }
+        }
+        emitEvent(state, { type: 'devolved', army: enemy, piece: p, at: action.target, parts: placed });
+        pushLog(state, `${army} fire ability: sacrifices ${fuel} at ${fmtCell(config, action.from)}, dealing ${fuel} damage to ${enemy} ${p} at ${fmtCell(config, action.target)} (now ${placed.join('+') || 'nothing'})`);
+      }
       return;
     }
     case 'water': {
-      // Return a scout home to bounce an enemy piece (<=2) to its sideboard.
-      removePiece(state, action.from, 1);
-      state.sideboard[army][1]++;
-      emitEvent(state, { type: 'toSideboard', army, piece: 1, from: action.from });
+      // Return fuel F home to bounce an enemy piece of value <= F.
+      removePiece(state, action.from, fuel);
+      state.sideboard[army][fuel]++;
+      emitEvent(state, { type: 'toSideboard', army, piece: fuel, from: action.from });
       removePiece(state, action.target, action.piece);
       state.sideboard[enemy][action.piece]++;
       emitEvent(state, { type: 'toSideboard', army: enemy, piece: action.piece, from: action.target });
-      pushLog(state, `${army} water ability: returns scout at ${fmtCell(config, action.from)}, bouncing ${enemy} ${action.piece} at ${fmtCell(config, action.target)} to sideboard`);
+      pushLog(state, `${army} water ability: returns ${fuel} at ${fmtCell(config, action.from)}, bouncing ${enemy} ${action.piece} at ${fmtCell(config, action.target)} to sideboard`);
       return;
     }
     case 'earth': {
-      // Return a scout home to devolve an enemy warrior (any piece >= 2)
-      // where it stands.
-      const target = action.piece ?? 2;
-      removePiece(state, action.from, 1);
-      state.sideboard[army][1]++;
-      emitEvent(state, { type: 'toSideboard', army, piece: 1, from: action.from });
-      const placed = devolveInPlace(state, enemy, action.target, target);
-      emitEvent(state, { type: 'devolved', army: enemy, piece: target, at: action.target, parts: placed });
-      pushLog(state, `${army} earth ability: returns scout at ${fmtCell(config, action.from)}, devolving ${enemy} ${target} at ${fmtCell(config, action.target)} to (${placed.join(',') || 'sideboard'})`);
+      // Return fuel F home to devolve an enemy warrior of value <= nextFib(F).
+      removePiece(state, action.from, fuel);
+      state.sideboard[army][fuel]++;
+      emitEvent(state, { type: 'toSideboard', army, piece: fuel, from: action.from });
+      const placed = devolveInPlace(state, enemy, action.target, action.piece);
+      emitEvent(state, { type: 'devolved', army: enemy, piece: action.piece, at: action.target, parts: placed });
+      pushLog(state, `${army} earth ability: returns ${fuel} at ${fmtCell(config, action.from)}, devolving ${enemy} ${action.piece} at ${fmtCell(config, action.target)} to (${placed.join(',') || 'sideboard'})`);
       return;
     }
     case 'air': {
-      // Return a scout home to displace any enemy piece one territory.
-      removePiece(state, action.from, 1);
-      state.sideboard[army][1]++;
-      emitEvent(state, { type: 'toSideboard', army, piece: 1, from: action.from });
-      removePiece(state, action.target, action.piece);
-      addPiece(state, action.dest, enemy, action.piece);
-      emitEvent(state, { type: 'move', army: enemy, piece: action.piece, from: action.target, to: action.dest });
-      pushLog(state, `${army} air ability: returns scout at ${fmtCell(config, action.from)}, displacing ${enemy} ${action.piece} ${fmtCell(config, action.target)}→${fmtCell(config, action.dest)}`);
+      // Return fuel F home to displace F enemy pieces, each one territory.
+      removePiece(state, action.from, fuel);
+      state.sideboard[army][fuel]++;
+      emitEvent(state, { type: 'toSideboard', army, piece: fuel, from: action.from });
+      const moved = [];
+      for (const m of action.moves ?? []) {
+        const cell = state.cells[m.target];
+        if (cell.army !== enemy || !cell.pieces.includes(m.piece)) continue;
+        const dc = state.cells[m.dest];
+        if (!(dc.army === null || dc.army === enemy) || !canAddPiece(config, dc, m.piece)) continue;
+        removePiece(state, m.target, m.piece);
+        addPiece(state, m.dest, enemy, m.piece);
+        emitEvent(state, { type: 'move', army: enemy, piece: m.piece, from: m.target, to: m.dest });
+        moved.push(`${m.piece} ${fmtCell(config, m.target)}→${fmtCell(config, m.dest)}`);
+      }
+      pushLog(state, `${army} air ability: returns ${fuel} at ${fmtCell(config, action.from)}, displacing ${enemy} ${moved.join(', ')}`);
       return;
     }
     default:
