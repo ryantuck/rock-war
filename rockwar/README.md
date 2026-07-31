@@ -131,9 +131,12 @@ board can never drift from the real state. Sims ignore the stream.
   - *earth*: attacking your territories costs the attacker piece value
     **plus the earth bonus**.
   Disable with `obeliskPowers: false`.
-- **Winning**: eliminate all enemy pieces from the board, or leave the enemy
-  with no legal action on their turn. If a combat wipes both boards at once,
-  the game is a draw (`mutual-elimination`). Games also draw at the turn limit.
+- **Winning**: eliminate all enemy pieces from the board, leave the enemy
+  with no legal action on their turn, or **control all four obelisks
+  simultaneously** (checked after every action — the completing move wins
+  on the spot; `obeliskVictory` knob). If a combat wipes both boards at
+  once, the game is a draw (`mutual-elimination`). Games also draw at the
+  turn limit.
 
 ## Assumptions made where the spec was open (all tunable)
 
@@ -155,6 +158,7 @@ box or via `--config file.json` on the CLI:
 | `obelisks` | 4 corners | element + corner position per obelisk; empty array disables them |
 | `obeliskAbilities` | `true` | controlled obelisks grant their active ability |
 | `obeliskPowers` | `true` | passive auras: air retreat budget, water combat saves, earth attack tax |
+| `obeliskVictory` | `true` | controlling every obelisk simultaneously wins immediately |
 | `obeliskTiers` | 3/5/8/13/21/34 | adjacent-value thresholds granting +1/+2/+3/+5/+8/+13 bonus budget |
 | destroyed pieces | removed | destroyed pieces leave the game entirely (they do *not* return to the sideboard) |
 | capture on retreat | yes | if all defenders retreat, the attacker advances into the vacated territory |

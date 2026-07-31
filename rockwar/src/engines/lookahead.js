@@ -22,6 +22,7 @@ const DEFAULT_WEIGHTS = {
   obeliskProgress: 0.5, // per point of adjacency-margin toward each obelisk,
                     // so partial progress (first cell, more value) pays too
   obeliskFoothold: 2,   // having the 2-territory foothold at an obelisk
+  obeliskCount: 5,      // quadratic pressure toward the control-all victory
   obeliskFadeAt: 12, // obelisk terms reach full value only while the enemy
                     // has at least this much deployable strength — budget
                     // annuities are worthless against a nearly-dead opponent
@@ -70,8 +71,12 @@ function obeliskGradient(state, me, W) {
   const enemy = other(me);
   const topTier = (state.config.obeliskTiers ?? [3, 5, 8, 13])[3] ?? 13;
   let s = 0;
+  let mine = 0;
+  let theirs = 0;
   for (const ob of state.config.obelisks ?? []) {
     const st = obeliskStatus(state, ob);
+    if (st.controller === me) mine++;
+    else if (st.controller === enemy) theirs++;
     s += W.obeliskProgress *
       (Math.min(st.score[me], topTier) - Math.min(st.score[enemy], topTier));
     if (st.count[me] >= 2) s += W.obeliskFoothold;
@@ -79,7 +84,19 @@ function obeliskGradient(state, me, W) {
     if (st.controller === me) s += W.obeliskHold * st.bonus;
     else if (st.controller === enemy) s -= W.obeliskHold * st.bonus;
   }
+  // Control-all victory pressure: each additional simultaneous hold matters
+  // more than the last (the win itself is handled in evaluate()).
+  if (state.config.obeliskVictory !== false) {
+    s += W.obeliskCount * (mine * mine - theirs * theirs);
+  }
   return s;
+}
+
+// Does `army` control every obelisk (the instant-win condition)?
+function controlsAll(state, army) {
+  if (state.config.obeliskVictory === false) return false;
+  const obs = state.config.obelisks ?? [];
+  return obs.length > 0 && obs.every((ob) => obeliskStatus(state, ob).controller === army);
 }
 
 // Evolve-ready pairs: cells whose two pieces could combine right now (the
@@ -185,6 +202,8 @@ function evaluate(state, me, W) {
   if (theirPieces === 0 && myPieces > 0) return 1e6;
   if (myPieces === 0 && theirPieces > 0) return -1e6;
   if (myPieces === 0 && theirPieces === 0) return 0;
+  if (controlsAll(state, me)) return 1e6;
+  if (controlsAll(state, enemy)) return -1e6;
   const myDep = deployable(state, me);
   const enemyDep = deployable(state, enemy);
   let score = 0;

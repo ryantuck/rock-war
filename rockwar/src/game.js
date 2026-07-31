@@ -99,6 +99,8 @@ export function defaultConfig() {
     //   earth — attacking the earth-holder's territories costs the attacker
     //           piece value + the earth bonus
     obeliskPowers: true,
+    // Controlling every obelisk simultaneously wins the game on the spot.
+    obeliskVictory: true,
     // Control requires occupying >= 2 of the obelisk's adjacent territories
     // with the strictly greatest total adjacent piece value, which must reach
     // the first tier. Bonuses scale fibonacci with the tier reached:
@@ -759,20 +761,37 @@ export function applyAction(state, army, action, engines, rng) {
 function checkElimination(state) {
   const aOut = armyPieceCount(state, 'A') === 0;
   const bOut = armyPieceCount(state, 'B') === 0;
-  if (!aOut && !bOut) return false;
-  state.phase = 'over';
-  if (aOut && bOut) {
-    // Mutual destruction can wipe both boards at once.
-    state.winner = 'draw';
-    state.reason = 'mutual-elimination';
-    pushLog(state, 'draw: both armies eliminated');
-  } else {
-    const loser = aOut ? 'A' : 'B';
-    state.winner = other(loser);
-    state.reason = 'elimination';
-    pushLog(state, `${other(loser)} wins: ${loser} eliminated`);
+  if (aOut || bOut) {
+    state.phase = 'over';
+    if (aOut && bOut) {
+      // Mutual destruction can wipe both boards at once.
+      state.winner = 'draw';
+      state.reason = 'mutual-elimination';
+      pushLog(state, 'draw: both armies eliminated');
+    } else {
+      const loser = aOut ? 'A' : 'B';
+      state.winner = other(loser);
+      state.reason = 'elimination';
+      pushLog(state, `${other(loser)} wins: ${loser} eliminated`);
+    }
+    return true;
   }
-  return true;
+  // Obelisk victory: controlling every obelisk at once wins immediately.
+  if (state.config.obeliskVictory !== false) {
+    const obs = state.config.obelisks ?? [];
+    if (obs.length > 0) {
+      for (const army of ['A', 'B']) {
+        if (obs.every((ob) => obeliskStatus(state, ob).controller === army)) {
+          state.phase = 'over';
+          state.winner = army;
+          state.reason = 'obelisks';
+          pushLog(state, `${army} wins: controls all ${obs.length} obelisks`);
+          return true;
+        }
+      }
+    }
+  }
+  return false;
 }
 
 // Reaction window: after each of the active player's actions, the other army
