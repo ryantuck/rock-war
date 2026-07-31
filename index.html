@@ -12,10 +12,14 @@
     --line: #2c313a;
     --text: #e6e8ec;
     --muted: #8b93a1;
-    --army-a: #5b8def;
-    --army-a-dim: #2a3a5c;
-    --army-b: #e2984a;
-    --army-b-dim: #54402a;
+    /* rocky palette: matte stone territories, beige river-stones for A,
+       brown cut-stone squares for B */
+    --army-a: #e9dfc9;
+    --army-a-dim: #5c5b53;
+    --army-b: #9c6538;
+    --army-b-dim: #55483d;
+    --stone: #4b4e53;
+    --stone-line: #3a3d41;
     --empty: #23272e;
   }
   * { box-sizing: border-box; }
@@ -90,8 +94,12 @@
     h1 { font-size: 18px; }
   }
   .cell {
-    width: var(--cell); height: var(--cell); border-radius: 8px;
-    background: var(--empty); border: 1px solid var(--line);
+    width: var(--cell); height: var(--cell); border-radius: 6px;
+    background:
+      radial-gradient(circle at 30% 25%, rgba(255,255,255,0.045), transparent 55%),
+      var(--stone);
+    border: 1px solid var(--stone-line);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), inset 0 -2px 3px rgba(0,0,0,0.25);
     display: flex; align-items: center; justify-content: center; gap: 4px;
     position: relative;
   }
@@ -99,17 +107,39 @@
     position: absolute; top: 3px; left: 6px;
     font-size: 10px; color: var(--muted); opacity: 0.6;
   }
-  .cell.army-A { background: var(--army-a-dim); border-color: var(--army-a); }
-  .cell.army-B { background: var(--army-b-dim); border-color: var(--army-b); }
+  .cell.army-A {
+    background:
+      radial-gradient(circle at 30% 25%, rgba(255,250,235,0.07), transparent 55%),
+      var(--army-a-dim);
+    border-color: rgba(233, 223, 201, 0.55);
+  }
+  .cell.army-B {
+    background:
+      radial-gradient(circle at 30% 25%, rgba(200,140,80,0.08), transparent 55%),
+      var(--army-b-dim);
+    border-color: rgba(156, 101, 56, 0.7);
+  }
   .piece {
-    border-radius: 50%; display: flex; align-items: center; justify-content: center;
-    font-weight: 700; color: #0e1013;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700;
     width: calc(var(--cell) * var(--ps, 0.4));
     height: calc(var(--cell) * var(--ps, 0.4));
     font-size: calc(var(--cell) * var(--ps, 0.4) * 0.45);
   }
-  .piece.A { background: var(--army-a); }
-  .piece.B { background: var(--army-b); }
+  .piece.A {
+    /* smooth beige-white river stone */
+    border-radius: 50%;
+    background: radial-gradient(circle at 34% 28%, #f7f0e1, var(--army-a) 60%, #cfc3a8);
+    color: #4a4335;
+    box-shadow: 0 2px 3px rgba(0,0,0,0.4), inset 0 -2px 3px rgba(120,105,80,0.35);
+  }
+  .piece.B {
+    /* brown cut-stone block */
+    border-radius: 16%;
+    background: linear-gradient(145deg, #b57a45, var(--army-b) 55%, #7a4c27);
+    color: #f4e9d6;
+    box-shadow: 0 2px 3px rgba(0,0,0,0.45), inset 0 1px 1px rgba(255,220,170,0.3), inset 0 -2px 3px rgba(40,20,5,0.4);
+  }
   .p1 { --ps: 0.285; }
   .p2 { --ps: 0.357; }
   .p3 { --ps: 0.43; }
