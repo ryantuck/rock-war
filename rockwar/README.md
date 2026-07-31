@@ -141,9 +141,11 @@ board can never drift from the real state. Sims ignore the stream.
     unavailable parts are lost). 2 damage turns a chieftain into a scout.
   - *water*: **return** fuel F to bounce an enemy piece of value **≤ F**
     back to its owner's sideboard.
-  - *earth*: **return** fuel F to devolve an enemy warrior of value **≤ the
-    next fibonacci above F** where it stands (scout fuel devolves a
-    soldier; a soldier devolves a chieftain; …).
+  - *earth*: **devolve** one of your warriors (fuel F ≥ 2, split in place)
+    to devolve an enemy warrior of value **≤ the next fibonacci above F**
+    where it stands — a soldier breaks a chieftain, a chieftain breaks a
+    warlord. Earth requires fervor ≥ 5 (warrior fuel) and trades your own
+    concentration for theirs.
   - *air*: **return** fuel F to displace **F enemy pieces** (any size),
     each into an adjacent legal territory of your choice.
   Abilities can also be cast **on the opponent's turn**: after each action

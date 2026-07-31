@@ -96,8 +96,8 @@ export function defaultConfig() {
     //   fire  — sacrifice the scout to slay an enemy scout in any territory
     //   water — return the scout to bounce an enemy piece of strength <= 2
     //           back to its owner's sideboard
-    //   earth — return the scout to devolve any enemy warrior (piece >= 2)
-    //           in place
+    //   earth — DEVOLVE one of your adjacent warriors (in place) to devolve
+    //           an enemy warrior in place
     //   air   — return the scout to displace ANY enemy piece into an
     //           adjacent legal territory of your choice
     obeliskAbilities: true,
@@ -558,7 +558,8 @@ export function legalActions(state, cont, remainingBudget, actionsTaken, bonusPo
 // equals the obelisk's bonus tier value.
 //   fire  — sacrifice fuel F to deal F damage to a chosen enemy piece
 //   water — return fuel F to bounce an enemy piece of value <= F
-//   earth — return fuel F to devolve an enemy warrior of value <= nextFib(F)
+//   earth — DEVOLVE warrior fuel F (>= 2, in place) to devolve an enemy
+//           warrior of value <= nextFib(F)
 //   air   — return fuel F to displace F enemy pieces (any size)
 export function abilityActions(state, army, cellFilter = null) {
   const { config } = state;
@@ -577,6 +578,8 @@ export function abilityActions(state, army, cellFilter = null) {
       if (cell.army !== army) continue;
       for (const fuel of new Set(cell.pieces)) {
         if (fuel > maxFuel) continue;
+        // Earth burns a warrior, not a scout: fuel must be >= 2.
+        if (ob.element === 'earth' && fuel < 2) continue;
         if (ob.element === 'air') {
           // Fuel value = number of displacements. Enumerate singles fully;
           // doubles with canonical destinations; 3+ not enumerated (legal
@@ -955,13 +958,13 @@ function resolveAbility(state, army, action) {
       return;
     }
     case 'earth': {
-      // Return fuel F home to devolve an enemy warrior of value <= nextFib(F).
-      removePiece(state, action.from, fuel);
-      state.sideboard[army][fuel]++;
-      emitEvent(state, { type: 'toSideboard', army, piece: fuel, from: action.from });
+      // Devolve one of your own warriors (the fuel, in place) to devolve an
+      // enemy warrior of value <= nextFib(F) where it stands.
+      const fuelParts = devolveInPlace(state, army, action.from, fuel);
+      emitEvent(state, { type: 'devolved', army, piece: fuel, at: action.from, parts: fuelParts });
       const placed = devolveInPlace(state, enemy, action.target, action.piece);
       emitEvent(state, { type: 'devolved', army: enemy, piece: action.piece, at: action.target, parts: placed });
-      pushLog(state, `${army} earth ability: returns ${fuel} at ${fmtCell(config, action.from)}, devolving ${enemy} ${action.piece} at ${fmtCell(config, action.target)} to (${placed.join(',') || 'sideboard'})`);
+      pushLog(state, `${army} earth ability: devolves own ${fuel} at ${fmtCell(config, action.from)} to (${fuelParts.join(',') || 'sideboard'}), devolving ${enemy} ${action.piece} at ${fmtCell(config, action.target)} to (${placed.join(',') || 'sideboard'})`);
       return;
     }
     case 'air': {
