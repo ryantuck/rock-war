@@ -111,8 +111,12 @@ export function defaultConfig() {
     // the first tier. Bonuses scale fibonacci with the tier reached:
     // value >= 3 → +1 budget, >= 5 → +2, >= 8 → +3, >= 13 → +5, >= 21 → +8.
     obeliskTiers: [3, 5, 8, 13, 21, 34],
-    // Game is a draw after this many turns (one turn = one army's contingents acting).
+    // Game ends after this many turns (one turn = one army's contingents
+    // acting). With turnLimitTiebreak, the army with more board strength
+    // wins at the cap (controlled obelisks break a strength tie); it's only
+    // a draw if both are dead even.
     maxTurns: 200,
+    turnLimitTiebreak: true,
   };
 }
 
@@ -921,9 +925,29 @@ export function playTurn(state, engines, rng) {
   state.turn++;
   if (state.turn > config.maxTurns) {
     state.phase = 'over';
-    state.winner = 'draw';
-    state.reason = 'max-turns';
-    pushLog(state, `draw: turn limit ${config.maxTurns} reached`);
+    const sA = armyStrengthOnBoard(state, 'A');
+    const sB = armyStrengthOnBoard(state, 'B');
+    let leader = sA > sB ? 'A' : sB > sA ? 'B' : null;
+    let basis = `strength ${sA}·${sB}`;
+    if (!leader && config.turnLimitTiebreak !== false) {
+      // Strength dead even: controlled obelisks break the tie.
+      const held = { A: 0, B: 0 };
+      for (const ob of config.obelisks ?? []) {
+        const c = obeliskStatus(state, ob).controller;
+        if (c) held[c]++;
+      }
+      leader = held.A > held.B ? 'A' : held.B > held.A ? 'B' : null;
+      basis += ` obelisks ${held.A}·${held.B}`;
+    }
+    if (config.turnLimitTiebreak !== false && leader) {
+      state.winner = leader;
+      state.reason = 'turn-limit-tiebreak';
+      pushLog(state, `${leader} wins at turn limit ${config.maxTurns} (${basis})`);
+    } else {
+      state.winner = 'draw';
+      state.reason = 'max-turns';
+      pushLog(state, `draw: turn limit ${config.maxTurns} reached (${basis})`);
+    }
   }
   return state;
 }

@@ -140,8 +140,10 @@ board can never drift from the real state. Sims ignore the stream.
   on the spot; `obeliskVictory` / `obeliskVictoryCount` knobs). Control
   means the strictly greatest adjacent value of at least 3 across at least
   2 of the obelisk's adjacent territories. If a combat wipes both boards
-  at once, the game is a draw (`mutual-elimination`). Games also draw at
-  the turn limit.
+  at once, the game is a draw (`mutual-elimination`). At the turn limit,
+  the army with **more board strength wins** (controlled obelisks break a
+  strength tie; `turnLimitTiebreak` knob) — it's only a draw if both are
+  dead even.
 
 ## Assumptions made where the spec was open (all tunable)
 
@@ -170,7 +172,8 @@ box or via `--config file.json` on the CLI:
 | capture on retreat | yes | if all defenders retreat, the attacker advances into the vacated territory |
 | simultaneous wipe | draw | mutual destruction can empty both boards at once → draw |
 | `initialScouts` | 2 | scouts each army places in the placement phase (capped at scout supply) |
-| `maxTurns` | 200 | draw backstop so batch runs always terminate |
+| `maxTurns` | 200 | game ends here; tiebreak decides unless dead even |
+| `turnLimitTiebreak` | `true` | at the cap: most board strength wins, obelisks break ties |
 | `supply` | 8/5/3/2/1 | change piece mix freely; placement uses the scout count |
 | `width`/`height` | 5×5 | any board size; the frontend adapts |
 
