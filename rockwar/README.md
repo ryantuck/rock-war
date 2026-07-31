@@ -74,12 +74,15 @@ board can never drift from the real state. Sims ignore the stream.
   that stayed all die (a legal attack always starts ≥ the full stack, and
   retreats only lower the defense), and the attacker's fate depends on how
   stiff the broken defense was (devolve rule):
-  - defense **> ½** the attacker's value → the attacker **devolves** into its
-    fibonacci constituents (3→2+1, 5→3+2, 8→5+3, 2→1+1), exchanged through
-    the sideboard like evolution in reverse. A 3 attacking a (2) kills the 2
-    and lands as a (2,1); a 3 attacking a (2,1) kills both and likewise
-    devolves. Value is conserved — the price is concentration and the tempo
-    to re-evolve. (If the sideboard lacks a constituent, that part is lost.)
+  - defense **=** the attacker's value → **mutual destruction**: everything
+    dies (a 2 attacking a (2), or a 3 attacking a (2,1) — all pieces are
+    removed).
+  - defense **> ½** but less than the attacker's value → the defenders die
+    and the attacker **devolves** into its fibonacci constituents (3→2+1,
+    5→3+2, 8→5+3), exchanged through the sideboard like evolution in
+    reverse. A 3 attacking a (2) kills the 2 and lands as a (2,1). Value is
+    conserved — the price is concentration and the tempo to re-evolve. (If
+    the sideboard lacks a constituent, that part is lost.)
   - defense **≤ ½** the attacker's value → the attacker survives intact
     (a 3 attacking a lone (1): the 1 just dies).
   Either way the attacker advances into the captured territory (every

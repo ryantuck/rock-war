@@ -189,7 +189,7 @@ function maxAttackThreat(state, enemy, W) {
           if (!nc.army || nc.army === enemy) continue;
           const defSum = nc.pieces.reduce((s, x) => s + x, 0);
           if (p > defSum) best = Math.max(best, defSum * waterScale);
-          else if (p === defSum && (rule === 'attacker-survives' || rule === 'devolve')) {
+          else if (p === defSum && rule === 'attacker-survives') {
             best = Math.max(best, defSum * waterScale);
           }
         }
@@ -243,7 +243,7 @@ function retreatPolicy(state, attackInfo, options) {
   const total = options.reduce((s, o) => s + o.piece, 0);
   if (attackInfo.piece < total) return [];
   const rule = combatRuleOf(state.config);
-  if (rule === 'margin' && attackInfo.piece === total) return [];
+  if ((rule === 'margin' || rule === 'devolve') && attackInfo.piece === total) return [];
   const sorted = [...options].sort((a, b) => b.piece - a.piece);
   const retreaters = rule === 'mutual' ? sorted.slice(0, -1) : sorted;
   const plan = [];

@@ -47,13 +47,15 @@ export function defaultConfig() {
     scoutRetreatBudget: 1,
     // How a connecting attack (attacker value >= non-retreated defenders'
     // sum) resolves:
-    //   'devolve'           — defenders die; if their sum exceeds
-    //                         devolveThreshold x attacker, the attacker
-    //                         devolves into its fibonacci constituents
-    //                         (3→2+1, 5→3+2, 8→5+3, 2→1+1) via the sideboard;
-    //                         otherwise it survives intact. Either way it
-    //                         advances. E.g. 3 vs (2): the 2 dies and the 3
-    //                         lands as (2,1); 3 vs (1): the 1 just dies.
+    //   'devolve'           — an exact tie destroys everything (2 vs (2):
+    //                         all pieces die). A strictly greater attacker
+    //                         kills the defenders; if their sum exceeds
+    //                         devolveThreshold x attacker, it devolves into
+    //                         its fibonacci constituents (3→2+1, 5→3+2,
+    //                         8→5+3) via the sideboard; otherwise it
+    //                         survives intact. Either way it advances.
+    //                         E.g. 3 vs (2): the 2 dies and the 3 lands as
+    //                         (2,1); 3 vs (1): the 1 just dies.
     //   'margin'            — defenders die; the attacker dies only on an
     //                         exact tie
     //   'mutual'            — the attacker always dies with the defenders
@@ -597,7 +599,8 @@ function resolveAttack(state, army, action, engines, rng) {
       defCell.pieces = [];
       defCell.army = null;
       const attackerDies =
-        rule === 'mutual' || (rule === 'margin' && action.piece === defSum);
+        rule === 'mutual' ||
+        ((rule === 'margin' || rule === 'devolve') && action.piece === defSum);
       if (attackerDies) {
         removePiece(state, action.from, action.piece);
         const verb = fellDefenders();

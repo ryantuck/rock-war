@@ -122,24 +122,23 @@ export function makeGreedyEngine(opts = {}) {
           const defCell = state.cells[a.to];
           const defSum = defCell.pieces.reduce((s, p) => s + p, 0);
           const rule = combatRuleOf(state.config);
-          const attackerDies = rule === 'mutual' || (rule === 'margin' && a.piece === defSum);
+          const attackerDies = rule === 'mutual' ||
+            ((rule === 'margin' || rule === 'devolve') && a.piece === defSum);
           if (a.piece < defSum) {
             score -= 100; // attack would be repelled — never worth it
+          } else if (attackerDies) {
+            // Tie or mutual rule: we die with them — value as a trade, only
+            // from a position of strength.
+            const mine = totalStrength(state, army);
+            const theirs = totalStrength(state, other(army));
+            score += (defSum - a.piece) * W.killPerPoint + (mine >= theirs ? W.trade : -W.trade);
+            if (armyPieceCount(state, army) <= 1) score -= 1000;
           } else if (rule === 'devolve') {
             // Defenders die and we keep our value (possibly split into
             // constituents) — attacking is material-profitable; devolution
             // only costs concentration and the tempo to re-evolve.
             const devolves = defSum > a.piece * (state.config.devolveThreshold ?? 0.5);
             score += defSum * W.killPerPoint + W.capture - (devolves ? W.devolvePenalty : 0);
-          } else if (attackerDies) {
-            // We die with them: value the trade by material delta, and only
-            // seek trades from a position of strength — when ahead on total
-            // material, simplifying wins; when behind, it loses.
-            const mine = totalStrength(state, army);
-            const theirs = totalStrength(state, other(army));
-            score += (defSum - a.piece) * W.killPerPoint + (mine >= theirs ? W.trade : -W.trade);
-            // Never trade away our last board piece: 0 pieces = we lose.
-            if (armyPieceCount(state, army) <= 1) score -= 1000;
           } else {
             score += defSum * W.killPerPoint + W.capture;
           }
@@ -205,7 +204,9 @@ export function makeGreedyEngine(opts = {}) {
       const total = options.reduce((s, o) => s + o.piece, 0);
       if (attackInfo.piece < total) return []; // attack fails; don't budge
       const rule = combatRuleOf(state.config);
-      if (rule === 'margin' && attackInfo.piece === total) return []; // even trade, deny tempo
+      if ((rule === 'margin' || rule === 'devolve') && attackInfo.piece === total) {
+        return []; // exact tie kills the attacker too — stand and trade
+      }
       const sorted = [...options].sort((a, b) => b.piece - a.piece);
       const retreaters = rule === 'mutual' ? sorted.slice(0, -1) : sorted;
       const plan = [];

@@ -39,9 +39,10 @@ node src/sim.js --games 500 --a lookahead --b greedy --seed 42
   · *attack* an adjacent enemy territory (cost = attacker's value; scouts
   can't attack; attacker must be ≥ the territory's total).
 - **Combat**: defenders retreat free into adjacent friendly territories or
-  die; breaking a defense worth more than half the attacker's value makes
-  the attacker **devolve** into its fibonacci constituents (3→2+1, 5→3+2,
-  8→5+3) as it advances — value is conserved, concentration is the price.
+  die. Exact-value ties are mutual destruction. A stronger attacker breaking
+  a defense worth more than half its value **devolves** into its fibonacci
+  constituents (3→2+1, 5→3+2, 8→5+3) as it advances — value conserved,
+  concentration the price; weaker defense dies cleanly.
 - **Obelisks**: four elemental obelisks on corner intersections (fire→attack,
   earth→evolve, air→move, water→spawn). Occupying ≥2 adjacent territories
   with the greatest adjacent value ≥3 grants bonus budget for that mechanic
