@@ -253,7 +253,16 @@ function render(after = null) {
   const view = { ...state, cells, sideboard };
 
   const board = $('board');
-  board.style.gridTemplateColumns = `repeat(${config.width}, 84px)`;
+  // Scale cells to the viewport (mobile) up to the 84px default; pieces,
+  // ghosts, and obelisk positions all follow via the --cell variable. The
+  // board's left offset measures the page chrome (body + panel padding),
+  // which is symmetric — the panel itself shrinks to fit, so it can't be
+  // the measurement source.
+  const chrome = board.getBoundingClientRect().left;
+  const avail = document.documentElement.clientWidth - 2 * Math.max(0, chrome);
+  const cellPx = Math.max(40, Math.min(84, Math.floor((avail - (config.width - 1) * 6) / config.width)));
+  document.documentElement.style.setProperty('--cell', `${cellPx}px`);
+  board.style.gridTemplateColumns = `repeat(${config.width}, ${cellPx}px)`;
   board.innerHTML = '';
   cells.forEach((c, i) => {
     const cell = document.createElement('div');
@@ -267,8 +276,8 @@ function render(after = null) {
     board.appendChild(cell);
   });
 
-  // Obelisks sit on the corner points between cells (cell 84px + gap 6px).
-  const pitch = 90;
+  // Obelisks sit on the corner points between cells (cell size + 6px gap).
+  const pitch = cellPx + 6;
   for (const ob of config.obelisks ?? []) {
     const st = obeliskStatus(view, ob);
     const el = document.createElement('div');
@@ -412,5 +421,12 @@ $('runBatch').onclick = async () => {
     `  endings: ${Object.entries(reasons).map(([k, v]) => `${k}=${v}`).join(', ')}`,
   ].join('\n');
 };
+
+// Re-fit the board when the viewport changes (debounced).
+let resizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => { if (!animating) render(); }, 150);
+});
 
 startGame();

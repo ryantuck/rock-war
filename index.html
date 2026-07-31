@@ -34,10 +34,11 @@
   .panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em;
     color: var(--muted); margin: 0 0 12px; }
 
-  /* board */
+  /* board — cell size set as --cell by the UI so everything scales together */
+  :root { --cell: 84px; }
   #board {
     display: grid; gap: 6px;
-    grid-template-columns: repeat(4, 84px);
+    grid-template-columns: repeat(4, var(--cell));
     position: relative;
   }
   .obelisk {
@@ -77,8 +78,19 @@
     100% { box-shadow: inset 0 0 0 40px rgba(88, 179, 104, 0); }
   }
   .replaying { color: var(--muted); font-size: 12px; }
+
+  /* mobile */
+  @media (max-width: 720px) {
+    body { padding: 10px; }
+    .panel { padding: 12px; }
+    .layout { gap: 14px; }
+    .controls, .logpanel { width: 100%; }
+    #log { height: 240px; }
+    .sideboards { flex-wrap: wrap; }
+    h1 { font-size: 18px; }
+  }
   .cell {
-    width: 84px; height: 84px; border-radius: 8px;
+    width: var(--cell); height: var(--cell); border-radius: 8px;
     background: var(--empty); border: 1px solid var(--line);
     display: flex; align-items: center; justify-content: center; gap: 4px;
     position: relative;
@@ -92,14 +104,17 @@
   .piece {
     border-radius: 50%; display: flex; align-items: center; justify-content: center;
     font-weight: 700; color: #0e1013;
+    width: calc(var(--cell) * var(--ps, 0.4));
+    height: calc(var(--cell) * var(--ps, 0.4));
+    font-size: calc(var(--cell) * var(--ps, 0.4) * 0.45);
   }
   .piece.A { background: var(--army-a); }
   .piece.B { background: var(--army-b); }
-  .p1 { width: 24px; height: 24px; font-size: 12px; }
-  .p2 { width: 30px; height: 30px; font-size: 14px; }
-  .p3 { width: 36px; height: 36px; font-size: 15px; }
-  .p5 { width: 44px; height: 44px; font-size: 17px; }
-  .p8 { width: 52px; height: 52px; font-size: 18px; }
+  .p1 { --ps: 0.285; }
+  .p2 { --ps: 0.357; }
+  .p3 { --ps: 0.43; }
+  .p5 { --ps: 0.523; }
+  .p8 { --ps: 0.62; }
 
   /* sideboards */
   .sideboards { display: flex; gap: 16px; margin-top: 14px; }
