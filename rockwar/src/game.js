@@ -99,8 +99,11 @@ export function defaultConfig() {
     //   earth — attacking the earth-holder's territories costs the attacker
     //           piece value + the earth bonus
     obeliskPowers: true,
-    // Controlling every obelisk simultaneously wins the game on the spot.
+    // Controlling this many obelisks simultaneously wins the game on the
+    // spot. Control means holding the strictly greatest adjacent value of at
+    // least 3 across at least 2 of an obelisk's adjacent territories.
     obeliskVictory: true,
+    obeliskVictoryCount: 3,
     // Control requires occupying >= 2 of the obelisk's adjacent territories
     // with the strictly greatest total adjacent piece value, which must reach
     // the first tier. Bonuses scale fibonacci with the tier reached:
@@ -776,16 +779,22 @@ function checkElimination(state) {
     }
     return true;
   }
-  // Obelisk victory: controlling every obelisk at once wins immediately.
+  // Obelisk victory: controlling enough obelisks at once wins immediately.
   if (state.config.obeliskVictory !== false) {
     const obs = state.config.obelisks ?? [];
-    if (obs.length > 0) {
+    const need = state.config.obeliskVictoryCount ?? obs.length;
+    if (obs.length > 0 && need > 0) {
+      const held = { A: 0, B: 0 };
+      for (const ob of obs) {
+        const c = obeliskStatus(state, ob).controller;
+        if (c) held[c]++;
+      }
       for (const army of ['A', 'B']) {
-        if (obs.every((ob) => obeliskStatus(state, ob).controller === army)) {
+        if (held[army] >= need) {
           state.phase = 'over';
           state.winner = army;
           state.reason = 'obelisks';
-          pushLog(state, `${army} wins: controls all ${obs.length} obelisks`);
+          pushLog(state, `${army} wins: controls ${held[army]} obelisks`);
           return true;
         }
       }

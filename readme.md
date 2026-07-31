@@ -49,7 +49,7 @@ node src/sim.js --games 500 --a lookahead --b greedy --seed 42
   active ability — castable on either player's turn, fueled by an
   obelisk-adjacent scout.
 - **Winning**: eliminate the enemy's board pieces, leave them unable to
-  act, or control all four obelisks simultaneously.
+  act, or control any three obelisks simultaneously.
 
 Full rules, every tunable knob, engine internals, and simulation findings:
 [rockwar/README.md](rockwar/README.md).

@@ -92,11 +92,15 @@ function obeliskGradient(state, me, W) {
   return s;
 }
 
-// Does `army` control every obelisk (the instant-win condition)?
-function controlsAll(state, army) {
+// Does `army` control enough obelisks for the instant win?
+function controlsEnough(state, army) {
   if (state.config.obeliskVictory === false) return false;
   const obs = state.config.obelisks ?? [];
-  return obs.length > 0 && obs.every((ob) => obeliskStatus(state, ob).controller === army);
+  const need = state.config.obeliskVictoryCount ?? obs.length;
+  if (obs.length === 0 || need <= 0) return false;
+  let held = 0;
+  for (const ob of obs) if (obeliskStatus(state, ob).controller === army) held++;
+  return held >= need;
 }
 
 // Evolve-ready pairs: cells whose two pieces could combine right now (the
@@ -202,8 +206,8 @@ function evaluate(state, me, W) {
   if (theirPieces === 0 && myPieces > 0) return 1e6;
   if (myPieces === 0 && theirPieces > 0) return -1e6;
   if (myPieces === 0 && theirPieces === 0) return 0;
-  if (controlsAll(state, me)) return 1e6;
-  if (controlsAll(state, enemy)) return -1e6;
+  if (controlsEnough(state, me)) return 1e6;
+  if (controlsEnough(state, enemy)) return -1e6;
   const myDep = deployable(state, me);
   const enemyDep = deployable(state, enemy);
   let score = 0;
