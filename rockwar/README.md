@@ -15,6 +15,11 @@ node src/sim.js --games 500 --a greedy --b greedy
 node src/sim.js --games 100 --a greedy --b random --verbose   # per-game lines
 node src/sim.js --games 500 --a greedy --b random --config my-rules.json
 
+# Round-robin tournament across all engines (the balance dashboard):
+# standings by points (win 1, draw 0.5) plus a head-to-head grid
+node src/sim.js --tournament --games 60 --seed 42
+node src/sim.js --tournament --engines lookahead-aggro,lookahead-obelisk --games 200
+
 # Frontend (index.html lives at the repo root; ES modules need a server)
 cd .. && python3 -m http.server 8000
 # then open http://localhost:8000
@@ -204,9 +209,16 @@ box or via `--config file.json` on the CLI:
   candidate action through the real rules engine (combat included), and
   evaluates the resulting position — material, fighting strength, evolve
   potential, territory, obelisk power, spawn-lock, minus the enemy's best
-  immediate attack threat. Beats greedy ~8:1 in decided games. ~40× slower
-  than greedy (still ~33ms/game). Weights overridable; pass `debug: true`
-  to log candidate scores.
+  immediate attack threat. ~40× slower than greedy (still ~tens of ms per
+  game). Weights overridable; pass `debug: true` to log candidate scores.
+- **lookahead-aggro / -obelisk / -turtle / -tempo** — strategy-archetype
+  presets of the same search with re-weighted evaluators (attrition, map
+  control, defense/clock, economy). Tournaments between them measure which
+  strategies the *current rules* favor — run the tournament after every
+  rules change. First reading (60 games/pairing): **obelisk play dominates**
+  (70.6%, beating every other engine head-to-head), then turtle, balanced,
+  tempo — with **aggro dead last among lookaheads** (49%): under
+  tie-mutual-destruction combat, pure aggression is the weakest archetype.
 
 Add an engine by implementing three functions and registering it in
 `src/engines/index.js`:
