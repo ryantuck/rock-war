@@ -229,6 +229,13 @@ box or via `--config file.json` on the CLI:
   (70.6%, beating every other engine head-to-head), then turtle, balanced,
   tempo — with **aggro dead last among lookaheads** (49%): under
   tie-mutual-destruction combat, pure aggression is the weakest archetype.
+- **planner / planner-obelisk** — full-turn planning: a receding-horizon
+  beam search (depth 3, beam 6) over *sequences* of a contingent's actions,
+  evaluated with the lookahead evaluator, replanned at every decision. Finds
+  multi-step combos one-ply search can't (spawn → evolve → kicker-attack).
+  ~5× lookahead's cost (~160ms/game). Current tournament champion is
+  **planner-obelisk** (planning depth + map-control weights): 62.1% overall,
+  beating lookahead-obelisk 54%, planner 53%, lookahead 80% head-to-head.
 
 Add an engine by implementing three functions and registering it in
 `src/engines/index.js`:

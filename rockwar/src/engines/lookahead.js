@@ -254,6 +254,84 @@ function retreatPolicy(state, attackInfo, options) {
   return plan;
 }
 
+// Full-turn planner: the same evaluator, but instead of scoring single
+// actions it beam-searches SEQUENCES of the contingent's remaining actions
+// (spawn → evolve → attack-on-the-kicker, swap → strike, ...) and plays the
+// first action of the best line. It replans from scratch at every decision
+// (receding horizon), so enemy reactions and mid-turn surprises are
+// absorbed naturally.
+export function makePlannerEngine(opts = {}) {
+  const { depth = 3, beam = 6, expand = 40, ...weightOpts } = opts;
+  const W = { ...DEFAULT_WEIGHTS, ...weightOpts };
+  const base = makeLookaheadEngine(weightOpts);
+  const simStub = { planRetreats: (s, info, options) => retreatPolicy(s, info, options) };
+  const simEngines = { A: simStub, B: simStub };
+
+  return {
+    ...base,
+    name: 'planner',
+
+    chooseAction(state, ctx, acts, rng) {
+      const { army, contingent, remainingBudget, actionsTaken, bonusPool } = ctx;
+      const cap = state.config.maxActionsPerContingent;
+      const baseline = evaluate(state, army, W) + W.passMargin;
+
+      const step = (fromState, terrs, remaining, taken, pool, action, spentSoFar, first) => {
+        const clone = structuredClone({ ...fromState, log: [], events: null, captureSnapshots: false });
+        const res = applyAction(clone, army, action, simEngines, rng);
+        const nextTerrs = new Set(terrs);
+        if (res.capturedTerritory !== undefined) nextTerrs.add(res.capturedTerritory);
+        if (res.captured) for (const c of res.captured) nextTerrs.add(c);
+        // An air swap plants our piece in the enemy's old cell — treat it as
+        // part of the contingent so follow-up actions can come from there.
+        if (action.type === 'ability' && action.element === 'air') nextTerrs.add(action.theirs);
+        const poolKey = action.type === 'coordAttack' ? 'attack' : action.type;
+        const nextPool = { ...pool };
+        const beyond = taken >= cap;
+        const drawn = beyond ? action.cost : Math.max(0, action.cost - remaining);
+        if (drawn > 0) nextPool[poolKey] = (nextPool[poolKey] || 0) - drawn;
+        const spent = spentSoFar + action.cost;
+        return {
+          state: clone,
+          terrs: nextTerrs,
+          remaining: Math.max(0, remaining - (action.cost - drawn)),
+          taken: taken + 1,
+          pool: nextPool,
+          spent,
+          first: first ?? action,
+          score: evaluate(clone, army, W) - W.costPenalty * spent + rng() * W.jitter,
+        };
+      };
+
+      let beamStates = acts.map((a) =>
+        step(state, contingent.terrs, remainingBudget, actionsTaken, bonusPool, a, 0, null)
+      );
+      if (beamStates.length === 0) return null;
+      beamStates.sort((x, y) => y.score - x.score);
+      let best = beamStates[0];
+      beamStates = beamStates.slice(0, beam);
+
+      for (let d = 1; d < depth; d++) {
+        const next = [];
+        for (const b of beamStates) {
+          if (b.state.phase !== 'play') continue;
+          const contLike = { army, terrs: b.terrs, strength: b.remaining };
+          const followups = legalActions(b.state, contLike, b.remaining, b.taken, b.pool, cap);
+          for (const a of followups.slice(0, expand)) {
+            next.push(step(b.state, b.terrs, b.remaining, b.taken, b.pool, a, b.spent, b.first));
+          }
+        }
+        if (next.length === 0) break;
+        next.sort((x, y) => y.score - x.score);
+        if (next[0].score > best.score) best = next[0];
+        beamStates = next.slice(0, beam);
+      }
+
+      return best.score > baseline ? best.first : null;
+    },
+  };
+}
+
 export function makeLookaheadEngine(opts = {}) {
   const W = { ...DEFAULT_WEIGHTS, ...opts };
   const simStub = { planRetreats: (s, info, options) => retreatPolicy(s, info, options) };

@@ -1,6 +1,6 @@
 import { makeRandomEngine } from './random.js';
 import { makeGreedyEngine } from './greedy.js';
-import { makeLookaheadEngine } from './lookahead.js';
+import { makeLookaheadEngine, makePlannerEngine } from './lookahead.js';
 
 // Strategy-archetype presets: the same lookahead search with re-weighted
 // evaluators. Tournaments between these measure which strategies the
@@ -17,6 +17,17 @@ export const engineFactories = {
   random: makeRandomEngine,
   greedy: makeGreedyEngine,
   lookahead: makeLookaheadEngine,
+  // Full-turn beam search over action sequences (depth 3, beam 6).
+  planner: makePlannerEngine,
+  // Planner search with the map-control evaluator — depth plus strategy.
+  'planner-obelisk': (opts = {}) => {
+    const e = makePlannerEngine({
+      obeliskHold: 9, obeliskProgress: 1.2, obeliskFoothold: 4, obeliskCount: 10,
+      obeliskFadeAt: 6, advance: 0.8, myThreat: 4, ...opts,
+    });
+    e.name = 'planner-obelisk';
+    return e;
+  },
   // Wins by attrition: hunts kills, shrugs at obelisks.
   'lookahead-aggro': preset('lookahead-aggro', {
     fighting: 6, threat: 2, myThreat: 9, advance: 2.5, hunt: 4, huntCap: 6,
