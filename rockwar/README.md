@@ -142,8 +142,10 @@ board can never drift from the real state. Sims ignore the stream.
     parts are lost).
   - *water*: bounce an enemy piece of value **≤ F** back to its owner's
     sideboard.
-  - *air*: **exile** an enemy piece of value ≤ F to **any legal territory
-    on the board** — no adjacency, your choice of destination.
+  - *air*: **swap the locations** of one of your pieces and an enemy piece
+    — both of value ≤ F, both alone in their territories (a partial swap
+    would create an illegal mixed-army cell). Teleport your soldier into
+    their backline while yanking their corner anchor out of position.
   - *earth*: the sacrificed piece is **remote evolution material** — level
     up one of your own pieces fib-adjacent to the fuel into their sum
     (sacrifice a soldier to turn a chieftain into a warlord), drawn from

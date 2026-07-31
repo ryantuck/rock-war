@@ -560,7 +560,8 @@ export function legalActions(state, cont, remainingBudget, actionsTaken, bonusPo
 //   fire  — F damage to enemy territories, splittable across up to
 //           prevFib(F) of them (3 can hit 2 territories, 5 can hit 3)
 //   water — bounce an enemy piece of value <= F to its owner's sideboard
-//   air   — move an enemy piece of value <= F to ANY legal territory
+//   air   — swap the locations of one of your pieces and an enemy piece
+//           (both of value <= F, both alone in their territories)
 //   earth — the sacrificed piece acts as remote evolution material: level
 //           up one of your own pieces fib-adjacent to the fuel into their
 //           sum (sac a 2 to turn a 3 into a 5), drawn from the sideboard
@@ -611,32 +612,24 @@ export function abilityActions(state, army, cellFilter = null) {
             }
           });
         } else if (ob.element === 'air') {
-          // Exile: move an enemy piece (value <= F) to ANY legal territory.
-          // Engines enumerate one canonical destination per piece — the
-          // empty cell farthest from that piece's nearest friendly cell.
-          state.cells.forEach((ec, e) => {
-            if (ec.army !== enemy) return;
-            for (const v of new Set(ec.pieces)) {
-              if (v > fuel) continue;
-              let best = null;
-              let bestIso = -1;
-              state.cells.forEach((dc, d) => {
-                if (d === e || dc.army !== null || !canAddPiece(config, dc, v)) return;
-                let iso = Infinity;
-                state.cells.forEach((fc, f) => {
-                  if (fc.army !== enemy || f === e) return;
-                  const [x1, y1] = xy(config, d);
-                  const [x2, y2] = xy(config, f);
-                  iso = Math.min(iso, Math.abs(x1 - x2) + Math.abs(y1 - y2));
-                });
-                if (iso === Infinity) iso = 0;
-                if (iso > bestIso) { bestIso = iso; best = d; }
-              });
-              if (best !== null) {
-                acts.push({ type: 'ability', element: 'air', from: t, fuel, target: e, piece: v, dest: best, cost: 0 });
-              }
-            }
+          // Swap the locations of one of our pieces and an enemy piece.
+          // Both must be <= F and alone in their territories (a partial
+          // swap would create an illegal mixed-army cell).
+          const mines = [];
+          const theirs = [];
+          state.cells.forEach((c, i) => {
+            if (c.pieces.length !== 1 || c.pieces[0] > fuel) return;
+            if (c.army === army && i !== t) mines.push({ i, p: c.pieces[0] });
+            else if (c.army === enemy) theirs.push({ i, p: c.pieces[0] });
           });
+          for (const m of mines) {
+            for (const th of theirs) {
+              acts.push({
+                type: 'ability', element: 'air', from: t, fuel, cost: 0,
+                mine: m.i, myPiece: m.p, theirs: th.i, theirPiece: th.p,
+              });
+            }
+          }
         } else if (ob.element === 'earth') {
           // The sacrificed fuel is remote evolution material: level up one
           // of our own pieces fib-adjacent to it into their sum.
@@ -992,11 +985,14 @@ function resolveAbility(state, army, action) {
       return;
     }
     case 'air': {
-      // Exile: move an enemy piece of value <= F to ANY legal territory.
-      removePiece(state, action.target, action.piece);
-      addPiece(state, action.dest, enemy, action.piece);
-      emitEvent(state, { type: 'move', army: enemy, piece: action.piece, from: action.target, to: action.dest });
-      pushLog(state, `${army} air ability: sacrifices ${fuel} at ${fmtCell(config, action.from)}, exiling ${enemy} ${action.piece} ${fmtCell(config, action.target)}→${fmtCell(config, action.dest)}`);
+      // Swap the locations of one of our pieces and an enemy piece.
+      removePiece(state, action.mine, action.myPiece);
+      removePiece(state, action.theirs, action.theirPiece);
+      addPiece(state, action.theirs, army, action.myPiece);
+      addPiece(state, action.mine, enemy, action.theirPiece);
+      emitEvent(state, { type: 'move', army, piece: action.myPiece, from: action.mine, to: action.theirs });
+      emitEvent(state, { type: 'move', army: enemy, piece: action.theirPiece, from: action.theirs, to: action.mine });
+      pushLog(state, `${army} air ability: sacrifices ${fuel} at ${fmtCell(config, action.from)}, swapping own ${action.myPiece} at ${fmtCell(config, action.mine)} with ${enemy} ${action.theirPiece} at ${fmtCell(config, action.theirs)}`);
       return;
     }
     default:
