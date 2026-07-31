@@ -92,7 +92,11 @@ async function stepAction() {
   const seq = queue[0].seq;
   while (queue.length && queue[0].seq === seq) {
     const ev = queue.shift();
+    // Reveal this action's log lines as its animation STARTS — the board
+    // itself only re-renders after the flight (ghosts source from the
+    // pre-event board), but the narration shouldn't trail the motion.
     shownSeq = ev.seq;
+    renderLog();
     try { await animateEvent(ev); } catch (e) { console.error('animation error', e); }
     render(ev.after);
   }
@@ -356,6 +360,11 @@ function render(after = null) {
       (obSummary ? `<br>obelisks — ${obSummary}` : '');
   }
 
+  renderLog();
+}
+
+function renderLog() {
+  if (!state) return;
   const log = $('log');
   log.innerHTML = '';
   const entries = state.log.filter((e) => (e.seq ?? 0) <= shownSeq).slice(-120);
