@@ -78,7 +78,10 @@ board can never drift from the real state. Sims ignore the stream.
     strikes are simultaneous, **defenders cannot retreat into any territory
     under attack**, and the scout retreat-to-empty budget is shared across
     the whole assault — two scouts side by side can no longer shelter each
-    other. `coordinatedAttacks` knob; engines generate pairs.
+    other. Strikers may come from **different contingents**: each contingent
+    pays its own strikers' share from its budget and spends one of its
+    actions on the assault. `coordinatedAttacks` knob; engines generate
+    pairs.
 - **Combat**: the defender may retreat each piece for free into an adjacent
   territory it occupies (respecting stacking limits), plus up to 1 scout per
   attack may retreat into an adjacent *empty* territory. Then the defenders

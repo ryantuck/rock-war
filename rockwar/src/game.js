@@ -66,10 +66,12 @@ export function defaultConfig() {
     devolveThreshold: 0.5,
     // Minimum piece value that may attack: scouts (1) cannot attack.
     minAttackValue: 2,
-    // Coordinated attacks: one action in which several pieces strike
+    // Coordinated attacks: one assault in which several pieces strike
     // simultaneously — at different territories or combining their values
-    // against one. Defenders cannot retreat into ANY territory under attack,
-    // and the scout retreat-to-empty budget is shared across the assault.
+    // against one. Strikers may come from different contingents: each
+    // contingent pays its own strikers' share from its budget and spends
+    // one of its actions. Defenders cannot retreat into ANY territory under
+    // attack, and the scout retreat-to-empty budget is shared.
     coordinatedAttacks: true,
     // First-turn handicap: the first player acts with at most this many
     // contingents on turn 1 (their engine chooses which). null = no handicap.
@@ -406,8 +408,10 @@ export function evolveCostOf(config, a, b) {
 // Within the action cap, an action is affordable from budget + type bonus.
 // BEYOND the cap, obelisk bonuses grant extra actions: an action is legal
 // only if its full cost is covered by its type's bonus pool.
+// allies: [{cont, remaining, taken}] for OTHER contingents still able to act —
+// enables cross-contingent coordinated attacks where each side pays its share.
 export function legalActions(state, cont, remainingBudget, actionsTaken, bonusPool = {},
-                             actionCap = state.config.maxActionsPerContingent) {
+                             actionCap = state.config.maxActionsPerContingent, allies = null) {
   const acts = [];
   const { config } = state;
   const army = cont.army;
@@ -474,45 +478,62 @@ export function legalActions(state, cont, remainingBudget, actionsTaken, bonusPo
   // cost = sum of piece values (+ earth tax per strike).
   if (config.coordinatedAttacks !== false) {
     const minAtk = config.minAttackValue ?? 1;
-    const units = [];
-    for (const t of cont.terrs) {
-      const cell = state.cells[t];
-      if (cell.army !== army) continue;
-      cell.pieces.forEach((p, slot) => {
-        if (p < minAtk) return;
-        const targets = [];
-        for (const n of neighbors(config, t)) {
-          const nc = state.cells[n];
-          if (nc.army !== null && nc.army !== army) {
-            targets.push({ to: n, defSum: nc.pieces.reduce((s, x) => s + x, 0) });
+    const collectUnits = (terrs) => {
+      const units = [];
+      for (const t of terrs) {
+        const cell = state.cells[t];
+        if (cell.army !== army) continue;
+        cell.pieces.forEach((p, slot) => {
+          if (p < minAtk) return;
+          const targets = [];
+          for (const n of neighbors(config, t)) {
+            const nc = state.cells[n];
+            if (nc.army !== null && nc.army !== army) {
+              targets.push({ to: n, defSum: nc.pieces.reduce((s, x) => s + x, 0) });
+            }
+          }
+          if (targets.length) units.push({ from: t, slot, piece: p, targets });
+        });
+      }
+      return units;
+    };
+    const pairUp = (a, b) => {
+      for (const ta of a.targets) {
+        for (const tb of b.targets) {
+          const strikes = [
+            { from: a.from, piece: a.piece, to: ta.to },
+            { from: b.from, piece: b.piece, to: tb.to },
+          ];
+          const cost = a.piece + b.piece + 2 * earthTax;
+          if (ta.to === tb.to) {
+            // Joint strike: combined value must connect.
+            if (a.piece + b.piece >= ta.defSum) acts.push({ type: 'coordAttack', cost, strikes });
+          } else if (a.piece >= ta.defSum && b.piece >= tb.defSum) {
+            // Twin strike on two territories: each must connect on its own.
+            acts.push({ type: 'coordAttack', cost, strikes });
           }
         }
-        if (targets.length) units.push({ from: t, slot, piece: p, targets });
-      });
-    }
+      }
+    };
+    const units = collectUnits(cont.terrs);
+    // Pairs within this contingent: the whole cost comes from our budget.
     for (let i = 0; i < units.length; i++) {
       for (let j = i + 1; j < units.length; j++) {
-        const a = units[i];
-        const b = units[j];
-        const cost = a.piece + b.piece + 2 * earthTax;
-        if (!afford('attack', cost)) continue;
-        for (const ta of a.targets) {
-          for (const tb of b.targets) {
-            if (ta.to === tb.to) {
-              // Joint strike: combined value must connect.
-              if (a.piece + b.piece >= ta.defSum) {
-                acts.push({
-                  type: 'coordAttack', cost,
-                  strikes: [{ from: a.from, piece: a.piece, to: ta.to }, { from: b.from, piece: b.piece, to: tb.to }],
-                });
-              }
-            } else if (a.piece >= ta.defSum && b.piece >= tb.defSum) {
-              // Twin strike on two territories: each must connect on its own.
-              acts.push({
-                type: 'coordAttack', cost,
-                strikes: [{ from: a.from, piece: a.piece, to: ta.to }, { from: b.from, piece: b.piece, to: tb.to }],
-              });
-            }
+        if (afford('attack', units[i].piece + units[j].piece + 2 * earthTax)) {
+          pairUp(units[i], units[j]);
+        }
+      }
+    }
+    // Cross-contingent pairs: each contingent pays its own striker's share
+    // (piece + earth tax) and spends one of its actions.
+    if (allies) {
+      for (const ally of allies) {
+        const allyUnits = collectUnits(ally.cont.terrs);
+        for (const u of units) {
+          if (!afford('attack', u.piece + earthTax)) continue;
+          for (const au of allyUnits) {
+            if (au.piece + earthTax > ally.remaining) continue;
+            pairUp(u, au);
           }
         }
       }
@@ -1052,18 +1073,20 @@ export function playTurn(state, engines, rng) {
     ? Math.min(config.maxActionsPerContingent, config.firstTurnActions ?? Infinity)
     : config.maxActionsPerContingent;
 
-  for (const cont of acting) {
-    let remaining = cont.strength;
-    let taken = 0;
+  // Shared ledger: cross-contingent coordinated attacks charge every
+  // participating contingent its share of budget and one of its actions.
+  const slots = acting.map((c) => ({ cont: c, remaining: c.strength, taken: 0 }));
+  for (const slot of slots) {
     // Loop past maxActions: obelisk bonuses fund extra actions beyond the cap
     // (legalActions only offers fully-bonus-funded actions there), so a
     // contingent can e.g. spawn, evolve, then attack on the fire kicker.
     while (state.phase === 'play') {
-      const acts = legalActions(state, cont, remaining, taken, bonusPool, maxActions);
+      const allies = slots.filter((s) => s !== slot && s.taken < maxActions && s.remaining > 0);
+      const acts = legalActions(state, slot.cont, slot.remaining, slot.taken, bonusPool, maxActions, allies);
       if (acts.length === 0) break;
       const choice = engines[army].chooseAction(
         state,
-        { army, contingent: cont, remainingBudget: remaining, actionsTaken: taken, bonusPool },
+        { army, contingent: slot.cont, remainingBudget: slot.remaining, actionsTaken: slot.taken, bonusPool },
         acts,
         rng
       );
@@ -1071,20 +1094,44 @@ export function playTurn(state, engines, rng) {
       // Only accept an action from the legal list.
       const match = acts.find((a) => JSON.stringify(a) === JSON.stringify(choice));
       if (!match) break;
-      const beyondCap = taken >= maxActions;
+      const beyondCap = slot.taken >= maxActions;
       state.eventSeq = (state.eventSeq ?? 0) + 1;
       const res = applyAction(state, army, match, engines, rng);
-      if (res.capturedTerritory !== undefined) cont.terrs.add(res.capturedTerritory);
-      if (res.captured) for (const c of res.captured) cont.terrs.add(c);
-      // Payment: within the cap, contingent budget first so the kicker stays
-      // available for extra actions; beyond the cap, entirely bonus-funded.
-      const drawn = beyondCap ? match.cost : Math.max(0, match.cost - remaining);
-      if (drawn > 0) {
-        bonusPool[match.type] -= drawn;
-        pushLog(state, `${army} draws ${drawn} obelisk ${match.type} budget${beyondCap ? ' (extra action)' : ''}`);
+      if (res.capturedTerritory !== undefined) slot.cont.terrs.add(res.capturedTerritory);
+      if (res.captured) for (const c of res.captured) slot.cont.terrs.add(c);
+      // Payment. Coordinated attacks split the bill: every participating
+      // contingent pays its own strikers' share and spends an action.
+      // Bonus pools (attack pool for coordAttacks) top up the acting
+      // contingent; beyond the cap its whole share is bonus-funded.
+      const poolKey = match.type === 'coordAttack' ? 'attack' : match.type;
+      if (match.type === 'coordAttack') {
+        const tax = obeliskElementBonus(state, other(army), 'earth');
+        for (const s of slots) {
+          const mine = match.strikes.filter((st) => s.cont.terrs.has(st.from));
+          if (mine.length === 0) continue;
+          const share = mine.reduce((sum, st) => sum + st.piece, 0) + tax * mine.length;
+          if (s === slot) {
+            const drawn = beyondCap ? share : Math.max(0, share - s.remaining);
+            if (drawn > 0) {
+              bonusPool[poolKey] = (bonusPool[poolKey] || 0) - drawn;
+              pushLog(state, `${army} draws ${drawn} obelisk attack budget${beyondCap ? ' (extra action)' : ''}`);
+            }
+            s.remaining -= share - drawn;
+          } else {
+            s.remaining = Math.max(0, s.remaining - share);
+            s.taken++;
+          }
+        }
+        slot.taken++;
+      } else {
+        const drawn = beyondCap ? match.cost : Math.max(0, match.cost - slot.remaining);
+        if (drawn > 0) {
+          bonusPool[poolKey] = (bonusPool[poolKey] || 0) - drawn;
+          pushLog(state, `${army} draws ${drawn} obelisk ${poolKey} budget${beyondCap ? ' (extra action)' : ''}`);
+        }
+        slot.remaining -= match.cost - drawn;
+        slot.taken++;
       }
-      remaining -= match.cost - drawn;
-      taken++;
       if (checkElimination(state)) return state;
       // The other army may respond with obelisk abilities.
       offerReactions(state, other(army), engines, rng);
