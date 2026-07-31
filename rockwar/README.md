@@ -34,6 +34,21 @@ speed selector. You can also edit the rules config as JSON (applies on New
 game) and run batches of hundreds of games in-browser with the same stats
 as the CLI.
 
+**Interactive play**: pick **human** for either army and start a new game —
+the engine side plays automatically (with the same animations) and the UI
+pauses whenever it's your move. Click a highlighted cell to place your
+scouts; on your turn, click one of your territories to select it (green
+outline = move there, red = attack, with buttons for spawn / evolve /
+obelisk abilities and a piece picker when a territory holds two values),
+then end your turn. The human turn runs through the exact `playTurn`
+machinery — per-contingent fib budgets, the 2-action cap, obelisk bonus
+pools funding extra actions, the first-turn handicap (your first action
+locks in your one acting contingent), and the opponent's reaction window
+after each of your actions. v1 limits for the human side: retreats are
+auto-planned (greedy's stand-on-repels-and-ties policy), you can't cast
+reaction-window abilities on the engine's turn, and coordinated attacks and
+two-territory fire splits aren't offered interactively.
+
 Under the hood the rules engine emits a structured event stream
 (`state.events`, grouped by action `seq`, with post-event snapshots when
 `state.captureSnapshots` is set) — the UI replays events with ghost-piece

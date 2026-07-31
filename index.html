@@ -83,6 +83,23 @@
   }
   .replaying { color: var(--muted); font-size: 12px; }
 
+  /* interactive play */
+  .actionbar {
+    margin-top: 14px; padding: 10px 12px;
+    background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+    max-width: calc(var(--cell) * 7);
+  }
+  .actionbar .muted { color: var(--muted); font-size: 12px; margin-top: 4px; }
+  .actionbar .btnrow { margin-top: 10px; }
+  .actionbar button { padding: 5px 10px; font-size: 13px; }
+  .cell.clickable { cursor: pointer; }
+  .cell.clickable:hover { border-color: var(--muted); }
+  .cell.sel { outline: 3px solid #f2c14e; outline-offset: -3px; }
+  .cell.hl-move { outline: 3px solid #58b368; outline-offset: -3px; }
+  .cell.hl-attack { outline: 3px solid #e05252; outline-offset: -3px; }
+  .cell.hl-target { outline: 3px dashed #4a9fe0; outline-offset: -3px; }
+  .cell.hl-place { outline: 3px dashed #58b368; outline-offset: -3px; }
+
   /* mobile */
   @media (max-width: 720px) {
     body { padding: 10px; }
@@ -220,12 +237,16 @@
 </head>
 <body>
   <h1>Rock War</h1>
-  <div class="sub">Territory war — watch engines play, or batch-run hundreds of games while iterating on rules.</div>
+  <div class="sub">Territory war — watch engines play, play against one yourself, or batch-run hundreds of games while iterating on rules.</div>
 
   <div class="layout">
     <div class="panel">
       <h2>Board</h2>
       <div id="board"></div>
+      <div id="actionBar" class="actionbar" hidden>
+        <div id="abMsg"></div>
+        <div id="abBtns" class="btnrow"></div>
+      </div>
       <div class="sideboards">
         <div class="sideboard"><div class="label A">Army A sideboard</div><div class="row" id="sideA"></div></div>
         <div class="sideboard"><div class="label B">Army B sideboard</div><div class="row" id="sideB"></div></div>
@@ -345,6 +366,13 @@
         strength wins (obelisks break ties). Full rules, tunable knobs, and
         sim findings live in
         <a href="https://github.com/ryantuck/rock-war/blob/master/rockwar/README.md">rockwar/README.md</a>.</p>
+        <h3>Playing yourself</h3>
+        <p>Pick <b>human</b> as either engine and start a new game. Click a
+        highlighted cell to place scouts; on your turn, click a territory to
+        select it (green = move, red = attack, buttons for spawn / evolve /
+        obelisk abilities), then <b>end turn</b>. Retreats are auto-planned
+        for you, and reaction-window casts, coordinated attacks, and
+        split fire hits aren't offered interactively yet.</p>
       </div>
     </div>
   </div>

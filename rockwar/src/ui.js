@@ -1,5 +1,6 @@
 // Frontend controller: watch games play out action-by-action with animated
-// pieces, or run large batches in-browser. Same engine code as the CLI.
+// pieces, play interactively against an engine, or run large batches
+// in-browser. Same engine code as the CLI.
 //
 // How stepping works: the rules engine emits a structured event stream
 // (state.events) with per-action sequence numbers and post-event snapshots
@@ -7,10 +8,21 @@
 // time, queues that turn's events, and each Step click replays ONE action's
 // events with ghost-piece animations, rendering the matching snapshot after
 // each event so the board is always exact.
+//
+// Interactive play: pick "human" for either army. The advance() driver runs
+// engine placements/turns automatically (with the same animated replay) and
+// pauses whenever it's the human's move. A human turn keeps the exact slots
+// ledger playTurn uses — per-contingent budget, action cap, obelisk bonus
+// pools, first-turn handicap — and executes clicked actions through the same
+// applyAction/offerReactions path, so the rules are identical to sim games.
+// v1 limits for the human side: retreats are auto-planned (greedy's policy),
+// no reaction-window casts on the opponent's turn, and no coordinated
+// attacks or two-territory fire splits.
 
 import {
   newGame, defaultConfig, playTurn, playGame, applyPlacement, legalPlacements,
-  armyStrengthOnBoard, fmtCell, obeliskStatus,
+  armyStrengthOnBoard, fmtCell, obeliskStatus, legalActions, applyAction,
+  contingents, obeliskBonuses, offerReactions, finishTurn, checkGameEnd, other,
 } from './game.js';
 import { engineFactories, makeEngine } from './engines/index.js';
 import { mulberry32 } from './rng.js';
@@ -19,11 +31,16 @@ const $ = (id) => document.getElementById(id);
 
 // --- engine selectors -------------------------------------------------------
 
+// Game selectors get a "human" entry (interactive play); batch runs stay
+// engine-only.
 for (const sel of ['engineA', 'engineB', 'batchA', 'batchB']) {
-  for (const name of Object.keys(engineFactories)) {
+  const names = sel.startsWith('engine')
+    ? ['human', ...Object.keys(engineFactories)]
+    : Object.keys(engineFactories);
+  for (const name of names) {
     const opt = document.createElement('option');
     opt.value = name;
-    opt.textContent = name;
+    opt.textContent = name === 'human' ? '☺ human (you)' : name;
     $(sel).appendChild(opt);
   }
 }
@@ -34,6 +51,23 @@ $('batchB').value = 'random';
 
 $('config').value = JSON.stringify(defaultConfig(), null, 2);
 
+// A "human" engine slot: moves come from board clicks, not from the engine
+// interface. Retreats (and nothing else) are auto-planned with greedy's
+// policy — stand on repels and exact ties, otherwise flee what can flee.
+function makeHumanEngine() {
+  const helper = makeEngine('greedy');
+  return {
+    name: 'human',
+    human: true,
+    placeScout: () => null,   // placements come from board clicks
+    chooseAction: () => null, // actions come from board clicks
+    planRetreats: (s, a, o, r) => helper.planRetreats(s, a, o, r),
+    // no chooseReaction: the human side doesn't cast on the enemy's turn (v1)
+  };
+}
+
+const mkEngine = (name) => (name === 'human' ? makeHumanEngine() : makeEngine(name));
+
 // --- live game state --------------------------------------------------------
 
 let state = null;
@@ -43,6 +77,17 @@ let queue = [];          // events of the in-progress turn, grouped by seq
 let animating = false;
 let autoRunning = false;
 let shownSeq = Infinity; // log entries with seq beyond this are hidden
+
+// interactive play
+let interactive = false;
+let uiMode = null;       // 'place' | 'turn' | null
+let human = null;        // { army, slots, bonusPool, maxActions, limit }
+let selCell = null;      // selected own territory
+let selSlot = null;      // its slot in the ledger
+let selActs = [];        // legal actions originating from selCell
+let selPiece = null;     // which piece value moves/attacks (multi-piece cells)
+let pending = null;      // ability target-picking: { element, fuel, acts, stage, mine }
+let highlights = new Map(); // cell index -> highlight class
 
 function readConfig() {
   try {
@@ -57,12 +102,19 @@ function startGame() {
   stopAuto();
   queue = [];
   shownSeq = Infinity;
+  uiMode = null;
+  human = null;
+  clearSelection();
   const config = readConfig();
   rng = mulberry32(parseInt($('seed').value, 10) || 1);
-  engines = { A: makeEngine($('engineA').value), B: makeEngine($('engineB').value) };
+  engines = { A: mkEngine($('engineA').value), B: mkEngine($('engineB').value) };
+  interactive = !!(engines.A.human || engines.B.human);
+  $('step').style.display = interactive ? 'none' : '';
+  $('auto').style.display = interactive ? 'none' : '';
   state = newGame(config);
   state.captureSnapshots = true;
   render();
+  if (interactive) advance();
 }
 
 // Advance the real game by one placement or one full turn, and queue the
@@ -83,11 +135,9 @@ function fillQueue() {
   queue = state.events.slice(before);
 }
 
-// One Step = one action: replay every event sharing the next seq.
-async function stepAction() {
-  if (!state || animating) return;
-  if (queue.length === 0) fillQueue();
-  if (queue.length === 0) { render(); return; }
+// Replay every queued event sharing the next seq — one action's worth.
+async function replayOneGroup() {
+  if (queue.length === 0) return;
   animating = true;
   const seq = queue[0].seq;
   while (queue.length && queue[0].seq === seq) {
@@ -104,14 +154,27 @@ async function stepAction() {
   animating = false;
 }
 
+async function drainQueue() {
+  while (queue.length) await replayOneGroup();
+}
+
+// One Step = one action (engine-vs-engine spectator mode).
+async function stepAction() {
+  if (!state || animating) return;
+  if (queue.length === 0) fillQueue();
+  if (queue.length === 0) { render(); return; }
+  await replayOneGroup();
+}
+
 function stopAuto() {
   autoRunning = false;
   $('auto').textContent = '▶ Auto';
 }
 
 $('newGame').onclick = startGame;
-$('step').onclick = () => { stopAuto(); stepAction(); };
+$('step').onclick = () => { if (interactive) return; stopAuto(); stepAction(); };
 $('auto').onclick = async () => {
+  if (interactive) return;
   if (autoRunning) { stopAuto(); return; }
   if (!state || (state.phase === 'over' && queue.length === 0)) startGame();
   autoRunning = true;
@@ -122,6 +185,269 @@ $('auto').onclick = async () => {
   }
   stopAuto();
 };
+
+// --- interactive play -------------------------------------------------------
+
+// Drive the game forward until it's the human's move (or the game ends).
+// Engine placements and turns replay with the usual animations.
+async function advance() {
+  while (interactive && state) {
+    if (state.phase === 'placement') {
+      const army = state.placementQueue[0];
+      if (engines[army].human) {
+        uiMode = 'place';
+        highlights = new Map();
+        for (const i of legalPlacements(state)) highlights.set(i, 'hl-place');
+        render();
+        return;
+      }
+      fillQueue();
+      await drainQueue();
+    } else if (state.phase === 'play') {
+      if (engines[state.toMove].human) { beginHumanTurn(); return; }
+      fillQueue();
+      await drainQueue();
+    } else {
+      await drainQueue();
+      render();
+      return;
+    }
+  }
+}
+
+async function humanPlace(i) {
+  uiMode = null;
+  highlights = new Map();
+  const army = state.placementQueue[0];
+  const before = state.events.length;
+  applyPlacement(state, army, i);
+  queue = state.events.slice(before);
+  await drainQueue();
+  advance();
+}
+
+// Start a human turn with the same ledger playTurn builds: one slot per
+// contingent (snapshotted now), fib budget = strength, obelisk bonus pools,
+// and the turn-1 handicap on both contingent count and action cap.
+function beginHumanTurn() {
+  const army = state.toMove;
+  if (checkGameEnd(state)) { render(); advance(); return; }
+  const { config } = state;
+  const conts = contingents(state, army);
+  state.abilitiesUsedThisTurn = [];
+  const bonusPool = obeliskBonuses(state, army);
+  const maxActions = state.turn === 1
+    ? Math.min(config.maxActionsPerContingent, config.firstTurnActions ?? Infinity)
+    : config.maxActionsPerContingent;
+  const limit = state.turn === 1 ? (config.firstTurnContingents ?? Infinity) : Infinity;
+  human = {
+    army,
+    slots: conts.map((c) => ({ cont: c, remaining: c.strength, taken: 0 })),
+    bonusPool,
+    maxActions,
+    limit,
+  };
+  clearSelection();
+  // Loss by immobilization: no contingent has any legal action.
+  if (!anyHumanActions()) {
+    state.phase = 'over';
+    state.winner = other(army);
+    state.reason = 'immobilized';
+    state.log.push({ turn: state.turn, text: `${other(army)} wins: ${army} cannot act`, seq: state.eventSeq ?? 0 });
+    human = null;
+    render();
+    return;
+  }
+  uiMode = 'turn';
+  render();
+}
+
+// First-turn handicap: only `limit` contingents may act; a slot that hasn't
+// acted is usable only while the acted count is below the limit.
+function slotUsable(slot) {
+  if (slot.taken > 0) return true;
+  const acted = human.slots.filter((s) => s.taken > 0).length;
+  return acted < human.limit;
+}
+
+function actsForSlot(slot) {
+  if (!slotUsable(slot)) return [];
+  return legalActions(state, slot.cont, slot.remaining, slot.taken,
+    human.bonusPool, human.maxActions, null)
+    .filter((a) => a.type !== 'coordAttack'); // not offered interactively (v1)
+}
+
+function anyHumanActions() {
+  return human.slots.some((s) => actsForSlot(s).length > 0);
+}
+
+function clearSelection() {
+  selCell = null;
+  selSlot = null;
+  selActs = [];
+  selPiece = null;
+  pending = null;
+  highlights = new Map();
+}
+
+function deselect() { clearSelection(); render(); }
+
+function selectCell(i) {
+  const slot = human.slots.find((s) => s.cont.terrs.has(i) && state.cells[i].army === human.army);
+  if (!slot) return deselect();
+  const acts = actsForSlot(slot).filter((a) =>
+    (a.type === 'spawn' && a.to === i) ||
+    (a.type === 'move' && a.from === i) ||
+    (a.type === 'attack' && a.from === i) ||
+    (a.type === 'evolve' && a.at === i) ||
+    (a.type === 'ability' && a.from === i));
+  selCell = i;
+  selSlot = slot;
+  selActs = acts;
+  selPiece = Math.max(...state.cells[i].pieces);
+  pending = null;
+  refreshMoveHighlights();
+}
+
+function refreshMoveHighlights() {
+  highlights = new Map();
+  for (const a of selActs) {
+    if (a.type === 'move' && a.piece === selPiece) highlights.set(a.to, 'hl-move');
+    else if (a.type === 'attack' && a.piece === selPiece) highlights.set(a.to, 'hl-attack');
+  }
+  render();
+}
+
+function onCellClick(i) {
+  if (!interactive || animating || !state) return;
+  if (uiMode === 'place') {
+    if (highlights.get(i) === 'hl-place') humanPlace(i);
+    return;
+  }
+  if (uiMode !== 'turn' || !human) return;
+  if (pending) return onTargetClick(i);
+  const cls = highlights.get(i);
+  if (cls === 'hl-move' || cls === 'hl-attack') {
+    const type = cls === 'hl-move' ? 'move' : 'attack';
+    const act = selActs.find((a) => a.type === type && a.to === i && a.piece === selPiece);
+    if (act) return execHuman(act);
+  }
+  if (state.cells[i].army === human.army) selectCell(i);
+  else deselect();
+}
+
+// Ability casting: pick the target(s) on the board. Fire offers full
+// single-territory hits, water/earth pick the strongest eligible piece in
+// the clicked territory, air is a two-stage pick (yours, then theirs).
+function startAbility(element, fuel) {
+  let acts = selActs.filter((a) => a.type === 'ability' && a.element === element && a.fuel === fuel);
+  if (element === 'fire') {
+    acts = acts.filter((a) => a.hits.length === 1); // no split hits in the UI (v1)
+    pending = { element, fuel, acts, stage: 'target' };
+    setTargetHighlights(acts.map((a) => a.hits[0].target));
+  } else if (element === 'air') {
+    pending = { element, fuel, acts, stage: 'mine' };
+    setTargetHighlights([...new Set(acts.map((a) => a.mine))]);
+  } else {
+    pending = { element, fuel, acts, stage: 'target' };
+    setTargetHighlights([...new Set(acts.map((a) => a.target))]);
+  }
+  render();
+}
+
+function setTargetHighlights(cells) {
+  highlights = new Map();
+  for (const c of cells) highlights.set(c, 'hl-target');
+}
+
+function onTargetClick(i) {
+  const p = pending;
+  if (!highlights.has(i)) return deselect(); // click-off cancels the cast
+  if (p.element === 'air') {
+    if (p.stage === 'mine') {
+      p.mine = i;
+      p.stage = 'theirs';
+      setTargetHighlights([...new Set(p.acts.filter((a) => a.mine === i).map((a) => a.theirs))]);
+      render();
+      return;
+    }
+    const act = p.acts.find((a) => a.mine === p.mine && a.theirs === i);
+    if (act) return execHuman(act);
+    return deselect();
+  }
+  if (p.element === 'fire') {
+    const act = p.acts.find((a) => a.hits[0].target === i);
+    if (act) return execHuman(act);
+    return deselect();
+  }
+  const cands = p.acts.filter((a) => a.target === i).sort((a, b) => b.piece - a.piece);
+  if (cands.length) return execHuman(cands[0]);
+  return deselect();
+}
+
+// Execute one human action exactly the way playTurn would: bump the event
+// seq, apply, grow the contingent on captures, pay from budget with obelisk
+// pool top-ups, run the game-end check and the enemy's reaction window,
+// then animate whatever happened. Stale clicks (mid-animation, or a button
+// outliving the selection it was built for) re-verify against the current
+// legal list and no-op instead of corrupting the ledger.
+async function execHuman(act) {
+  const slot = selSlot;
+  if (!human || animating || !slot) return;
+  if (!actsForSlot(slot).some((a) => JSON.stringify(a) === JSON.stringify(act))) {
+    return deselect();
+  }
+  const army = human.army;
+  clearSelection();
+  const beyondCap = slot.taken >= human.maxActions;
+  state.eventSeq = (state.eventSeq ?? 0) + 1;
+  const before = state.events.length;
+  const res = applyAction(state, army, act, engines, rng);
+  if (res.capturedTerritory !== undefined) slot.cont.terrs.add(res.capturedTerritory);
+  if (res.captured) for (const c of res.captured) slot.cont.terrs.add(c);
+  const drawn = beyondCap ? act.cost : Math.max(0, act.cost - slot.remaining);
+  if (drawn > 0) {
+    human.bonusPool[act.type] = (human.bonusPool[act.type] || 0) - drawn;
+    state.log.push({
+      turn: state.turn,
+      text: `${army} draws ${drawn} obelisk ${act.type} budget${beyondCap ? ' (extra action)' : ''}`,
+      seq: state.eventSeq,
+    });
+  }
+  slot.remaining -= act.cost - drawn;
+  slot.taken++;
+  if (!checkGameEnd(state)) {
+    // The other army may respond with obelisk abilities.
+    offerReactions(state, other(army), engines, rng);
+  }
+  queue = state.events.slice(before);
+  await drainQueue();
+  if (state.phase !== 'play') {
+    human = null;
+    uiMode = null;
+    render();
+    advance();
+    return;
+  }
+  if (!anyHumanActions()) return endHumanTurn();
+  render();
+}
+
+function endHumanTurn() {
+  if (!human || animating) return;
+  clearSelection();
+  human = null;
+  uiMode = null;
+  finishTurn(state);
+  render();
+  advance();
+}
+
+$('board').addEventListener('click', (e) => {
+  const cellEl = e.target.closest('.cell');
+  if (!cellEl || cellEl.dataset.i === undefined) return;
+  onCellClick(parseInt(cellEl.dataset.i, 10));
+});
 
 // --- animation --------------------------------------------------------------
 
@@ -280,6 +606,24 @@ function render(after = null) {
     board.appendChild(cell);
   });
 
+  // Interactive highlights — only on the live board, never mid-replay.
+  if (interactive && !after) {
+    for (const [i, cls] of highlights) {
+      const el = board.querySelector(`.cell[data-i="${i}"]`);
+      if (el) el.classList.add(cls, 'clickable');
+    }
+    if (selCell !== null) {
+      board.querySelector(`.cell[data-i="${selCell}"]`)?.classList.add('sel');
+    }
+    if (uiMode === 'turn' && human && !pending) {
+      cells.forEach((c, i) => {
+        if (c.army === human.army) {
+          board.querySelector(`.cell[data-i="${i}"]`)?.classList.add('clickable');
+        }
+      });
+    }
+  }
+
   // Obelisks sit on the corner points between cells (cell size + 6px gap).
   const pitch = cellPx + 6;
   for (const ob of config.obelisks ?? []) {
@@ -335,14 +679,17 @@ function render(after = null) {
   const replaying = queue.length > 0 || after !== null;
   if (state.phase === 'placement') {
     const army = state.placementQueue[0];
+    const who = interactive && engines[army].human ? 'You place' : `Army ${army} places`;
     status.innerHTML =
-      `Placement — <span class="winner ${army}">Army ${army}</span> places a scout` +
+      `Placement — <span class="winner ${army}">${who}</span> a scout` +
       `<br>${state.placementQueue.length} placement${state.placementQueue.length === 1 ? '' : 's'} remaining`;
   } else if (state.phase === 'over' && !replaying) {
     if (state.winner === 'draw') {
       status.innerHTML = `Turn ${state.turn} — <span class="winner">draw</span> (${state.reason})`;
     } else {
-      status.innerHTML = `Turn ${state.turn} — <span class="winner ${state.winner}">Army ${state.winner} wins</span> (${state.reason})`;
+      const label = interactive && engines[state.winner]?.human
+        ? 'You win!' : `Army ${state.winner} wins`;
+      status.innerHTML = `Turn ${state.turn} — <span class="winner ${state.winner}">${label}</span> (${state.reason})`;
     }
   } else {
     const obSummary = ['A', 'B'].map((army) => {
@@ -353,14 +700,101 @@ function render(after = null) {
       return held.length ? `${army}: ${held.join(' ')}` : null;
     }).filter(Boolean).join(' · ');
     const strengths = `A ${armyStrengthOnBoard(view, 'A')} · B ${armyStrengthOnBoard(view, 'B')}`;
+    const mover = interactive && engines[state.toMove]?.human ? 'You' : `Army ${state.toMove}`;
     status.innerHTML =
-      `Turn ${state.turn} — <span class="winner ${state.toMove}">Army ${state.toMove}</span> to move` +
+      `Turn ${state.turn} — <span class="winner ${state.toMove}">${mover}</span> to move` +
       (replaying ? ' <span class="replaying">· playing out turn…</span>' : '') +
       `<br>strength on board: ${strengths}` +
       (obSummary ? `<br>obelisks — ${obSummary}` : '');
   }
 
+  renderActionBar();
   renderLog();
+}
+
+function addBtn(parent, label, onclick, cls = null) {
+  const b = document.createElement('button');
+  b.textContent = label;
+  if (cls) b.classList.add(cls);
+  b.onclick = onclick;
+  parent.appendChild(b);
+  return b;
+}
+
+// The interactive prompt panel under the board: what to do next, each
+// contingent's remaining budget/actions, and buttons for the non-click
+// actions (spawn, evolve, abilities, piece choice, end turn).
+function renderActionBar() {
+  const bar = $('actionBar');
+  if (!bar) return;
+  if (!interactive || (uiMode !== 'turn' && uiMode !== 'place')) {
+    bar.hidden = true;
+    return;
+  }
+  bar.hidden = false;
+  const msg = $('abMsg');
+  const btns = $('abBtns');
+  btns.innerHTML = '';
+
+  if (uiMode === 'place') {
+    const army = state.placementQueue[0];
+    msg.innerHTML = `<b class="winner ${army}">Your placement (${army})</b> — click a highlighted empty territory to place a scout.`;
+    return;
+  }
+
+  const cfg = state.config;
+  const slotLines = human.slots.map((s) => {
+    const cells = [...s.cont.terrs]
+      .filter((t) => state.cells[t].army === human.army)
+      .map((t) => fmtCell(cfg, t)).join(' ');
+    const usable = slotUsable(s) ? '' : ' (locked by first-turn handicap)';
+    return `[${cells}] budget ${s.remaining} · actions ${s.taken}/${human.maxActions}${usable}`;
+  });
+  const pools = Object.entries(human.bonusPool)
+    .filter(([, v]) => v > 0)
+    .map(([k, v]) => `${k}+${v}`).join(' ');
+
+  let hint;
+  if (pending) {
+    hint = pending.element === 'air'
+      ? (pending.stage === 'mine'
+        ? `air swap (sac ${pending.fuel}): click YOUR highlighted lone piece`
+        : 'air swap: click the enemy piece to swap positions with')
+      : `${pending.element} (sac ${pending.fuel}): click a highlighted target territory`;
+  } else if (selCell !== null) {
+    hint = 'green = move there, red = attack — or use a button below. Click another of your territories to switch.';
+  } else {
+    hint = 'click one of your territories to act with it, or end your turn.';
+  }
+  msg.innerHTML =
+    `<b class="winner ${human.army}">Your turn (${human.army})</b> — ${hint}` +
+    `<div class="muted">${slotLines.join('<br>')}${pools ? `<br>obelisk pools: ${pools}` : ''}</div>`;
+
+  if (selCell !== null && !pending) {
+    const pieces = [...new Set(state.cells[selCell].pieces)].sort((a, b) => b - a);
+    if (pieces.length > 1) {
+      for (const pv of pieces) {
+        const b = addBtn(btns, `act with ${pv}`, () => { selPiece = pv; refreshMoveHighlights(); });
+        if (pv === selPiece) b.classList.add('primary');
+      }
+    }
+    const spawn = selActs.find((a) => a.type === 'spawn');
+    if (spawn) addBtn(btns, 'spawn scout (cost 1)', () => execHuman(spawn));
+    const evolve = selActs.find((a) => a.type === 'evolve');
+    if (evolve) {
+      const [hi, lo] = state.cells[selCell].pieces;
+      addBtn(btns, `evolve ${lo}+${hi}→${hi + lo} (cost ${evolve.cost})`, () => execHuman(evolve));
+    }
+    const seen = new Set();
+    for (const a of selActs.filter((x) => x.type === 'ability')) {
+      const key = `${a.element}:${a.fuel}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      addBtn(btns, `${a.element} ability (sac ${a.fuel})`, () => startAbility(a.element, a.fuel));
+    }
+  }
+  if (pending || selCell !== null) addBtn(btns, 'cancel', deselect);
+  addBtn(btns, 'end turn', endHumanTurn, 'primary');
 }
 
 function renderLog() {

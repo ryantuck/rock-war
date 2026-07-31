@@ -15,8 +15,9 @@ python3 -m http.server 8000   # from the repo root
 ```
 
 The frontend ([index.html](index.html)) animates games action-by-action
-between any two engines, lets you edit the rules config live as JSON, and
-batch-runs hundreds of games in-browser.
+between any two engines, lets you **play interactively against an engine**
+(pick "human" as either army), edit the rules config live as JSON, and
+batch-run hundreds of games in-browser.
 
 ```sh
 cd rockwar

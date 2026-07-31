@@ -1097,7 +1097,7 @@ function checkElimination(state) {
 // may fire its unused obelisk abilities (any obelisk-adjacent scout as fuel,
 // no budget or action cost). Engines opt in via chooseReaction; loop is
 // bounded by the once-per-element-per-turn ledger.
-function offerReactions(state, reactor, engines, rng) {
+export function offerReactions(state, reactor, engines, rng) {
   const eng = engines[reactor];
   if (!eng || !eng.chooseReaction) return;
   while (state.phase === 'play') {
@@ -1231,7 +1231,17 @@ export function playTurn(state, engines, rng) {
     }
   }
 
-  state.toMove = other(army);
+  finishTurn(state);
+  return state;
+}
+
+// Ends the current player's turn: flips toMove, advances the turn counter,
+// and applies the turn-limit ending (board-strength tiebreak, obelisks as
+// the secondary criterion). Exported so interactive frontends can drive a
+// human turn manually and finish it with identical semantics.
+export function finishTurn(state) {
+  const { config } = state;
+  state.toMove = other(state.toMove);
   state.turn++;
   if (state.turn > config.maxTurns) {
     state.phase = 'over';
@@ -1260,6 +1270,12 @@ export function playTurn(state, engines, rng) {
     }
   }
   return state;
+}
+
+// Exported game-end check (elimination, mutual wipe, obelisk victory) for
+// interactive frontends; returns true if the game just ended.
+export function checkGameEnd(state) {
+  return checkElimination(state);
 }
 
 // ---------------------------------------------------------------------------
