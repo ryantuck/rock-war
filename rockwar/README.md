@@ -269,7 +269,68 @@ Add an engine by implementing three functions and registering it in
 Engines only ever pick from engine-generated legal-action lists, so a buggy
 engine can't corrupt game state.
 
+## Five-scout placement (`initialScouts` 2 → 5)
+
+*[AI - Claude]: Five-scout snake placement — simulation findings*
+
+Same seeds for both configs, seats swapped every game; matchup sizes
+200–1000 games, plus the 9-engine round robin at 40 games per pairing.
+"Pts (1st)" = the first-named engine's points (win 1, draw ½); "cap" = games reaching `maxTurns` (tiebreak or draw); "obelisk" = instant
+3-obelisk wins; "seat A" = A's share of decided games.
+
+| Matchup | Scouts | Pts (1st) | Draws | Cap | Obelisk wins | Seat A | Median turns |
+|---|---|---|---|---|---|---|---|
+| greedy mirror (1000) | 2 → 5 | 50 → 51% | 22.6 → 12.7% | 26.5 → 19.1% | 0 → 0% | 63 → 60% | 23 → 23 |
+| lookahead vs greedy (400) | 2 → 5 | 79 → 98% | 21.0 → 1.8% | 10.0 → 8.0% | 0.8 → 3.8% | 37 → 50% | 15 → 15 |
+| lookahead mirror (400) | 2 → 5 | 49 → 50% | 19.5 → 2.2% | 25.2 → 28.0% | 1.2 → 28.0% | 30 → 59% | 21 → 32 |
+| planner-obelisk vs lookahead (200) | 2 → 5 | 71 → 67% | 2.5 → 0% | 14.0 → 26.0% | 5.0 → 40.5% | 52 → 50% | 20 → 31 |
+| planner vs planner-obelisk (200) | 2 → 5 | 40 → 36% | 8.0 → 0.5% | 9.5 → 9.5% | 9.0 → 50.0% | 50 → 32% | 22 → 27 |
+| planner-obelisk mirror (200) | 2 → 5 | 50 → 48% | 13.5 → 1.0% | 5.0 → 19.5% | 9.5 → 49.0% | 53 → 33% | 15 → 28 |
+| greedy vs random (400) | 2 → 5 | 96 → 91% | 2.8 → 3.5% | 0 → 0% | 0 → 0% | 49 → 50% | 21 → 25 |
+
+- **Draws nearly disappear.** Round-robin draws fell from 14.9% to 1.9% of
+  games (214 → 28 of 1440). Mutual-elimination endings among search engines
+  mostly vanish (lookahead mirror 71 → 5 of 400).
+- **The obelisk race becomes the game.** Heuristic placers first control an
+  obelisk on turn ~2.3 (was 5–6.5). Abilities fire 2–3× as often (planner
+  mirror 3.3 → 9.1 per game). Instant 3-obelisk wins go from a rare ending
+  to *the* main ending between planners (~50% of games, was ~9%).
+- **Placement can hand out an obelisk before turn 1.** Greedy/lookahead/
+  planner placement (center + adjacency + obelisk pull) builds two abutting
+  5-scout blocks in the middle. In ~33% of those games the final (10th)
+  placement completes B's 3-scout ring around a corner, so B holds an
+  obelisk at the start of play (random placement: 12%, either seat). It
+  isn't decisive: B wins 54% of those in the planner mirror and only 43% in
+  the lookahead mirror.
+- **Seat balance now depends on the engine.** One-ply engines favor the
+  first mover (A 59–60%), while planners strongly favor B (A 32–33%). In the
+  planner mirror, B wins 73% of games with *no* obelisk held at the start,
+  so placement isn't the driver. The likely cause is the turn-1 handicap:
+  A's single opening action now comes from a 5-strength block while B
+  answers with two. `firstTurnActions`/`firstTurnContingents` need a
+  re-sweep under five scouts.
+- **Skill matters more.** Lookahead vs greedy goes 79% → 98%, and greedy
+  drops from 29.2% to 12.7% in the round robin (near-shutout by every
+  search engine). Random gains slightly against greedy (91%, was 96%):
+  its scattered placement starts with ~3.7 contingents vs greedy's 1.
+- **Strategy archetypes reshuffle.** Round robin (2 → 5 scouts):
+  planner-obelisk 73.1 → 76.3%, planner 66.1 → 67.7%, lookahead-obelisk
+  69.7 → 65.2%, lookahead 61.7 → 62.7%, turtle 52.7 → 62.7%, tempo
+  45.3 → 61.9%, aggro 47.5 → 39.1%. The middle tightens (lookahead,
+  turtle and tempo within 1 point of each other). Aggro is crushed by turtle (14%) and
+  tempo (13%): with more material on the board from turn 1, economy and
+  defense beat early trades.
+- **Strong-engine games run longer.** Planner-mirror median length goes
+  15 → 28 turns and turn-cap finishes 5% → 20%. The board-strength
+  tiebreak decides them, where the 2-scout game ended earlier in mutual
+  wipes or draws.
+- **Placement heuristics are still tuned for 2 scouts.** Every
+  heuristic placer packs all five scouts into one contingent (2 actions a
+  turn, same as before). Spreading for more contingents is untested.
+
 ## Current observations (300-game matchups, seats swapped, 5×5, devolve combat)
+
+These observations predate the five-scout change (two scouts per army).
 
 - **Devolution made aggression profitable and broke the fortress meta.**
   A connecting attack now conserves the attacker's material (it devolves
