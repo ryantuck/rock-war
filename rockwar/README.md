@@ -126,7 +126,7 @@ board can never drift from the real state. Sims ignore the stream.
   constituent pair is fib-adjacent, so it fits). If every defender retreats,
   no combat happens and the attacker advances whole.
 - **First-turn handicap**: on turn 1, the opening player acts with only one
-  contingent (their engine chooses which) and it takes only one action.
+  contingent (their engine chooses which); it takes the normal 2 actions.
   Tunable via `firstTurnContingents` / `firstTurnActions`.
 - **Obelisks**: four elemental obelisks sit on corner points where four
   territories meet — fire (red) at [1,1], earth (green) at [4,1], air
@@ -207,7 +207,7 @@ box or via `--config file.json` on the CLI:
 | `combatRule` | `'devolve'` | attacker devolves through stiff defense; also `'margin'` (dies on exact tie), `'mutual'` (always dies), `'attacker-survives'` (never dies) |
 | `devolveThreshold` | 0.5 | devolution triggers when defense > this fraction of the attacker |
 | `firstTurnContingents` | 1 | contingents the opening player may act with on turn 1 (0 = skip turn 1, null = no handicap) |
-| `firstTurnActions` | 1 | actions per contingent on turn 1 (null = normal 2) |
+| `firstTurnActions` | 2 | actions per contingent on turn 1 (1 = the old single-action opening; null = normal cap) |
 | `minAttackValue` | 2 | minimum piece value that may attack — scouts can't (1 = anyone can) |
 | `obelisks` | 4 corners | element + corner position per obelisk; empty array disables them |
 | `obeliskAbilities` | `true` | controlled obelisks grant their active ability |

@@ -78,7 +78,7 @@ export function defaultConfig() {
     firstTurnContingents: 1,
     // First-turn handicap: each acting contingent takes at most this many
     // actions on turn 1. null = no cap beyond maxActionsPerContingent.
-    firstTurnActions: 1,
+    firstTurnActions: 2,
     // Obelisks sit on interior corner points where four territories meet:
     // corner [cx, cy] touches cells (cx-1,cy-1) (cx,cy-1) (cx-1,cy) (cx,cy).
     // Each element grants bonus budget for its mechanic while controlled:
