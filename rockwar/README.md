@@ -305,10 +305,9 @@ Same seeds for both configs, seats swapped every game; matchup sizes
 - **Seat balance now depends on the engine.** One-ply engines favor the
   first mover (A 59–60%), while planners strongly favor B (A 32–33%). In the
   planner mirror, B wins 73% of games with *no* obelisk held at the start,
-  so placement isn't the driver. The likely cause is the turn-1 handicap:
-  A's single opening action now comes from a 5-strength block while B
-  answers with two. `firstTurnActions`/`firstTurnContingents` need a
-  re-sweep under five scouts.
+  so the pre-turn-1 obelisk isn't the driver. The turn-1 handicap was the
+  next suspect, but giving A a second opening action barely moves it (see
+  below).
 - **Skill matters more.** Lookahead vs greedy goes 79% → 98%, and greedy
   drops from 29.2% to 12.7% in the round robin (near-shutout by every
   search engine). Random gains slightly against greedy (91%, was 96%):
@@ -327,6 +326,42 @@ Same seeds for both configs, seats swapped every game; matchup sizes
 - **Placement heuristics are still tuned for 2 scouts.** Every
   heuristic placer packs all five scouts into one contingent (2 actions a
   turn, same as before). Spreading for more contingents is untested.
+
+## First turn: 2 actions (`firstTurnActions` 1 → 2)
+
+*[AI - Claude]: Two-action opening — simulation findings*
+
+Five scouts, same seeds and matchup sizes as above. A still acts with one
+contingent on turn 1, which in practice is all five scouts.
+
+| Matchup | Seat A (1 → 2 actions) | Draws | Cap | Obelisk wins | Avg turns |
+|---|---|---|---|---|---|
+| greedy mirror (1000) | 60.1 → 62.0% | 12.7 → 9.3% | 19.1 → 15.9% | 0 → 0% | 58 → 51 |
+| lookahead mirror (400) | 59.1 → 58.1% | 2.2 → 3.2% | 28.0 → 34.8% | 28.0 → 20.5% | 77 → 89 |
+| planner vs planner-obelisk (200) | 31.7 → 37.9% | 0.5 → 1.0% | 9.5 → 15.5% | 50.0 → 38.0% | 45 → 56 |
+| planner-obelisk mirror (200) | 33.3 → 38.2% | 1.0 → 0.5% | 19.5 → 21.0% | 49.0 → 46.5% | 61 → 64 |
+| planner-obelisk vs lookahead (200) | 50.0 → 47.9% | 0 → 3.0% | 26.0 → 28.0% | 40.5 → 34.0% | 74 → 78 |
+
+- **A now opens like B replies.** A's turn 1 is spawn → evolve (a soldier
+  on the board) in 70–82% of games, matching B's most common turn 2.
+- **Seat balance barely moves.** Pooled planner games: A's share of decided
+  games goes 32.5% → 38.0% (+5.5 pts, 1.6 SE, suggestive but not
+  conclusive). Pooled one-ply mirrors: 59.8% → 60.8% (noise). The
+  single-action handicap explains at most a small part of the planners'
+  B edge. The one-ply engines' A edge didn't come from it at all.
+- **Remaining suspect: the openings themselves.** Heuristic placement is
+  near-deterministic (~80–90 distinct opening boards per 400 games, B
+  always placing last), so seat numbers reflect a narrow set of openings
+  under one placement policy. A planner mirror with randomized placement
+  would separate rule bias from opening-book bias.
+- **The obelisk race cools slightly.** Instant obelisk wins drop in every
+  search-engine matchup (planner vs planner-obelisk 50% → 38%). Turn-cap
+  finishes rise a little instead.
+- **Everything else holds.** Round-robin draws stay ~2% (30 of 1440).
+  Lookahead vs greedy stays 97%, and the standings barely move (40 games
+  per pairing, so ±3-point shifts are noise): planner-obelisk 75.3%,
+  planner 67.7%, turtle 65.0%, lookahead-obelisk 64.5%, tempo 60.3%,
+  lookahead 59.4%, aggro 39.5%, greedy 15.9%, random 2.3%.
 
 ## Current observations (300-game matchups, seats swapped, 5×5, devolve combat)
 
