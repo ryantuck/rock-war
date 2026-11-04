@@ -62,8 +62,9 @@ board can never drift from the real state. Sims ignore the stream.
   3×3 (chieftains), 2×5 (warlords), 1×8 (behemoth) — fibonacci counts of
   fibonacci values, 45 points total. Any piece of value 2 or more is a
   **warrior**.
-- **Placement**: snake order (A B B A), one scout per slot onto any empty
-  territory, until each army has placed `initialScouts` (default 2). Remaining
+- **Placement**: snake order (A B B A A B B A A B …), one scout per slot onto
+  any empty territory, until each army has placed `initialScouts` (default 5;
+  B makes the final placement). Remaining
   sideboard pieces — including the other scouts — enter play by spawning and
   evolving. Then A moves first.
 - **Territories** hold at most 2 pieces, which must be fibonacci-adjacent:
@@ -217,7 +218,7 @@ box or via `--config file.json` on the CLI:
 | destroyed pieces | removed | destroyed pieces leave the game entirely (they do *not* return to the sideboard) |
 | capture on retreat | yes | if all defenders retreat, the attacker advances into the vacated territory |
 | simultaneous wipe | draw | mutual destruction can empty both boards at once → draw |
-| `initialScouts` | 2 | scouts each army places in the placement phase (capped at scout supply) |
+| `initialScouts` | 5 | scouts each army places in the placement phase (capped at scout supply) |
 | `maxTurns` | 200 | game ends here; tiebreak decides unless dead even |
 | `turnLimitTiebreak` | `true` | at the cap: most board strength wins, obelisks break ties |
 | `supply` | 8/5/3/2/1 | change piece mix freely; placement uses the scout count |

@@ -36,7 +36,7 @@ export function defaultConfig() {
     supply: { 1: 8, 2: 5, 3: 3, 5: 2, 8: 1 },
     // Scouts each army places during the snake-placement phase; the rest of
     // the sideboard (including remaining scouts) enters play via spawning.
-    initialScouts: 2,
+    initialScouts: 5,
     maxPiecesPerTerritory: 2,
     // Each contingent takes at most this many actions per turn...
     maxActionsPerContingent: 2,
