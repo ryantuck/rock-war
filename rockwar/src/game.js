@@ -525,10 +525,13 @@ export function legalActions(state, cont, remainingBudget, actionsTaken, bonusPo
       }
     }
     // Cross-contingent pairs: each contingent pays its own striker's share
-    // (piece + earth tax) and spends one of its actions.
+    // (piece + earth tax) and spends one of its actions. Contingent footprints
+    // grow mid-turn (captures, moves into an ally's territory), so they can
+    // overlap: territories this contingent already covers are excluded from
+    // the ally's units, or one piece could be paired with itself.
     if (allies) {
       for (const ally of allies) {
-        const allyUnits = collectUnits(ally.cont.terrs);
+        const allyUnits = collectUnits([...ally.cont.terrs].filter((t) => !cont.terrs.has(t)));
         for (const u of units) {
           if (!afford('attack', u.piece + earthTax)) continue;
           for (const au of allyUnits) {
@@ -1199,7 +1202,10 @@ export function playTurn(state, engines, rng) {
       if (match.type === 'coordAttack') {
         const tax = obeliskElementBonus(state, other(army), 'earth');
         for (const s of slots) {
-          const mine = match.strikes.filter((st) => s.cont.terrs.has(st.from));
+          // A strike from a territory the acting contingent shares with an
+          // ally (overlapping footprints) is billed to the acting one only.
+          const mine = match.strikes.filter((st) => s.cont.terrs.has(st.from) &&
+            (s === slot || !slot.cont.terrs.has(st.from)));
           if (mine.length === 0) continue;
           const share = mine.reduce((sum, st) => sum + st.piece, 0) + tax * mine.length;
           if (s === slot) {
