@@ -11,6 +11,7 @@ import {
   other, armyPieceCount, armyStrengthOnBoard, canAddPiece, obeliskBonuses,
   obeliskStatus, obeliskCells, obeliskElementBonus, combatRuleOf,
 } from '../game.js';
+import { obeliskReach, reachDanger } from './obelisk-threat.js';
 
 const DEFAULT_WEIGHTS = {
   material: 10,     // per point of deployable strength difference
@@ -23,9 +24,13 @@ const DEFAULT_WEIGHTS = {
                     // so partial progress (first cell, more value) pays too
   obeliskFoothold: 2,   // having the 2-territory foothold at an obelisk
   obeliskCount: 5,      // quadratic pressure toward the control-all victory
-  obeliskFadeAt: 12, // obelisk terms reach full value only while the enemy
-                    // has at least this much deployable strength — budget
-                    // annuities are worthless against a nearly-dead opponent
+  obeliskFadeAt: 12, // OUR obelisk terms reach full value only while the
+                    // enemy has at least this much deployable strength —
+                    // budget annuities are worthless against a nearly-dead
+                    // opponent (the enemy's terms never fade)
+  obeliskLethal: 300, // the enemy can complete an obelisk victory on its next
+                    // turn (scaled down for 1-2 units short — see reachDanger)
+  obeliskSetup: 60, // we could complete one on our next turn
   hunt: 2,          // extra advance pressure per point of material dominance
   huntCap: 4,       // ...capped, so the hunt drive can't dwarf everything
   potential: 2,     // per point of evolve-ready pairs (sum in sideboard)
@@ -67,29 +72,33 @@ function fightingStrength(state, army) {
 // Graded obelisk score: held control pays as an annuity, and progress toward
 // control (adjacent value margin, the 2-territory foothold) pays on the way —
 // a one-ply searcher can't chase a reward that only exists at the finish line.
+// Returned as { mine, theirs } (both >= 0) so evaluate() can fade only our
+// side: the enemy's obelisks stay a full threat however weak its army looks.
 function obeliskGradient(state, me, W) {
   const enemy = other(me);
   const topTier = (state.config.obeliskTiers ?? [3, 5, 8, 13])[3] ?? 13;
-  let s = 0;
+  let mineS = 0;
+  let theirsS = 0;
   let mine = 0;
   let theirs = 0;
   for (const ob of state.config.obelisks ?? []) {
     const st = obeliskStatus(state, ob);
     if (st.controller === me) mine++;
     else if (st.controller === enemy) theirs++;
-    s += W.obeliskProgress *
-      (Math.min(st.score[me], topTier) - Math.min(st.score[enemy], topTier));
-    if (st.count[me] >= 2) s += W.obeliskFoothold;
-    if (st.count[enemy] >= 2) s -= W.obeliskFoothold;
-    if (st.controller === me) s += W.obeliskHold * st.bonus;
-    else if (st.controller === enemy) s -= W.obeliskHold * st.bonus;
+    mineS += W.obeliskProgress * Math.min(st.score[me], topTier);
+    theirsS += W.obeliskProgress * Math.min(st.score[enemy], topTier);
+    if (st.count[me] >= 2) mineS += W.obeliskFoothold;
+    if (st.count[enemy] >= 2) theirsS += W.obeliskFoothold;
+    if (st.controller === me) mineS += W.obeliskHold * st.bonus;
+    else if (st.controller === enemy) theirsS += W.obeliskHold * st.bonus;
   }
   // Control-all victory pressure: each additional simultaneous hold matters
   // more than the last (the win itself is handled in evaluate()).
   if (state.config.obeliskVictory !== false) {
-    s += W.obeliskCount * (mine * mine - theirs * theirs);
+    mineS += W.obeliskCount * mine * mine;
+    theirsS += W.obeliskCount * theirs * theirs;
   }
-  return s;
+  return { mine: mineS, theirs: theirsS };
 }
 
 // Does `army` control enough obelisks for the instant win?
@@ -215,9 +224,17 @@ function evaluate(state, me, W) {
   score += W.pieces * (myPieces - theirPieces);
   score += W.fighting * (fightingStrength(state, me) - fightingStrength(state, enemy));
   score += W.territory * (territoryCount(state, me) - territoryCount(state, enemy));
-  // Obelisk annuities fade as the enemy fades — against a nearly-dead
+  // Our obelisk annuities fade as the enemy fades — against a nearly-dead
   // opponent, holding budget bonuses must never outbid finishing the game.
-  score += Math.min(1, enemyDep / W.obeliskFadeAt) * obeliskGradient(state, me, W);
+  // The enemy's never fade: a thin army can still win on obelisks.
+  const og = obeliskGradient(state, me, W);
+  score += Math.min(1, enemyDep / W.obeliskFadeAt) * og.mine - og.theirs;
+  // Obelisk victory is a turn away, not an action away: the enemy moves
+  // next, and with two obelisks its bonus moves/spawns and abilities can
+  // seize a third from a distance. Neither one-ply nor own-turn search sees
+  // that, so estimate both armies' next-turn reach directly.
+  score -= W.obeliskLethal * reachDanger(obeliskReach(state, enemy).deficit);
+  score += W.obeliskSetup * reachDanger(obeliskReach(state, me).deficit);
   score += W.potential * (evolvePotential(state, me) - evolvePotential(state, enemy));
   // Hunt drive: material dominance converts into pressure to close distance
   // and finish, so a won game gets won instead of drifting to the turn cap.

@@ -229,14 +229,32 @@ box or via `--config file.json` on the CLI:
 - **random** — uniform random legal choices; the baseline sanity check.
 - **greedy** — scores every legal action with material/tempo/position weights
   (kills ≫ evolves > advancing > spawning) and retreats only when standing
-  would lose pieces. Weights are overridable via the factory in
-  `src/engines/greedy.js`.
+  would lose pieces. When either side is one obelisk from the win, it
+  simulates each action to take an outright obelisk victory and to block the
+  enemy's next-turn finish (actions and reaction abilities alike). Weights
+  are overridable via the factory in `src/engines/greedy.js`.
 - **lookahead** — one-ply search: clones the state, actually applies each
   candidate action through the real rules engine (combat included), and
   evaluates the resulting position — material, fighting strength, evolve
   potential, territory, obelisk power, spawn-lock, minus the enemy's best
-  immediate attack threat. ~40× slower than greedy (still ~tens of ms per
-  game). Weights overridable; pass `debug: true` to log candidate scores.
+  immediate attack threat and its **next-turn obelisk-victory reach** (plus
+  our own reach as a smaller bonus). ~40× slower than greedy (still ~tens of
+  ms per game). Weights overridable; pass `debug: true` to log candidate
+  scores.
+- **Obelisk-victory reach** (`src/engines/obelisk-threat.js`) — one-ply and
+  own-turn search can't see an obelisk win coming: an army holding two
+  obelisks gets bonus moves/spawns and abilities, and takes the third from a
+  distance in a 3–6 action turn. `obeliskReach(state, army)` estimates
+  whether it can finish next turn — a greedy simulation of spawns, moves
+  (1–2 steps), attacks (direct or after a move) and controlled abilities
+  into the target obelisk's territories, under playTurn's budget, cap and
+  bonus-pool rules, never breaking an obelisk already held. No state
+  cloning (~140µs). Against a real-rules search of the next turn it raised
+  no false alarms and caught 97% of finishes. The evaluator charges
+  `obeliskLethal` (300) for an enemy finish, fading to 30% / 10% when it's
+  one / two units short, and pays `obeliskSetup` (60) on the same curve
+  for our own. Our obelisk annuities still fade against a nearly-dead enemy
+  (`obeliskFadeAt`); the enemy's obelisk terms no longer do.
 - **lookahead-aggro / -obelisk / -turtle / -tempo** — strategy-archetype
   presets of the same search with re-weighted evaluators (attrition, map
   control, defense/clock, economy). Tournaments between them measure which

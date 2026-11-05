@@ -2,7 +2,8 @@
 // No search — just material, tempo, and position heuristics. Weights are
 // exposed so you can tune behavior while iterating on rules.
 
-import { legalPlacements, neighbors, xy, other, armyPieceCount, armyStrengthOnBoard, canAddPiece, combatRuleOf, obeliskCells, obeliskStatus } from '../game.js';
+import { legalPlacements, neighbors, xy, other, armyPieceCount, armyStrengthOnBoard, canAddPiece, combatRuleOf, obeliskCells, obeliskStatus, applyAction } from '../game.js';
+import { obeliskReach, reachDanger } from './obelisk-threat.js';
 
 const DEFAULT_WEIGHTS = {
   killPerPoint: 12,     // per point of enemy material destroyed
@@ -18,6 +19,9 @@ const DEFAULT_WEIGHTS = {
   spawnUnlock: 12,      // expanding when no cell can currently accept a scout
   obeliskAdj: 2,        // per uncontrolled obelisk touching a cell we move/spawn into
   obeliskControl: 8,    // an action that would complete obelisk control
+  obeliskWin: 1000,     // an action that wins on obelisks outright
+  obeliskBlock: 150,    // per unit of enemy next-turn obelisk-win danger removed
+                        // (reachDanger: 1 = they can finish next turn)
   presencePenalty: 25,  // evolving down to <=2 board pieces is a trap
   spawnLockPenalty: 40, // evolving into a position where no cell can accept a
                         // scout (1 only stacks with 1 or 2) freezes the army
@@ -80,6 +84,53 @@ function distToNearestEnemy(state, army, i) {
   return Math.min(...es.map((e) => manhattan(state.config, i, e)));
 }
 
+function retreatPolicy(state, attackInfo, options) {
+  const total = options.reduce((s, o) => s + o.piece, 0);
+  if (attackInfo.piece < total) return []; // attack fails; don't budge
+  const rule = combatRuleOf(state.config);
+  if ((rule === 'margin' || rule === 'devolve') && attackInfo.piece === total) {
+    return []; // exact tie kills the attacker too — stand and trade
+  }
+  const sorted = [...options].sort((a, b) => b.piece - a.piece);
+  const retreaters = rule === 'mutual' ? sorted.slice(0, -1) : sorted;
+  const plan = [];
+  for (const opt of retreaters) {
+    const dest = opt.dests[0] ?? opt.emptyDests[0];
+    if (dest !== undefined) plan.push({ piece: opt.piece, dest });
+  }
+  return plan;
+}
+const simStub = { planRetreats: retreatPolicy };
+const simEngines = { A: simStub, B: simStub };
+
+function heldCount(state, army) {
+  return (state.config.obelisks ?? []).filter((ob) => obeliskStatus(state, ob).controller === army).length;
+}
+
+// Obelisk-victory stakes of an action, simulated through the real rules —
+// only when someone is one obelisk from the win (otherwise 0, no cloning).
+// Taking the win outright dominates everything; otherwise score how much
+// the action shrinks the enemy's chance to finish on its next turn.
+function obeliskStakes(state, army, a, W, rng, ctx) {
+  if (!ctx.live) return 0;
+  const clone = structuredClone({ ...state, log: [], events: null, captureSnapshots: false });
+  applyAction(clone, army, a, simEngines, rng);
+  if (heldCount(clone, army) >= ctx.need) return W.obeliskWin;
+  if (!ctx.enemyLive) return 0;
+  const after = reachDanger(obeliskReach(clone, other(army)).deficit);
+  return W.obeliskBlock * (ctx.dangerBefore - after);
+}
+
+function obeliskContext(state, army) {
+  const obs = state.config.obelisks ?? [];
+  if (state.config.obeliskVictory === false || obs.length === 0) return { live: false };
+  const need = state.config.obeliskVictoryCount ?? obs.length;
+  const mine = heldCount(state, army) >= need - 1;
+  const enemyLive = heldCount(state, other(army)) >= need - 1;
+  const dangerBefore = enemyLive ? reachDanger(obeliskReach(state, other(army)).deficit) : 0;
+  return { live: mine || enemyLive, enemyLive, need, dangerBefore };
+}
+
 export function makeGreedyEngine(opts = {}) {
   const W = { ...DEFAULT_WEIGHTS, ...opts };
 
@@ -114,9 +165,11 @@ export function makeGreedyEngine(opts = {}) {
       const { army } = ctx;
       let best = null;
       let bestScore = -Infinity;
+      const oc = obeliskContext(state, army);
 
       for (const a of acts) {
         let score = -a.cost * W.costPenalty + rng() * 0.1;
+        score += obeliskStakes(state, army, a, W, rng, oc);
 
         if (a.type === 'attack') {
           const defCell = state.cells[a.to];
@@ -226,20 +279,7 @@ export function makeGreedyEngine(opts = {}) {
     // attacker down with it. Under 'margin', an exact tie kills the attacker,
     // so stand and trade. Otherwise stand only when the attack is repelled.
     planRetreats(state, attackInfo, options, rng) {
-      const total = options.reduce((s, o) => s + o.piece, 0);
-      if (attackInfo.piece < total) return []; // attack fails; don't budge
-      const rule = combatRuleOf(state.config);
-      if ((rule === 'margin' || rule === 'devolve') && attackInfo.piece === total) {
-        return []; // exact tie kills the attacker too — stand and trade
-      }
-      const sorted = [...options].sort((a, b) => b.piece - a.piece);
-      const retreaters = rule === 'mutual' ? sorted.slice(0, -1) : sorted;
-      const plan = [];
-      for (const opt of retreaters) {
-        const dest = opt.dests[0] ?? opt.emptyDests[0];
-        if (dest !== undefined) plan.push({ piece: opt.piece, dest });
-      }
-      return plan;
+      return retreatPolicy(state, attackInfo, options);
     },
 
     // On the opponent's turn, fire off any ability whose flat value clears
@@ -247,8 +287,9 @@ export function makeGreedyEngine(opts = {}) {
     chooseReaction(state, army, opts, rng) {
       let best = null;
       let bestScore = 6; // air (4) stays holstered; the rest are worth it
+      const oc = obeliskContext(state, army);
       for (const o of opts) {
-        const s = (W.ability[o.element] ?? 5) + rng() * 0.1;
+        const s = (W.ability[o.element] ?? 5) + rng() * 0.1 + obeliskStakes(state, army, o, W, rng, oc);
         if (s > bestScore) { bestScore = s; best = o; }
       }
       return best;
