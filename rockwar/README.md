@@ -388,6 +388,56 @@ contingent on turn 1, which in practice is all five scouts.
   planner 67.7%, turtle 65.0%, lookahead-obelisk 64.5%, tempo 60.3%,
   lookahead 59.4%, aggro 39.5%, greedy 15.9%, random 2.3%.
 
+## Obelisk-victory awareness (engines)
+
+*[AI - Claude]: Obelisk-victory defense — simulation findings*
+
+Human players beat the lookahead engines by racing for three obelisks. To
+measure the fix, scripted obelisk rushers stand in for that player: `rush`
+(one-ply, heavy obelisk weights, never fades) and `rush-planner` (the same
+weights with full-turn beam search). Both stay frozen on the pre-change
+evaluator. Defenders are compared old → new on the same seeds (100 games,
+60 for the planners vs `rush`).
+
+| Defender | vs rush: rusher obelisk wins | rusher pts | vs rush-planner: rusher obelisk wins | rusher pts |
+|---|---|---|---|---|
+| lookahead | 10 → 4 | 47.5 → 45% | 18 → 11 | 69 → 62.5% |
+| lookahead-obelisk | 8 → 7 | 52 → 43.5% | 19 → 18 | 64.5 → 59% |
+| planner | 3 → 4 (of 60) | 47.5 → 57.5% | 14 → 15 | 59 → 63.5% |
+| planner-obelisk | 2 → 3 (of 60) | 25 → 34% | 15 → 12 | 47 → 48% |
+| greedy | 7 → 5 | 98 → 96.5% | — | — |
+
+- **Why the engines lost to obelisk play.** Neither one-ply nor own-turn
+  search models the opponent's turn. The evaluator saw an obelisk loss
+  only once three were held. Its threat term counted only one enemy
+  attack's material, and it priced denial like ~2 points of material.
+  Meanwhile a two-obelisk army takes the third in a 3–6 action turn: bonus
+  moves and spawns, air swaps, water bounces, and reaction abilities fired
+  on the defender's own turn. When a two-action win was already on the
+  board, old lookahead blocked it 2 times in 100.
+- **One-ply engines improve most.** Lookahead's obelisk losses fall
+  ~40–60%, and it wins more obelisk races itself (obelisk wins vs `rush`
+  15 → 27).
+- **The planners hold steady.** Their obelisk losses don't change, and
+  the point swings are within noise (±5–6 pts at these sizes). An
+  own-reach bonus made them worse (planner-obelisk 53% vs 48%), so it is
+  off for planners.
+- **What remains is mostly double threats.** When the rusher holds two
+  obelisks with two reachable thirds, no single defense works. Defending
+  earlier (a flat brink cost, an approach term) made engines over-defend
+  corners and lose the material fight, so those knobs are off. The
+  full-turn rusher's residual edge over lookahead is mostly search depth:
+  most of its wins are eliminations.
+- **Effect on engine-vs-engine play.**
+  - Lookahead mirror: obelisk wins 20.5% → 37%, turn-cap finishes
+    35% → 17.5%, seat A 58% → 42%.
+  - Planner mirrors: unchanged within noise (planner-obelisk mirror:
+    obelisk wins 46.5% → 40.5%, seat A 38% → 37%).
+  - Lookahead vs greedy: still 97%.
+  - Round robin: planner-obelisk 72.2%, lookahead-obelisk 69.4% (was
+    64.5%), planner 63.9%, lookahead 62.5%, turtle 62.5%, tempo 61.6%,
+    aggro 40.6%, greedy 14.8%, random 2.5%. Draws ~2%.
+
 ## Current observations (300-game matchups, seats swapped, 5×5, devolve combat)
 
 These observations predate the five-scout change (two scouts per army).
