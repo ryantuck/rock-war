@@ -27,9 +27,9 @@ node src/sim.js --games 500 --a lookahead --b greedy --seed 42
 ## Rules in brief
 
 - **Armies**: 8×1 scouts, 5×2 soldiers, 3×3 chieftains, 2×5 warlords, 1×8
-  behemoth — fibonacci counts of fibonacci values, 45 points per side. Two
-  scouts each start on the board (snake placement); the rest deploy by
-  spawning and evolving.
+  behemoth — fibonacci counts of fibonacci values, 45 points per side. Five
+  scouts each start on the board (snake placement, A B B A A B B A A B);
+  the rest deploy by spawning and evolving.
 - **Territories** hold at most 2 pieces, which must be fibonacci-adjacent:
   (1,1) (1,2) (2,3) (3,5) (5,8).
 - **Contingents**: contiguous groups of one army's territories act as units.

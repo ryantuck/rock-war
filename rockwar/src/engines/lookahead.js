@@ -11,6 +11,7 @@ import {
   other, armyPieceCount, armyStrengthOnBoard, canAddPiece, obeliskBonuses,
   obeliskStatus, obeliskCells, obeliskElementBonus, combatRuleOf,
 } from '../game.js';
+import { obeliskReach } from './obelisk-threat.js';
 
 const DEFAULT_WEIGHTS = {
   material: 10,     // per point of deployable strength difference
@@ -23,9 +24,18 @@ const DEFAULT_WEIGHTS = {
                     // so partial progress (first cell, more value) pays too
   obeliskFoothold: 2,   // having the 2-territory foothold at an obelisk
   obeliskCount: 5,      // quadratic pressure toward the control-all victory
-  obeliskFadeAt: 12, // obelisk terms reach full value only while the enemy
-                    // has at least this much deployable strength — budget
-                    // annuities are worthless against a nearly-dead opponent
+  obeliskFadeAt: 12, // OUR obelisk terms reach full value only while the
+                    // enemy has at least this much deployable strength —
+                    // budget annuities are worthless against a nearly-dead
+                    // opponent (the enemy's terms never fade)
+  obeliskLethal: 300, // the enemy can complete an obelisk victory on its next
+                    // turn (scaled down when it's a few units short — reachCurve)
+  obeliskSetup: 60, // we could complete an obelisk victory on our next turn
+  reachCurve: [1, 0.5, 0.25, 0.1], // share of lethal/setup paid at reach
+                    // deficit 0, 1, 2, 3 units short (0 beyond) — the early
+                    // warning that pushes a threat back before it's lethal
+  obeliskBrink: 0,  // flat cost of the enemy sitting one obelisk from victory
+                    // (off by default: in sweeps it bought over-defense)
   hunt: 2,          // extra advance pressure per point of material dominance
   huntCap: 4,       // ...capped, so the hunt drive can't dwarf everything
   potential: 2,     // per point of evolve-ready pairs (sum in sideboard)
@@ -67,29 +77,33 @@ function fightingStrength(state, army) {
 // Graded obelisk score: held control pays as an annuity, and progress toward
 // control (adjacent value margin, the 2-territory foothold) pays on the way —
 // a one-ply searcher can't chase a reward that only exists at the finish line.
+// Returned as { mine, theirs } (both >= 0) so evaluate() can fade only our
+// side: the enemy's obelisks stay a full threat however weak its army looks.
 function obeliskGradient(state, me, W) {
   const enemy = other(me);
   const topTier = (state.config.obeliskTiers ?? [3, 5, 8, 13])[3] ?? 13;
-  let s = 0;
+  let mineS = 0;
+  let theirsS = 0;
   let mine = 0;
   let theirs = 0;
   for (const ob of state.config.obelisks ?? []) {
     const st = obeliskStatus(state, ob);
     if (st.controller === me) mine++;
     else if (st.controller === enemy) theirs++;
-    s += W.obeliskProgress *
-      (Math.min(st.score[me], topTier) - Math.min(st.score[enemy], topTier));
-    if (st.count[me] >= 2) s += W.obeliskFoothold;
-    if (st.count[enemy] >= 2) s -= W.obeliskFoothold;
-    if (st.controller === me) s += W.obeliskHold * st.bonus;
-    else if (st.controller === enemy) s -= W.obeliskHold * st.bonus;
+    mineS += W.obeliskProgress * Math.min(st.score[me], topTier);
+    theirsS += W.obeliskProgress * Math.min(st.score[enemy], topTier);
+    if (st.count[me] >= 2) mineS += W.obeliskFoothold;
+    if (st.count[enemy] >= 2) theirsS += W.obeliskFoothold;
+    if (st.controller === me) mineS += W.obeliskHold * st.bonus;
+    else if (st.controller === enemy) theirsS += W.obeliskHold * st.bonus;
   }
   // Control-all victory pressure: each additional simultaneous hold matters
   // more than the last (the win itself is handled in evaluate()).
   if (state.config.obeliskVictory !== false) {
-    s += W.obeliskCount * (mine * mine - theirs * theirs);
+    mineS += W.obeliskCount * mine * mine;
+    theirsS += W.obeliskCount * theirs * theirs;
   }
-  return s;
+  return { mine: mineS, theirs: theirsS };
 }
 
 // Does `army` control enough obelisks for the instant win?
@@ -199,6 +213,11 @@ function maxAttackThreat(state, enemy, W) {
   return best;
 }
 
+// Share of the obelisk lethal/setup weight paid at a given reach deficit.
+function reach(W, deficit) {
+  return W.reachCurve[deficit] ?? 0;
+}
+
 function evaluate(state, me, W) {
   const enemy = other(me);
   const myPieces = armyPieceCount(state, me);
@@ -215,9 +234,18 @@ function evaluate(state, me, W) {
   score += W.pieces * (myPieces - theirPieces);
   score += W.fighting * (fightingStrength(state, me) - fightingStrength(state, enemy));
   score += W.territory * (territoryCount(state, me) - territoryCount(state, enemy));
-  // Obelisk annuities fade as the enemy fades — against a nearly-dead
+  // Our obelisk annuities fade as the enemy fades — against a nearly-dead
   // opponent, holding budget bonuses must never outbid finishing the game.
-  score += Math.min(1, enemyDep / W.obeliskFadeAt) * obeliskGradient(state, me, W);
+  // The enemy's never fade: a thin army can still win on obelisks.
+  const og = obeliskGradient(state, me, W);
+  score += Math.min(1, enemyDep / W.obeliskFadeAt) * og.mine - og.theirs;
+  // Obelisk victory is a turn away, not an action away: the enemy moves
+  // next, and with two obelisks its bonus moves/spawns and abilities can
+  // seize a third from a distance. Neither one-ply nor own-turn search sees
+  // that, so estimate both armies' next-turn reach directly.
+  const er = obeliskReach(state, enemy);
+  if (er.held >= er.need - 1) score -= W.obeliskBrink + W.obeliskLethal * reach(W, er.deficit);
+  score += W.obeliskSetup * reach(W, obeliskReach(state, me).deficit);
   score += W.potential * (evolvePotential(state, me) - evolvePotential(state, enemy));
   // Hunt drive: material dominance converts into pressure to close distance
   // and finish, so a won game gets won instead of drifting to the turn cap.
@@ -261,7 +289,11 @@ function retreatPolicy(state, attackInfo, options) {
 // (receding horizon), so enemy reactions and mid-turn surprises are
 // absorbed naturally.
 export function makePlannerEngine(opts = {}) {
-  const { depth = 3, beam = 6, expand = 40, ...weightOpts } = opts;
+  const { depth = 3, beam = 6, expand = 40, ...rest } = opts;
+  // The planner finds its own within-turn obelisk finishes by search, so the
+  // own-reach bonus only double-counts them (it cost planner-obelisk ~6
+  // points against an obelisk rusher); the enemy-threat term stays.
+  const weightOpts = { obeliskSetup: 0, ...rest };
   const W = { ...DEFAULT_WEIGHTS, ...weightOpts };
   const base = makeLookaheadEngine(weightOpts);
   const simStub = { planRetreats: (s, info, options) => retreatPolicy(s, info, options) };

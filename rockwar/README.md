@@ -62,8 +62,9 @@ board can never drift from the real state. Sims ignore the stream.
   3×3 (chieftains), 2×5 (warlords), 1×8 (behemoth) — fibonacci counts of
   fibonacci values, 45 points total. Any piece of value 2 or more is a
   **warrior**.
-- **Placement**: snake order (A B B A), one scout per slot onto any empty
-  territory, until each army has placed `initialScouts` (default 2). Remaining
+- **Placement**: snake order (A B B A A B B A A B …), one scout per slot onto
+  any empty territory, until each army has placed `initialScouts` (default 5;
+  B makes the final placement). Remaining
   sideboard pieces — including the other scouts — enter play by spawning and
   evolving. Then A moves first.
 - **Territories** hold at most 2 pieces, which must be fibonacci-adjacent:
@@ -125,7 +126,7 @@ board can never drift from the real state. Sims ignore the stream.
   constituent pair is fib-adjacent, so it fits). If every defender retreats,
   no combat happens and the attacker advances whole.
 - **First-turn handicap**: on turn 1, the opening player acts with only one
-  contingent (their engine chooses which) and it takes only one action.
+  contingent (their engine chooses which); it takes the normal 2 actions.
   Tunable via `firstTurnContingents` / `firstTurnActions`.
 - **Obelisks**: four elemental obelisks sit on corner points where four
   territories meet — fire (red) at [1,1], earth (green) at [4,1], air
@@ -206,7 +207,7 @@ box or via `--config file.json` on the CLI:
 | `combatRule` | `'devolve'` | attacker devolves through stiff defense; also `'margin'` (dies on exact tie), `'mutual'` (always dies), `'attacker-survives'` (never dies) |
 | `devolveThreshold` | 0.5 | devolution triggers when defense > this fraction of the attacker |
 | `firstTurnContingents` | 1 | contingents the opening player may act with on turn 1 (0 = skip turn 1, null = no handicap) |
-| `firstTurnActions` | 1 | actions per contingent on turn 1 (null = normal 2) |
+| `firstTurnActions` | 2 | actions per contingent on turn 1 (1 = the old single-action opening; null = normal cap) |
 | `minAttackValue` | 2 | minimum piece value that may attack — scouts can't (1 = anyone can) |
 | `obelisks` | 4 corners | element + corner position per obelisk; empty array disables them |
 | `obeliskAbilities` | `true` | controlled obelisks grant their active ability |
@@ -217,7 +218,7 @@ box or via `--config file.json` on the CLI:
 | destroyed pieces | removed | destroyed pieces leave the game entirely (they do *not* return to the sideboard) |
 | capture on retreat | yes | if all defenders retreat, the attacker advances into the vacated territory |
 | simultaneous wipe | draw | mutual destruction can empty both boards at once → draw |
-| `initialScouts` | 2 | scouts each army places in the placement phase (capped at scout supply) |
+| `initialScouts` | 5 | scouts each army places in the placement phase (capped at scout supply) |
 | `maxTurns` | 200 | game ends here; tiebreak decides unless dead even |
 | `turnLimitTiebreak` | `true` | at the cap: most board strength wins, obelisks break ties |
 | `supply` | 8/5/3/2/1 | change piece mix freely; placement uses the scout count |
@@ -228,14 +229,39 @@ box or via `--config file.json` on the CLI:
 - **random** — uniform random legal choices; the baseline sanity check.
 - **greedy** — scores every legal action with material/tempo/position weights
   (kills ≫ evolves > advancing > spawning) and retreats only when standing
-  would lose pieces. Weights are overridable via the factory in
-  `src/engines/greedy.js`.
+  would lose pieces. When either side is one obelisk from the win, it
+  simulates each action to take an outright obelisk victory and to block the
+  enemy's next-turn finish (actions and reaction abilities alike). Weights
+  are overridable via the factory in `src/engines/greedy.js`.
 - **lookahead** — one-ply search: clones the state, actually applies each
   candidate action through the real rules engine (combat included), and
   evaluates the resulting position — material, fighting strength, evolve
   potential, territory, obelisk power, spawn-lock, minus the enemy's best
-  immediate attack threat. ~40× slower than greedy (still ~tens of ms per
-  game). Weights overridable; pass `debug: true` to log candidate scores.
+  immediate attack threat and its **next-turn obelisk-victory reach** (plus
+  our own reach as a smaller bonus). ~40× slower than greedy (still ~tens of
+  ms per game). Weights overridable; pass `debug: true` to log candidate
+  scores.
+- **Obelisk-victory reach** (`src/engines/obelisk-threat.js`) — one-ply and
+  own-turn search can't see an obelisk win coming: an army holding two
+  obelisks gets bonus moves/spawns and abilities, and takes the third from a
+  distance in a 3–6 action turn. `obeliskReach(state, army)` estimates
+  whether it can finish next turn — a greedy simulation of spawns, moves
+  (1–2 steps), attacks (direct or after a move) and controlled abilities
+  into the target obelisk's territories, under playTurn's budget, cap and
+  bonus-pool rules, never breaking an obelisk already held. No state
+  cloning (~140µs). Against a real-rules search of the next turn it raised
+  no false alarms and caught 97% of finishes. The evaluator charges
+  `obeliskLethal` (300) for an enemy finish, fading to 50% / 25% / 10% when
+  it's one / two / three units short (`reachCurve`, the early warning that
+  pushes a threat back before it's lethal), and pays `obeliskSetup` (60) on
+  the same curve for our own (one-ply engines only — the planners find
+  their own within-turn finishes by search, so `obeliskSetup` defaults to 0
+  there). Our obelisk annuities still fade against a
+  nearly-dead enemy (`obeliskFadeAt`); the enemy's obelisk terms no longer
+  do. `obeliskBrink` (flat cost of an enemy one obelisk from victory) and
+  `obeliskReach(..., { approach: true })` (can an enemy one short of the
+  brink step onto it?) exist but are off: in sweeps both bought
+  over-defense — engines out-fought while guarding corners.
 - **lookahead-aggro / -obelisk / -turtle / -tempo** — strategy-archetype
   presets of the same search with re-weighted evaluators (attrition, map
   control, defense/clock, economy). Tournaments between them measure which
@@ -268,7 +294,153 @@ Add an engine by implementing three functions and registering it in
 Engines only ever pick from engine-generated legal-action lists, so a buggy
 engine can't corrupt game state.
 
+## Five-scout placement (`initialScouts` 2 → 5)
+
+*[AI - Claude]: Five-scout snake placement — simulation findings*
+
+Same seeds for both configs, seats swapped every game; matchup sizes
+200–1000 games, plus the 9-engine round robin at 40 games per pairing.
+"Pts (1st)" = the first-named engine's points (win 1, draw ½); "cap" = games reaching `maxTurns` (tiebreak or draw); "obelisk" = instant
+3-obelisk wins; "seat A" = A's share of decided games.
+
+| Matchup | Scouts | Pts (1st) | Draws | Cap | Obelisk wins | Seat A | Median turns |
+|---|---|---|---|---|---|---|---|
+| greedy mirror (1000) | 2 → 5 | 50 → 51% | 22.6 → 12.7% | 26.5 → 19.1% | 0 → 0% | 63 → 60% | 23 → 23 |
+| lookahead vs greedy (400) | 2 → 5 | 79 → 98% | 21.0 → 1.8% | 10.0 → 8.0% | 0.8 → 3.8% | 37 → 50% | 15 → 15 |
+| lookahead mirror (400) | 2 → 5 | 49 → 50% | 19.5 → 2.2% | 25.2 → 28.0% | 1.2 → 28.0% | 30 → 59% | 21 → 32 |
+| planner-obelisk vs lookahead (200) | 2 → 5 | 71 → 67% | 2.5 → 0% | 14.0 → 26.0% | 5.0 → 40.5% | 52 → 50% | 20 → 31 |
+| planner vs planner-obelisk (200) | 2 → 5 | 40 → 36% | 8.0 → 0.5% | 9.5 → 9.5% | 9.0 → 50.0% | 50 → 32% | 22 → 27 |
+| planner-obelisk mirror (200) | 2 → 5 | 50 → 48% | 13.5 → 1.0% | 5.0 → 19.5% | 9.5 → 49.0% | 53 → 33% | 15 → 28 |
+| greedy vs random (400) | 2 → 5 | 96 → 91% | 2.8 → 3.5% | 0 → 0% | 0 → 0% | 49 → 50% | 21 → 25 |
+
+- **Draws nearly disappear.** Round-robin draws fell from 14.9% to 1.9% of
+  games (214 → 28 of 1440). Mutual-elimination endings among search engines
+  mostly vanish (lookahead mirror 71 → 5 of 400).
+- **The obelisk race becomes the game.** Heuristic placers first control an
+  obelisk on turn ~2.3 (was 5–6.5). Abilities fire 2–3× as often (planner
+  mirror 3.3 → 9.1 per game). Instant 3-obelisk wins go from a rare ending
+  to *the* main ending between planners (~50% of games, was ~9%).
+- **Placement can hand out an obelisk before turn 1.** Greedy/lookahead/
+  planner placement (center + adjacency + obelisk pull) builds two abutting
+  5-scout blocks in the middle. In ~33% of those games the final (10th)
+  placement completes B's 3-scout ring around a corner, so B holds an
+  obelisk at the start of play (random placement: 12%, either seat). It
+  isn't decisive: B wins 54% of those in the planner mirror and only 43% in
+  the lookahead mirror.
+- **Seat balance now depends on the engine.** One-ply engines favor the
+  first mover (A 59–60%), while planners strongly favor B (A 32–33%). In the
+  planner mirror, B wins 73% of games with *no* obelisk held at the start,
+  so the pre-turn-1 obelisk isn't the driver. The turn-1 handicap was the
+  next suspect, but giving A a second opening action barely moves it (see
+  below).
+- **Skill matters more.** Lookahead vs greedy goes 79% → 98%, and greedy
+  drops from 29.2% to 12.7% in the round robin (near-shutout by every
+  search engine). Random gains slightly against greedy (91%, was 96%):
+  its scattered placement starts with ~3.7 contingents vs greedy's 1.
+- **Strategy archetypes reshuffle.** Round robin (2 → 5 scouts):
+  planner-obelisk 73.1 → 76.3%, planner 66.1 → 67.7%, lookahead-obelisk
+  69.7 → 65.2%, lookahead 61.7 → 62.7%, turtle 52.7 → 62.7%, tempo
+  45.3 → 61.9%, aggro 47.5 → 39.1%. The middle tightens (lookahead,
+  turtle and tempo within 1 point of each other). Aggro is crushed by turtle (14%) and
+  tempo (13%): with more material on the board from turn 1, economy and
+  defense beat early trades.
+- **Strong-engine games run longer.** Planner-mirror median length goes
+  15 → 28 turns and turn-cap finishes 5% → 20%. The board-strength
+  tiebreak decides them, where the 2-scout game ended earlier in mutual
+  wipes or draws.
+- **Placement heuristics are still tuned for 2 scouts.** Every
+  heuristic placer packs all five scouts into one contingent (2 actions a
+  turn, same as before). Spreading for more contingents is untested.
+
+## First turn: 2 actions (`firstTurnActions` 1 → 2)
+
+*[AI - Claude]: Two-action opening — simulation findings*
+
+Five scouts, same seeds and matchup sizes as above. A still acts with one
+contingent on turn 1, which in practice is all five scouts.
+
+| Matchup | Seat A (1 → 2 actions) | Draws | Cap | Obelisk wins | Avg turns |
+|---|---|---|---|---|---|
+| greedy mirror (1000) | 60.1 → 62.0% | 12.7 → 9.3% | 19.1 → 15.9% | 0 → 0% | 58 → 51 |
+| lookahead mirror (400) | 59.1 → 58.1% | 2.2 → 3.2% | 28.0 → 34.8% | 28.0 → 20.5% | 77 → 89 |
+| planner vs planner-obelisk (200) | 31.7 → 37.9% | 0.5 → 1.0% | 9.5 → 15.5% | 50.0 → 38.0% | 45 → 56 |
+| planner-obelisk mirror (200) | 33.3 → 38.2% | 1.0 → 0.5% | 19.5 → 21.0% | 49.0 → 46.5% | 61 → 64 |
+| planner-obelisk vs lookahead (200) | 50.0 → 47.9% | 0 → 3.0% | 26.0 → 28.0% | 40.5 → 34.0% | 74 → 78 |
+
+- **A now opens like B replies.** A's turn 1 is spawn → evolve (a soldier
+  on the board) in 70–82% of games, matching B's most common turn 2.
+- **Seat balance barely moves.** Pooled planner games: A's share of decided
+  games goes 32.5% → 38.0% (+5.5 pts, 1.6 SE, suggestive but not
+  conclusive). Pooled one-ply mirrors: 59.8% → 60.8% (noise). The
+  single-action handicap explains at most a small part of the planners'
+  B edge. The one-ply engines' A edge didn't come from it at all.
+- **Remaining suspect: the openings themselves.** Heuristic placement is
+  near-deterministic (~80–90 distinct opening boards per 400 games, B
+  always placing last), so seat numbers reflect a narrow set of openings
+  under one placement policy. A planner mirror with randomized placement
+  would separate rule bias from opening-book bias.
+- **The obelisk race cools slightly.** Instant obelisk wins drop in every
+  search-engine matchup (planner vs planner-obelisk 50% → 38%). Turn-cap
+  finishes rise a little instead.
+- **Everything else holds.** Round-robin draws stay ~2% (30 of 1440).
+  Lookahead vs greedy stays 97%, and the standings barely move (40 games
+  per pairing, so ±3-point shifts are noise): planner-obelisk 75.3%,
+  planner 67.7%, turtle 65.0%, lookahead-obelisk 64.5%, tempo 60.3%,
+  lookahead 59.4%, aggro 39.5%, greedy 15.9%, random 2.3%.
+
+## Obelisk-victory awareness (engines)
+
+*[AI - Claude]: Obelisk-victory defense — simulation findings*
+
+Human players beat the lookahead engines by racing for three obelisks. To
+measure the fix, scripted obelisk rushers stand in for that player: `rush`
+(one-ply, heavy obelisk weights, never fades) and `rush-planner` (the same
+weights with full-turn beam search). Both stay frozen on the pre-change
+evaluator. Defenders are compared old → new on the same seeds (100 games,
+60 for the planners vs `rush`).
+
+| Defender | vs rush: rusher obelisk wins | rusher pts | vs rush-planner: rusher obelisk wins | rusher pts |
+|---|---|---|---|---|
+| lookahead | 10 → 4 | 47.5 → 45% | 18 → 11 | 69 → 62.5% |
+| lookahead-obelisk | 8 → 7 | 52 → 43.5% | 19 → 18 | 64.5 → 59% |
+| planner | 3 → 4 (of 60) | 47.5 → 57.5% | 14 → 15 | 59 → 63.5% |
+| planner-obelisk | 2 → 3 (of 60) | 25 → 34% | 15 → 12 | 47 → 48% |
+| greedy | 7 → 5 | 98 → 96.5% | — | — |
+
+- **Why the engines lost to obelisk play.** Neither one-ply nor own-turn
+  search models the opponent's turn. The evaluator saw an obelisk loss
+  only once three were held. Its threat term counted only one enemy
+  attack's material, and it priced denial like ~2 points of material.
+  Meanwhile a two-obelisk army takes the third in a 3–6 action turn: bonus
+  moves and spawns, air swaps, water bounces, and reaction abilities fired
+  on the defender's own turn. When a two-action win was already on the
+  board, old lookahead blocked it 2 times in 100.
+- **One-ply engines improve most.** Lookahead's obelisk losses fall
+  ~40–60%, and it wins more obelisk races itself (obelisk wins vs `rush`
+  15 → 27).
+- **The planners hold steady.** Their obelisk losses don't change, and
+  the point swings are within noise (±5–6 pts at these sizes). An
+  own-reach bonus made them worse (planner-obelisk 53% vs 48%), so it is
+  off for planners.
+- **What remains is mostly double threats.** When the rusher holds two
+  obelisks with two reachable thirds, no single defense works. Defending
+  earlier (a flat brink cost, an approach term) made engines over-defend
+  corners and lose the material fight, so those knobs are off. The
+  full-turn rusher's residual edge over lookahead is mostly search depth:
+  most of its wins are eliminations.
+- **Effect on engine-vs-engine play.**
+  - Lookahead mirror: obelisk wins 20.5% → 37%, turn-cap finishes
+    35% → 17.5%, seat A 58% → 42%.
+  - Planner mirrors: unchanged within noise (planner-obelisk mirror:
+    obelisk wins 46.5% → 40.5%, seat A 38% → 37%).
+  - Lookahead vs greedy: still 97%.
+  - Round robin: planner-obelisk 72.2%, lookahead-obelisk 69.4% (was
+    64.5%), planner 63.9%, lookahead 62.5%, turtle 62.5%, tempo 61.6%,
+    aggro 40.6%, greedy 14.8%, random 2.5%. Draws ~2%.
+
 ## Current observations (300-game matchups, seats swapped, 5×5, devolve combat)
+
+These observations predate the five-scout change (two scouts per army).
 
 - **Devolution made aggression profitable and broke the fortress meta.**
   A connecting attack now conserves the attacker's material (it devolves
