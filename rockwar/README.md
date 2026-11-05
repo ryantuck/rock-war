@@ -254,7 +254,9 @@ box or via `--config file.json` on the CLI:
   `obeliskLethal` (300) for an enemy finish, fading to 50% / 25% / 10% when
   it's one / two / three units short (`reachCurve`, the early warning that
   pushes a threat back before it's lethal), and pays `obeliskSetup` (60) on
-  the same curve for our own. Our obelisk annuities still fade against a
+  the same curve for our own (one-ply engines only — the planners find
+  their own within-turn finishes by search, so `obeliskSetup` defaults to 0
+  there). Our obelisk annuities still fade against a
   nearly-dead enemy (`obeliskFadeAt`); the enemy's obelisk terms no longer
   do. `obeliskBrink` (flat cost of an enemy one obelisk from victory) and
   `obeliskReach(..., { approach: true })` (can an enemy one short of the
