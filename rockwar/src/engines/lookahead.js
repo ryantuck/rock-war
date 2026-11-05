@@ -11,7 +11,7 @@ import {
   other, armyPieceCount, armyStrengthOnBoard, canAddPiece, obeliskBonuses,
   obeliskStatus, obeliskCells, obeliskElementBonus, combatRuleOf,
 } from '../game.js';
-import { obeliskReach, reachDanger } from './obelisk-threat.js';
+import { obeliskReach } from './obelisk-threat.js';
 
 const DEFAULT_WEIGHTS = {
   material: 10,     // per point of deployable strength difference
@@ -29,8 +29,13 @@ const DEFAULT_WEIGHTS = {
                     // budget annuities are worthless against a nearly-dead
                     // opponent (the enemy's terms never fade)
   obeliskLethal: 300, // the enemy can complete an obelisk victory on its next
-                    // turn (scaled down for 1-2 units short — see reachDanger)
-  obeliskSetup: 60, // we could complete one on our next turn
+                    // turn (scaled down when it's a few units short — reachCurve)
+  obeliskSetup: 60, // we could complete an obelisk victory on our next turn
+  reachCurve: [1, 0.5, 0.25, 0.1], // share of lethal/setup paid at reach
+                    // deficit 0, 1, 2, 3 units short (0 beyond) — the early
+                    // warning that pushes a threat back before it's lethal
+  obeliskBrink: 0,  // flat cost of the enemy sitting one obelisk from victory
+                    // (off by default: in sweeps it bought over-defense)
   hunt: 2,          // extra advance pressure per point of material dominance
   huntCap: 4,       // ...capped, so the hunt drive can't dwarf everything
   potential: 2,     // per point of evolve-ready pairs (sum in sideboard)
@@ -208,6 +213,11 @@ function maxAttackThreat(state, enemy, W) {
   return best;
 }
 
+// Share of the obelisk lethal/setup weight paid at a given reach deficit.
+function reach(W, deficit) {
+  return W.reachCurve[deficit] ?? 0;
+}
+
 function evaluate(state, me, W) {
   const enemy = other(me);
   const myPieces = armyPieceCount(state, me);
@@ -233,8 +243,9 @@ function evaluate(state, me, W) {
   // next, and with two obelisks its bonus moves/spawns and abilities can
   // seize a third from a distance. Neither one-ply nor own-turn search sees
   // that, so estimate both armies' next-turn reach directly.
-  score -= W.obeliskLethal * reachDanger(obeliskReach(state, enemy).deficit);
-  score += W.obeliskSetup * reachDanger(obeliskReach(state, me).deficit);
+  const er = obeliskReach(state, enemy);
+  if (er.held >= er.need - 1) score -= W.obeliskBrink + W.obeliskLethal * reach(W, er.deficit);
+  score += W.obeliskSetup * reach(W, obeliskReach(state, me).deficit);
   score += W.potential * (evolvePotential(state, me) - evolvePotential(state, enemy));
   // Hunt drive: material dominance converts into pressure to close distance
   // and finish, so a won game gets won instead of drifting to the turn cap.

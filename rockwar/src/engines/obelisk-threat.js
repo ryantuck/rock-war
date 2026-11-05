@@ -22,9 +22,12 @@
 // Validated against a real-rules search of the next turn (depth 4, pruned
 // to obelisk-relevant actions): no false alarms, ~90%+ of finishes seen.
 //
-// Returns { held, need, deficit, lethal }: deficit 0 means the army can
-// take the win next turn; Infinity when it holds fewer than need-1
-// obelisks (not a next-turn threat).
+// Returns { held, need, deficit, lethal }: `deficit` is how far the army is
+// from taking ONE more obelisk next turn (0 = it can). `lethal` = that
+// would complete the victory (it already holds need-1). Positions further
+// back (held < need-1, or < need-2 with opts.approach) return Infinity.
+// opts: { approach: also evaluate armies at need-2 (can they reach the
+// brink next turn?), trace: array that receives the committed plan steps }.
 
 import {
   contingents, obeliskBonuses, obeliskCells, obeliskStatus, neighbors,
@@ -60,7 +63,8 @@ const setCell = (cs, i, army, pieces) => {
 const movePiece = (cs, a, r, army, p) =>
   setCell(setCell(cs, a, army, removeOne(cs[a].pieces, p)), r, army, [...cs[r].pieces, p]);
 
-export function obeliskReach(state, army, trace = null) {
+export function obeliskReach(state, army, opts = {}) {
+  const trace = opts.trace ?? null;
   const { config } = state;
   if (config.obeliskVictory === false) return NONE;
   const obs = config.obelisks ?? [];
@@ -75,7 +79,7 @@ export function obeliskReach(state, army, trace = null) {
   statuses.forEach((st, k) => { if (st.controller === army) heldIdx.push(k); });
   const held = heldIdx.length;
   if (held >= need) return { held, need, deficit: 0, lethal: true };
-  if (held < need - 1) return { held, need, deficit: Infinity, lethal: false };
+  if (held < need - (opts.approach ? 2 : 1)) return { held, need, deficit: Infinity, lethal: false };
 
   // Turn resources: per-contingent action slots and budget, army bonus pools.
   const conts = contingents(state, army);
@@ -101,7 +105,7 @@ export function obeliskReach(state, army, trace = null) {
     if (statuses[k].controller === army) continue;
     best = Math.min(best, simulate(k));
   }
-  return { held, need, deficit: best, lethal: best === 0 };
+  return { held, need, deficit: best, lethal: best === 0 && held === need - 1 };
 
   function simulate(k) {
     const ringArr = rings[k];
@@ -281,12 +285,11 @@ export function obeliskReach(state, army, trace = null) {
 }
 
 // How dangerous a reach deficit is, on a 0..1 scale: a next-turn finish
-// (deficit 0) is the full threat; one or two units short still pays a
-// fading share, so one-ply search gets a gradient to push the threat back
-// (or, for its own reach, to walk a multi-action finish one step at a time).
+// (deficit 0) is the full threat; a few units short still pays a fading
+// share, so one-ply search gets a gradient to push the threat back (or, for
+// its own reach, to walk a multi-action finish one step at a time). Same
+// shape as the lookahead evaluator's default reachCurve.
+const DANGER = [1, 0.5, 0.25, 0.1];
 export function reachDanger(deficit) {
-  if (deficit <= 0) return 1;
-  if (deficit === 1) return 0.3;
-  if (deficit === 2) return 0.1;
-  return 0;
+  return DANGER[Math.max(0, deficit)] ?? 0;
 }

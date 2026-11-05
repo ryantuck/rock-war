@@ -251,10 +251,15 @@ box or via `--config file.json` on the CLI:
   bonus-pool rules, never breaking an obelisk already held. No state
   cloning (~140µs). Against a real-rules search of the next turn it raised
   no false alarms and caught 97% of finishes. The evaluator charges
-  `obeliskLethal` (300) for an enemy finish, fading to 30% / 10% when it's
-  one / two units short, and pays `obeliskSetup` (60) on the same curve
-  for our own. Our obelisk annuities still fade against a nearly-dead enemy
-  (`obeliskFadeAt`); the enemy's obelisk terms no longer do.
+  `obeliskLethal` (300) for an enemy finish, fading to 50% / 25% / 10% when
+  it's one / two / three units short (`reachCurve`, the early warning that
+  pushes a threat back before it's lethal), and pays `obeliskSetup` (60) on
+  the same curve for our own. Our obelisk annuities still fade against a
+  nearly-dead enemy (`obeliskFadeAt`); the enemy's obelisk terms no longer
+  do. `obeliskBrink` (flat cost of an enemy one obelisk from victory) and
+  `obeliskReach(..., { approach: true })` (can an enemy one short of the
+  brink step onto it?) exist but are off: in sweeps both bought
+  over-defense — engines out-fought while guarding corners.
 - **lookahead-aggro / -obelisk / -turtle / -tempo** — strategy-archetype
   presets of the same search with re-weighted evaluators (attrition, map
   control, defense/clock, economy). Tournaments between them measure which

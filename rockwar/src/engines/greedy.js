@@ -22,6 +22,7 @@ const DEFAULT_WEIGHTS = {
   obeliskWin: 1000,     // an action that wins on obelisks outright
   obeliskBlock: 150,    // per unit of enemy next-turn obelisk-win danger removed
                         // (reachDanger: 1 = they can finish next turn)
+  obeliskBreak: 60,     // knocking an enemy off the brink (one obelisk short)
   presencePenalty: 25,  // evolving down to <=2 board pieces is a trap
   spawnLockPenalty: 40, // evolving into a position where no cell can accept a
                         // scout (1 only stacks with 1 or 2) freezes the army
@@ -118,7 +119,8 @@ function obeliskStakes(state, army, a, W, rng, ctx) {
   if (heldCount(clone, army) >= ctx.need) return W.obeliskWin;
   if (!ctx.enemyLive) return 0;
   const after = reachDanger(obeliskReach(clone, other(army)).deficit);
-  return W.obeliskBlock * (ctx.dangerBefore - after);
+  const broke = heldCount(clone, other(army)) < ctx.need - 1 ? W.obeliskBreak : 0;
+  return W.obeliskBlock * (ctx.dangerBefore - after) + broke;
 }
 
 function obeliskContext(state, army) {
