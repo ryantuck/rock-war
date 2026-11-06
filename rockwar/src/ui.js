@@ -125,9 +125,7 @@ function fillQueue() {
   if (state.phase === 'placement') {
     const army = state.placementQueue[0];
     let i = engines[army].placeScout(state, army, rng);
-    if (typeof i !== 'number' || !state.cells[i] || state.cells[i].pieces.length !== 0) {
-      i = legalPlacements(state)[0];
-    }
+    if (!legalPlacements(state).includes(i)) i = legalPlacements(state)[0];
     applyPlacement(state, army, i);
   } else {
     playTurn(state, engines, rng);

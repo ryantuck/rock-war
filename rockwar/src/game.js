@@ -37,6 +37,9 @@ export function defaultConfig() {
     // Scouts each army places during the snake-placement phase; the rest of
     // the sideboard (including remaining scouts) enters play via spawning.
     initialScouts: 5,
+    // Placement may stack a scout onto your own lone scout (a (1,1) pair —
+    // evolvable to a soldier from turn 1) instead of only empty territories.
+    placementStacking: false,
     maxPiecesPerTerritory: 2,
     // Each contingent takes at most this many actions per turn...
     maxActionsPerContingent: 2,
@@ -329,16 +332,23 @@ function removePiece(state, i, piece) {
 // Placement phase
 // ---------------------------------------------------------------------------
 
+// Territories the army to place may use: any empty one, plus (with
+// placementStacking) its own territories that can take another scout.
 export function legalPlacements(state) {
+  const army = state.placementQueue?.[0];
+  const stack = !!state.config.placementStacking;
   const out = [];
-  state.cells.forEach((c, i) => { if (c.pieces.length === 0) out.push(i); });
+  state.cells.forEach((c, i) => {
+    if (c.pieces.length === 0) out.push(i);
+    else if (stack && c.army === army && canAddPiece(state.config, c, 1)) out.push(i);
+  });
   return out;
 }
 
 export function applyPlacement(state, army, i) {
   if (state.phase !== 'placement') throw new Error('not in placement phase');
   if (state.placementQueue[0] !== army) throw new Error(`not ${army}'s placement`);
-  if (state.cells[i].pieces.length !== 0) throw new Error(`territory ${i} not empty`);
+  if (!legalPlacements(state).includes(i)) throw new Error(`territory ${i} not a legal placement`);
   if (state.sideboard[army][1] <= 0) throw new Error(`${army} has no scouts left`);
   state.eventSeq = (state.eventSeq ?? 0) + 1;
   state.sideboard[army][1]--;
@@ -1297,7 +1307,7 @@ export function playGame({ engines, config = defaultConfig(), rng, onState }) {
   while (state.phase === 'placement') {
     const army = state.placementQueue[0];
     let i = engines[army].placeScout(state, army, rng);
-    if (typeof i !== 'number' || !state.cells[i] || state.cells[i].pieces.length !== 0) {
+    if (!legalPlacements(state).includes(i)) {
       i = legalPlacements(state)[0]; // fallback for a misbehaving engine
     }
     applyPlacement(state, army, i);

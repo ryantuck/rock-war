@@ -12,6 +12,7 @@ import {
   obeliskStatus, obeliskCells, obeliskElementBonus, combatRuleOf,
 } from '../game.js';
 import { obeliskReach } from './obelisk-threat.js';
+import { choosePlacement } from './placement.js';
 
 const DEFAULT_WEIGHTS = {
   material: 10,     // per point of deployable strength difference
@@ -48,6 +49,7 @@ const DEFAULT_WEIGHTS = {
   passMargin: -3,   // act unless clearly harmful — passing doesn't freeze the
                     // game, the opponent moves next, so idling has real cost
   jitter: 0.05,     // random tiebreak
+  placement: 'split', // scout placement style: single | split, optionally -stack
 };
 
 // Deployable strength: board material plus sideboard scouts (bigger sideboard
@@ -372,27 +374,9 @@ export function makeLookaheadEngine(opts = {}) {
   return {
     name: 'lookahead',
 
-    // Same opening as greedy: clustered scouts near the center.
+    // Placement style (see placement.js): one central cluster by default.
     placeScout(state, army, rng) {
-      const { config } = state;
-      const cx = (config.width - 1) / 2;
-      const cy = (config.height - 1) / 2;
-      let best = null;
-      let bestScore = -Infinity;
-      for (const i of legalPlacements(state)) {
-        const [x, y] = xy(config, i);
-        let score = -(Math.abs(x - cx) + Math.abs(y - cy));
-        for (const n of neighbors(config, i)) {
-          if (state.cells[n].army === army) score += 2;
-          if (state.cells[n].army === other(army)) score -= 0.5;
-        }
-        for (const ob of config.obelisks ?? []) {
-          if (obeliskCells(config, ob.corner).includes(i)) score += 1.5;
-        }
-        score += rng() * 0.1;
-        if (score > bestScore) { bestScore = score; best = i; }
-      }
-      return best;
+      return choosePlacement(state, army, rng, W.placement);
     },
 
     chooseAction(state, ctx, acts, rng) {

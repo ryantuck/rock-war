@@ -14,6 +14,7 @@ node src/sim.js --games 500 --a greedy --b random --seed 42
 node src/sim.js --games 500 --a greedy --b greedy
 node src/sim.js --games 100 --a greedy --b random --verbose   # per-game lines
 node src/sim.js --games 500 --a greedy --b random --config my-rules.json
+node src/sim.js --tournament --games 40 --config configs/4x4-partition.json  # 4×4 preset
 
 # Round-robin tournament across all engines (the balance dashboard):
 # standings by points (win 1, draw 0.5) plus a head-to-head grid
@@ -63,8 +64,9 @@ board can never drift from the real state. Sims ignore the stream.
   fibonacci values, 45 points total. Any piece of value 2 or more is a
   **warrior**.
 - **Placement**: snake order (A B B A A B B A A B …), one scout per slot onto
-  any empty territory, until each army has placed `initialScouts` (default 5;
-  B makes the final placement). Remaining
+  any empty territory — or, with `placementStacking`, onto one of your own
+  lone scouts, making a (1,1) pair — until each army has placed
+  `initialScouts` (default 5; B makes the final placement). Remaining
   sideboard pieces — including the other scouts — enter play by spawning and
   evolving. Then A moves first.
 - **Territories** hold at most 2 pieces, which must be fibonacci-adjacent:
@@ -219,6 +221,7 @@ box or via `--config file.json` on the CLI:
 | capture on retreat | yes | if all defenders retreat, the attacker advances into the vacated territory |
 | simultaneous wipe | draw | mutual destruction can empty both boards at once → draw |
 | `initialScouts` | 5 | scouts each army places in the placement phase (capped at scout supply) |
+| `placementStacking` | `false` | placement may double up on your own lone scout ((1,1), evolvable from turn 1) |
 | `maxTurns` | 200 | game ends here; tiebreak decides unless dead even |
 | `turnLimitTiebreak` | `true` | at the cap: most board strength wins, obelisks break ties |
 | `supply` | 8/5/3/2/1 | change piece mix freely; placement uses the scout count |
@@ -262,6 +265,14 @@ box or via `--config file.json` on the CLI:
   `obeliskReach(..., { approach: true })` (can an enemy one short of the
   brink step onto it?) exist but are off: in sweeps both bought
   over-defense — engines out-fought while guarding corners.
+- **Placement styles** (`src/engines/placement.js`, engine option
+  `placement`) — `split` (default): two separate starting contingents,
+  opening the second away from the first, growing the smaller, never
+  merging. `single`: one central cluster (the original heuristic).
+  `-stack` variants double up on their own lone scouts (up to two pairs)
+  when `placementStacking` allows it. Split wins head-to-head for every
+  engine tested, on both boards. Two contingents mean twice the actions
+  from turn 2 on, for the same material.
 - **lookahead-aggro / -obelisk / -turtle / -tempo** — strategy-archetype
   presets of the same search with re-weighted evaluators (attrition, map
   control, defense/clock, economy). Tournaments between them measure which
@@ -446,6 +457,61 @@ evaluator. Defenders are compared old → new on the same seeds (100 games,
   - Round robin: planner-obelisk 72.2%, lookahead-obelisk 69.4% (was
     64.5%), planner 63.9%, lookahead 62.5%, turtle 62.5%, tempo 61.6%,
     aggro 40.6%, greedy 14.8%, random 2.5%. Draws ~2%.
+
+## 4×4 partition board and placement styles
+
+*[AI - Claude]: 4×4 partition and split-placement findings*
+
+Preset: `configs/4x4-partition.json`. It sets a 4×4 board, obelisks on
+interior corners [1,1] [3,1] [1,3] [3,3] (every territory touches exactly
+one), five starting scouts, and `placementStacking` on. The old 5×5 corners
+don't work on 4×4: water would touch a single cell and could never be
+controlled. Paste the JSON into the frontend's config box, or pass
+`--config`.
+
+**Placement styles, head-to-head within each engine** (4×4 preset, 200
+games per pairing for greedy, 100 for the rest):
+
+| Engine | split | split-stack | single | single-stack |
+|---|---|---|---|---|
+| greedy | **60.5%** | 51.1% | 47.9% | 40.5% |
+| lookahead | **72.8%** | 47.5% | 54.0% | 25.7% |
+| planner | **71.7%** | 55.2% | 49.7% | 23.5% |
+| planner-obelisk | **66.7%** | 60.2% | 37.3% | 35.8% |
+
+On the default 5×5 board, split beats single too: lookahead 59%, greedy
+56.5%, planner-obelisk 73.8%. So `split` is now the engines' default
+placement. Two contingents take two actions each from turn 2 for the
+same material, and the turn-1 one-contingent limit costs the opener less
+than that is worth. Stacking hurts in nearly every pairing: a (1,1)
+pair's turn-1 soldier doesn't pay for the territory it gives up (on the
+partition board, territories are obelisk presence). Engines therefore
+don't stack, though the rule still lets a human player do it.
+
+**The game itself** (split placement for all engines; seat A = A's share
+of decided games, ±3–5 pts):
+
+| | 5×5, single (old) | 5×5, split | 4×4 preset, single | 4×4 preset, split |
+|---|---|---|---|---|
+| Seat A: greedy / lookahead / p-obelisk mirrors | 60 / 45 / 25% | 52 / 33.5 / 36% | 68 / 63 / 68% | 44.5 / 46 / 48% |
+| Obelisk wins: lookahead / p-obelisk mirror | 40 / 63% | 14.5 / 36% | 8 / 10% | 13 / 28% |
+| Draws: greedy / lookahead mirror | 9.5 / 5% | 8.8 / 1.5% | 16 / 7% | 20 / 5% |
+| Median length: lookahead / p-obelisk mirror | 27 / 22 | 18 / 16 | 14 / 12 | 14 / 15 |
+| Obelisk held before turn 1 | 33% | ~90% | 100% | ~30% |
+| Lookahead vs greedy | 95% | 86% | 88.5% | 90% |
+
+- **The 4×4 preset with split placement is the most even setup measured
+  so far.** Every mirror sits within ~2 SE of 50%, including the planner
+  mirror that favors B 75% on 5×5. Games run half as long as on 5×5, and
+  obelisk wins matter without dominating.
+- **The costs.** Greedy mirrors stall into draws more often (20%), and
+  skill separates less than on 5×5. Round robin on the preset:
+  planner-obelisk 77.7%, planner 66.6%, lookahead-obelisk 65.2%, tempo
+  62.7%, lookahead 57.8%, aggro 50.9%, turtle 48.8%, greedy 19.7%, random
+  0.8%. Draws 3%.
+- **On 5×5, split placement parks groups beside obelisks.** About 90% of
+  games start with an obelisk held. The lookahead mirror tilts toward B
+  (33.5% A), while the greedy and planner mirrors move closer to even.
 
 ## Current observations (300-game matchups, seats swapped, 5×5, devolve combat)
 
