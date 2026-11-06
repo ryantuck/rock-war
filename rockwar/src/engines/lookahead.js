@@ -289,11 +289,11 @@ function retreatPolicy(state, attackInfo, options) {
 // (receding horizon), so enemy reactions and mid-turn surprises are
 // absorbed naturally.
 export function makePlannerEngine(opts = {}) {
-  const { depth = 3, beam = 6, expand = 40, ...rest } = opts;
-  // The planner finds its own within-turn obelisk finishes by search, so the
-  // own-reach bonus only double-counts them (it cost planner-obelisk ~6
-  // points against an obelisk rusher); the enemy-threat term stays.
-  const weightOpts = { obeliskSetup: 0, ...rest };
+  // The beam search covers only THIS turn, so the evaluator's own-reach bonus
+  // (obeliskSetup) is the planner's only reason to set up an obelisk finish
+  // for its NEXT turn — without it, a planner holding two obelisks against a
+  // helpless opponent shuffled pieces instead of walking into the win.
+  const { depth = 3, beam = 6, expand = 40, ...weightOpts } = opts;
   const W = { ...DEFAULT_WEIGHTS, ...weightOpts };
   const base = makeLookaheadEngine(weightOpts);
   const simStub = { planRetreats: (s, info, options) => retreatPolicy(s, info, options) };

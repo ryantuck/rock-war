@@ -254,9 +254,9 @@ box or via `--config file.json` on the CLI:
   `obeliskLethal` (300) for an enemy finish, fading to 50% / 25% / 10% when
   it's one / two / three units short (`reachCurve`, the early warning that
   pushes a threat back before it's lethal), and pays `obeliskSetup` (60) on
-  the same curve for our own (one-ply engines only — the planners find
-  their own within-turn finishes by search, so `obeliskSetup` defaults to 0
-  there). Our obelisk annuities still fade against a
+  the same curve for our own. The planners need it too: their beam search
+  covers only the current turn, so this bonus is what makes them set up a
+  finish for the next one. Our obelisk annuities still fade against a
   nearly-dead enemy (`obeliskFadeAt`); the enemy's obelisk terms no longer
   do. `obeliskBrink` (flat cost of an enemy one obelisk from victory) and
   `obeliskReach(..., { approach: true })` (can an enemy one short of the
@@ -419,9 +419,18 @@ evaluator. Defenders are compared old → new on the same seeds (100 games,
   ~40–60%, and it wins more obelisk races itself (obelisk wins vs `rush`
   15 → 27).
 - **The planners hold steady.** Their obelisk losses don't change, and
-  the point swings are within noise (±5–6 pts at these sizes). An
-  own-reach bonus made them worse (planner-obelisk 53% vs 48%), so it is
-  off for planners.
+  the point swings are within noise (±5–6 pts at these sizes).
+- **Correction: planners need the own-reach bonus.** It was briefly off for
+  planners, on the theory that their search already finds their own
+  finishes. A human game showed that theory was wrong. The planner held
+  earth and water against an army of two 3s. A two-turn air win was
+  available (5 to a4, a scout toward a3, then 5×b4 and the scout into a4),
+  and it shuffled scouts back and forth instead. The search only spans the
+  current turn. From that position: 0 of 20 playouts won within 10 turns
+  with the bonus off; 20 of 20 won in 3 turns with it on (30 or 60 alike).
+  With the bonus on, planner mirrors end on obelisks more often
+  (planner-obelisk mirror 63%, seat B 76% of decided games) — a balance
+  question for the rules, not an engine bug.
 - **What remains is mostly double threats.** When the rusher holds two
   obelisks with two reachable thirds, no single defense works. Defending
   earlier (a flat brink cost, an approach term) made engines over-defend
