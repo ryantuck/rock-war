@@ -2,14 +2,19 @@
 // Batch simulator: play many games between two engines and report stats.
 //
 //   node src/sim.js --games 500 --a greedy --b random --seed 42
+//   node src/sim.js --games 200 --a greedy --b greedy --layout 5x5-classic
 //   node src/sim.js --games 200 --a greedy --b greedy --config my-rules.json
+//   node src/sim.js --layouts                      # list board layouts
+//
+// The board layout (--layout, else the config file's "layout", else the
+// default) supplies the base rules; a --config file's keys apply on top.
 //
 // Seats are swapped every game (unless --no-swap) so first-mover advantage
 // doesn't pollute engine comparisons; results are reported per engine AND
 // per seat so you can measure that advantage while iterating on rules.
 
 import { readFileSync } from 'node:fs';
-import { playGame, defaultConfig, armyStrengthOnBoard } from './game.js';
+import { playGame, resolveConfig, LAYOUTS, DEFAULT_LAYOUT, armyStrengthOnBoard } from './game.js';
 import { makeEngine, engineFactories } from './engines/index.js';
 import { mulberry32 } from './rng.js';
 
@@ -48,7 +53,7 @@ function runTournament(names, gamesPer, seed, config) {
       return { n, ...s, pts: games ? (100 * (s.w + s.d / 2)) / games : 0 };
     })
     .sort((x, y) => y.pts - x.pts);
-  console.log(`\nTournament: ${names.length} engines, ${gamesPer} games per pairing (seed ${seed}, ${elapsed}s)`);
+  console.log(`\nTournament: ${names.length} engines, ${gamesPer} games per pairing (layout ${config.layout}, seed ${seed}, ${elapsed}s)`);
   console.log('─'.repeat(64));
   rows.forEach((r, k) => {
     console.log(`  ${String(k + 1).padStart(2)}. ${r.n.padEnd(20)} ${r.pts.toFixed(1).padStart(5)}%   ${String(r.w).padStart(4)}W ${String(r.l).padStart(4)}L ${String(r.d).padStart(4)}D`);
@@ -62,7 +67,7 @@ function runTournament(names, gamesPer, seed, config) {
 }
 
 function parseArgs(argv) {
-  const args = { games: 100, a: 'greedy', b: 'random', seed: 1, swap: true, config: null, verbose: false, tournament: false, engines: null };
+  const args = { games: 100, a: 'greedy', b: 'random', seed: 1, swap: true, config: null, layout: null, verbose: false, tournament: false, engines: null };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
     if (k === '--games') args.games = parseInt(argv[++i], 10);
@@ -71,12 +76,20 @@ function parseArgs(argv) {
     else if (k === '--seed') args.seed = parseInt(argv[++i], 10);
     else if (k === '--no-swap') args.swap = false;
     else if (k === '--config') args.config = argv[++i];
+    else if (k === '--layout') args.layout = argv[++i];
+    else if (k === '--layouts') {
+      for (const [name, L] of Object.entries(LAYOUTS)) {
+        console.log(`${name}${name === DEFAULT_LAYOUT ? ' (default)' : ''}\n    ${L.description}`);
+      }
+      process.exit(0);
+    }
     else if (k === '--verbose') args.verbose = true;
     else if (k === '--tournament') args.tournament = true;
     else if (k === '--engines') args.engines = argv[++i].split(',');
     else if (k === '--help' || k === '-h') {
-      console.log('usage: node src/sim.js [--games N] [--a engine] [--b engine] [--seed S] [--no-swap] [--config file.json] [--verbose]');
-      console.log('       node src/sim.js --tournament [--engines a,b,c] [--games N-per-pairing] [--seed S] [--config file.json]');
+      console.log('usage: node src/sim.js [--games N] [--a engine] [--b engine] [--seed S] [--no-swap] [--layout name] [--config file.json] [--verbose]');
+      console.log('       node src/sim.js --tournament [--engines a,b,c] [--games N-per-pairing] [--seed S] [--layout name] [--config file.json]');
+      console.log(`       node src/sim.js --layouts    (layouts: ${Object.keys(LAYOUTS).join(', ')}; default ${DEFAULT_LAYOUT})`);
       process.exit(0);
     }
   }
@@ -84,8 +97,8 @@ function parseArgs(argv) {
 }
 
 const args = parseArgs(process.argv.slice(2));
-let config = defaultConfig();
-if (args.config) config = { ...config, ...JSON.parse(readFileSync(args.config, 'utf8')) };
+const fileConfig = args.config ? JSON.parse(readFileSync(args.config, 'utf8')) : {};
+const config = resolveConfig({ ...fileConfig, ...(args.layout ? { layout: args.layout } : {}) });
 
 if (args.tournament) {
   const names = args.engines ?? Object.keys(engineFactories);
@@ -133,7 +146,7 @@ const elapsed = (Date.now() - t0) / 1000;
 const avg = (xs) => (xs.length ? (xs.reduce((s, x) => s + x, 0) / xs.length).toFixed(1) : '-');
 const pct = (n) => ((100 * n) / args.games).toFixed(1) + '%';
 
-console.log(`\n${args.games} games: ${name1} vs ${name2}  (seed ${args.seed}, seats ${args.swap ? 'swapped each game' : 'fixed'}, ${elapsed.toFixed(2)}s)`);
+console.log(`\n${args.games} games: ${name1} vs ${name2}  (layout ${config.layout}, seed ${args.seed}, seats ${args.swap ? 'swapped each game' : 'fixed'}, ${elapsed.toFixed(2)}s)`);
 console.log('─'.repeat(60));
 console.log(`  ${name1.padEnd(12)} ${String(stats.wins[name1]).padStart(5)}  ${pct(stats.wins[name1])}`);
 console.log(`  ${name2.padEnd(12)} ${String(stats.wins[name2]).padStart(5)}  ${pct(stats.wins[name2])}`);
