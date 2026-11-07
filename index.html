@@ -186,6 +186,7 @@
     font: inherit;
   }
   .controls textarea { height: 150px; font-size: 12px; resize: vertical; }
+  .controls .layoutdesc { color: var(--muted); font-size: 12px; margin-top: 4px; }
   .btnrow { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
   button {
     background: #2b3040; color: var(--text);
@@ -273,7 +274,10 @@
         <option value="fast">Fast</option>
       </select>
       <div id="status"></div>
-      <label>Rules config (applies on New game)</label>
+      <label>Board layout (applies on New game)</label>
+      <select id="layout"></select>
+      <div id="layoutDesc" class="layoutdesc"></div>
+      <label>Rules config (applies on New game; picking a layout resets it)</label>
       <textarea id="config" spellcheck="false"></textarea>
     </div>
 
@@ -301,11 +305,16 @@
     <div class="rulescols">
       <div>
         <h3>Setup</h3>
-        <p>5×5 board of territories. Each army fields <b>8×1 scouts, 5×2
-        soldiers, 3×3 chieftains, 2×5 warlords, 1×8 behemoth</b> (45 pts);
-        any piece of 2+ is a <b>warrior</b>.
-        Placement snakes A&nbsp;B&nbsp;B&nbsp;A — five scouts each onto empty
-        territories; everything else deploys later by spawning and evolving.</p>
+        <p>The <b>board layout</b> sets the board, the obelisk positions and
+        a few rules. The default, <b>4×4 partition</b>, is a 4×4 board where
+        every territory touches exactly one obelisk. <b>5×5 classic</b> and
+        an experimental <b>4×4 diamond</b> are also available. Each army
+        fields <b>8×1 scouts, 5×2 soldiers, 3×3 chieftains, 2×5 warlords,
+        1×8 behemoth</b> (45 pts); any piece of 2+ is a <b>warrior</b>.
+        Placement snakes A&nbsp;B&nbsp;B&nbsp;A — five scouts each (three on
+        the diamond) onto empty territories, or, on 4×4 partition, doubled
+        up on your own scout. Everything else deploys later by spawning and
+        evolving.</p>
         <h3>Territories &amp; contingents</h3>
         <p>A territory holds at most <b>2 pieces</b>, and they must be
         fibonacci-adjacent: (1,1) (1,2) (2,3) (3,5) (5,8). A
@@ -342,7 +351,8 @@
         it <b>devolves</b> into its constituents (3→2+1, 5→3+2, 8→5+3) as it
         advances; weaker defense dies cleanly.</p>
         <h3>Obelisks</h3>
-        <p>Four elemental obelisks sit on corner intersections:
+        <p>Four elemental obelisks sit on corner intersections (where
+        depends on the layout):
         <span class="ob fire">fire</span>→attack,
         <span class="ob earth">earth</span>→evolve,
         <span class="ob air">air</span>→move,

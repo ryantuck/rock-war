@@ -14,7 +14,8 @@ node src/sim.js --games 500 --a greedy --b random --seed 42
 node src/sim.js --games 500 --a greedy --b greedy
 node src/sim.js --games 100 --a greedy --b random --verbose   # per-game lines
 node src/sim.js --games 500 --a greedy --b random --config my-rules.json
-node src/sim.js --tournament --games 40 --config configs/4x4-partition.json  # 4×4 preset
+node src/sim.js --games 500 --a greedy --b greedy --layout 5x5-classic   # another board
+node src/sim.js --layouts                                                 # list layouts
 
 # Round-robin tournament across all engines (the balance dashboard):
 # standings by points (win 1, draw 0.5) plus a head-to-head grid
@@ -56,9 +57,56 @@ Under the hood the rules engine emits a structured event stream
 animations and renders the exact snapshot after each, so the displayed
 board can never drift from the real state. Sims ignore the stream.
 
+## Board layouts
+
+*[AI - Claude]: Board layouts*
+
+A **layout** (`LAYOUTS` in `src/game.js`) bundles a board size, its obelisk
+positions, and the rule variants measured to suit it. `defaultConfig(name)`
+builds the full config: shared base rules plus the layout. A partial
+config naming a `layout` is completed from it (`resolveConfig`). Pick one
+in the frontend's layout menu (it reloads the rules editor), or with
+`--layout` on the CLI. `--config` keys apply on top.
+
+| Layout | Board | Obelisk corners | Scouts | Stack on own scout |
+|---|---|---|---|---|
+| `4x4-partition` (default) | 4×4 | [1,1] [3,1] [1,3] [3,3] — every territory touches exactly one | 5 | yes |
+| `5x5-classic` | 5×5 | [1,1] [4,1] [1,4] [4,4] — center and edges free | 5 | no |
+| `4x4-diamond` (experimental) | 4×4 | [2,1] [3,2] [1,2] [2,3] — center territories touch two, corners none | 3 | no |
+
+How they play under the current engines (split placement; 100–400 games
+per matchup, seat shares ±3–5 pts):
+
+| | 4x4-partition | 5x5-classic | 4x4-diamond |
+|---|---|---|---|
+| Seat A: greedy / lookahead / planner-obelisk mirrors | 44.5 / 46 / 48% | 52 / 33.5 / 36% | 47 / 48 / 54% |
+| Obelisk wins: lookahead / planner-obelisk mirror | 13 / 28% | 14.5 / 36% | 40.5 / 62% |
+| Draws: greedy / lookahead mirror | 20 / 5% | 8.8 / 1.5% | 8.8 / 4.5% |
+| Median length: lookahead / planner-obelisk mirror | 14 / 15 | 18 / 16 | 10 / 7 |
+| Obelisk held before turn 1 | ~30% | ~90% | 0% |
+| Lookahead vs greedy | 90% | 86% | 82% |
+
+- **4x4-partition (default):** the most even overall, and obelisks matter
+  without dominating. Greedy mirrors stall into draws often.
+- **5x5-classic:** longer games and the most room. The lookahead and
+  planner mirrors favor seat B, and split placement usually hands someone
+  an obelisk before turn 1.
+- **4x4-diamond:** even and quick, but a race. Most search-engine games
+  end in an obelisk win within ~10 turns.
+
+To add a layout, add an entry to `LAYOUTS`: `width`, `height`,
+`obelisks` (four corner points), `initialScouts`, `placementStacking`, and
+a one-line `description`. The CLI, frontend and engines pick it up.
+
+The findings sections further down were measured on the 5×5 board
+(`5x5-classic`) unless they say otherwise. The 4×4 section and the tables
+above are on 4×4.
+
 ## Rules as implemented
 
-- **Board**: 5×5 grid of 25 territories, orthogonal adjacency.
+- **Board**: set by the **layout** (see *Board layouts* below) —
+  `4x4-partition` by default (16 territories), also `5x5-classic` and an
+  experimental `4x4-diamond`. Orthogonal adjacency.
 - **Armies**: each side's sideboard holds 8×1 (scouts), 5×2 (soldiers),
   3×3 (chieftains), 2×5 (warlords), 1×8 (behemoth) — fibonacci counts of
   fibonacci values, 45 points total. Any piece of value 2 or more is a
@@ -130,9 +178,10 @@ board can never drift from the real state. Sims ignore the stream.
 - **First-turn handicap**: on turn 1, the opening player acts with only one
   contingent (their engine chooses which); it takes the normal 2 actions.
   Tunable via `firstTurnContingents` / `firstTurnActions`.
-- **Obelisks**: four elemental obelisks sit on corner points where four
-  territories meet — fire (red) at [1,1], earth (green) at [4,1], air
-  (yellow) at [1,4], water (blue) at [4,4]. Each maps to a mechanic:
+- **Obelisks**: four elemental obelisks — fire (red), earth (green), air
+  (yellow), water (blue) — sit on corner points where four territories
+  meet, placed by the layout (4×4 partition: [1,1] [3,1] [1,3] [3,3];
+  5×5 classic: [1,1] [4,1] [1,4] [4,4]). Each maps to a mechanic:
   fire → attack, earth → evolve, air → move, water → spawn. An army
   *controls* an obelisk by occupying **at least 2** of its adjacent
   territories with the **strictly greatest** total adjacent piece value of
@@ -211,7 +260,8 @@ box or via `--config file.json` on the CLI:
 | `firstTurnContingents` | 1 | contingents the opening player may act with on turn 1 (0 = skip turn 1, null = no handicap) |
 | `firstTurnActions` | 2 | actions per contingent on turn 1 (1 = the old single-action opening; null = normal cap) |
 | `minAttackValue` | 2 | minimum piece value that may attack — scouts can't (1 = anyone can) |
-| `obelisks` | 4 corners | element + corner position per obelisk; empty array disables them |
+| `layout` | `4x4-partition` | named board layout: supplies `width`/`height`, `obelisks`, `initialScouts`, `placementStacking`; other keys apply on top |
+| `obelisks` | per layout | element + corner position per obelisk; empty array disables them |
 | `obeliskAbilities` | `true` | controlled obelisks grant their active ability |
 | `obeliskPowers` | `true` | passive auras: air retreat budget, water combat saves, earth attack tax |
 | `obeliskVictory` | `true` | controlling `obeliskVictoryCount` obelisks simultaneously wins immediately |
@@ -220,12 +270,12 @@ box or via `--config file.json` on the CLI:
 | destroyed pieces | removed | destroyed pieces leave the game entirely (they do *not* return to the sideboard) |
 | capture on retreat | yes | if all defenders retreat, the attacker advances into the vacated territory |
 | simultaneous wipe | draw | mutual destruction can empty both boards at once → draw |
-| `initialScouts` | 5 | scouts each army places in the placement phase (capped at scout supply) |
-| `placementStacking` | `false` | placement may double up on your own lone scout ((1,1), evolvable from turn 1) |
+| `initialScouts` | per layout (5; diamond 3) | scouts each army places in the placement phase (capped at scout supply) |
+| `placementStacking` | per layout (on for 4×4 partition) | placement may double up on your own lone scout ((1,1), evolvable from turn 1) |
 | `maxTurns` | 200 | game ends here; tiebreak decides unless dead even |
 | `turnLimitTiebreak` | `true` | at the cap: most board strength wins, obelisks break ties |
 | `supply` | 8/5/3/2/1 | change piece mix freely; placement uses the scout count |
-| `width`/`height` | 5×5 | any board size; the frontend adapts |
+| `width`/`height` | per layout (4×4) | any board size; the frontend adapts |
 
 ## Engines
 
@@ -462,12 +512,12 @@ evaluator. Defenders are compared old → new on the same seeds (100 games,
 
 *[AI - Claude]: 4×4 partition and split-placement findings*
 
-Preset: `configs/4x4-partition.json`. It sets a 4×4 board, obelisks on
+Layout `4x4-partition` (now the default): a 4×4 board, obelisks on
 interior corners [1,1] [3,1] [1,3] [3,3] (every territory touches exactly
 one), five starting scouts, and `placementStacking` on. The old 5×5 corners
 don't work on 4×4: water would touch a single cell and could never be
-controlled. Paste the JSON into the frontend's config box, or pass
-`--config`.
+controlled. (Measured when it was a `configs/` preset; the numbers below
+are unchanged under the layout.)
 
 **Placement styles, head-to-head within each engine** (4×4 preset, 200
 games per pairing for greedy, 100 for the rest):

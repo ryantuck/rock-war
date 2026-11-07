@@ -20,7 +20,8 @@
 // attacks or two-territory fire splits.
 
 import {
-  newGame, defaultConfig, playTurn, playGame, applyPlacement, legalPlacements,
+  newGame, defaultConfig, resolveConfig, LAYOUTS, DEFAULT_LAYOUT,
+  playTurn, playGame, applyPlacement, legalPlacements,
   armyStrengthOnBoard, fmtCell, obeliskStatus, legalActions, applyAction,
   contingents, obeliskBonuses, offerReactions, finishTurn, checkGameEnd, other,
 } from './game.js';
@@ -49,7 +50,20 @@ $('engineB').value = 'random';
 $('batchA').value = 'greedy';
 $('batchB').value = 'random';
 
-$('config').value = JSON.stringify(defaultConfig(), null, 2);
+// Board layouts: picking one loads its full rules config into the editor.
+for (const [name, L] of Object.entries(LAYOUTS)) {
+  const opt = document.createElement('option');
+  opt.value = name;
+  opt.textContent = name + (name === DEFAULT_LAYOUT ? ' (default)' : '');
+  $('layout').appendChild(opt);
+}
+function loadLayout(name) {
+  $('layout').value = name;
+  $('layoutDesc').textContent = LAYOUTS[name].description;
+  $('config').value = JSON.stringify(defaultConfig(name), null, 2);
+}
+$('layout').addEventListener('change', () => loadLayout($('layout').value));
+loadLayout(DEFAULT_LAYOUT);
 
 // A "human" engine slot: moves come from board clicks, not from the engine
 // interface. Retreats (and nothing else) are auto-planned with greedy's
@@ -89,12 +103,14 @@ let selPiece = null;     // which piece value moves/attacks (multi-piece cells)
 let pending = null;      // ability target-picking: { element, fuel, acts, stage, mine }
 let highlights = new Map(); // cell index -> highlight class
 
+// The editor's JSON on top of its layout's defaults (the "layout" key in the
+// JSON wins; otherwise the picker's), so partial configs work too.
 function readConfig() {
   try {
-    return { ...defaultConfig(), ...JSON.parse($('config').value) };
+    return resolveConfig({ layout: $('layout').value, ...JSON.parse($('config').value) });
   } catch (e) {
     alert(`bad config JSON: ${e.message}`);
-    return defaultConfig();
+    return defaultConfig($('layout').value);
   }
 }
 

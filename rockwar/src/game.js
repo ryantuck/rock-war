@@ -26,20 +26,74 @@ export function fibAdjacent(a, b) {
   return i >= 0 && FIBS[i + 1] === hi;
 }
 
-export function defaultConfig() {
-  return {
+// Board layouts. Each bundles a board size, its obelisk positions, and the
+// rule variants measured to play well on it; everything else comes from the
+// shared base rules below. Obelisks sit on interior corner points where four
+// territories meet: corner [cx, cy] touches cells (cx-1,cy-1) (cx,cy-1)
+// (cx-1,cy) (cx,cy). Each element grants bonus budget for its mechanic while
+// controlled: fire → attack, earth → evolve, air → move, water → spawn.
+const obelisksAt = (corners) =>
+  ['fire', 'earth', 'air', 'water'].map((element, k) => ({ element, corner: corners[k] }));
+
+export const LAYOUTS = {
+  '4x4-partition': {
+    description: '4×4 board; every territory touches exactly one obelisk. Five ' +
+      'scouts each, and placement may double up on your own scout.',
+    width: 4,
+    height: 4,
+    obelisks: obelisksAt([[1, 1], [3, 1], [1, 3], [3, 3]]),
+    initialScouts: 5,
+    placementStacking: true,
+  },
+  '5x5-classic': {
+    description: '5×5 board; obelisks on the four inner corners, the center ' +
+      'and edges free. Five scouts each, empty territories only.',
     width: 5,
     height: 5,
+    obelisks: obelisksAt([[1, 1], [4, 1], [1, 4], [4, 4]]),
+    initialScouts: 5,
+    placementStacking: false,
+  },
+  '4x4-diamond': {
+    description: 'Experimental: 4×4 board, obelisks ringed around the center ' +
+      '(center territories touch two, corners none). Three scouts each.',
+    width: 4,
+    height: 4,
+    obelisks: obelisksAt([[2, 1], [3, 2], [1, 2], [2, 3]]),
+    initialScouts: 3,
+    placementStacking: false,
+  },
+};
+export const DEFAULT_LAYOUT = '4x4-partition';
+
+// Full rules config for a layout: shared base rules plus the layout's board
+// and variants. `layout` is recorded in the config (frontends show it, and a
+// partial config naming a layout can be completed from it).
+export function defaultConfig(layout = DEFAULT_LAYOUT) {
+  const L = LAYOUTS[layout];
+  if (!L) throw new Error(`unknown layout '${layout}' (have: ${Object.keys(LAYOUTS).join(', ')})`);
+  const { description, ...variant } = L;
+  return { layout, ...baseRules(), ...structuredClone(variant) };
+}
+
+// Complete a (possibly partial) config, e.g. one parsed from JSON: start from
+// its layout's defaults and apply the given keys on top.
+export function resolveConfig(partial = {}) {
+  return { ...defaultConfig(partial.layout ?? DEFAULT_LAYOUT), ...partial };
+}
+
+// Rules shared by every layout (layouts supply width, height, obelisks,
+// initialScouts and placementStacking).
+function baseRules() {
+  return {
     // Per-army sideboard: value -> count. 8 scouts, 5 soldiers, 3 chieftains,
     // 2 warlords, 1 behemoth — fibonacci counts of fibonacci values, 45 pts.
     // ('Warrior' is the generic term for any piece of value 2 or more.)
     supply: { 1: 8, 2: 5, 3: 3, 5: 2, 8: 1 },
-    // Scouts each army places during the snake-placement phase; the rest of
-    // the sideboard (including remaining scouts) enters play via spawning.
-    initialScouts: 5,
-    // Placement may stack a scout onto your own lone scout (a (1,1) pair —
-    // evolvable to a soldier from turn 1) instead of only empty territories.
-    placementStacking: false,
+    // (Layout-supplied: initialScouts — scouts each army places during the
+    // snake-placement phase, the rest entering via spawning — and
+    // placementStacking — placement may also double up on your own lone
+    // scout, a (1,1) pair evolvable to a soldier from turn 1.)
     maxPiecesPerTerritory: 2,
     // Each contingent takes at most this many actions per turn...
     maxActionsPerContingent: 2,
@@ -82,16 +136,7 @@ export function defaultConfig() {
     // First-turn handicap: each acting contingent takes at most this many
     // actions on turn 1. null = no cap beyond maxActionsPerContingent.
     firstTurnActions: 2,
-    // Obelisks sit on interior corner points where four territories meet:
-    // corner [cx, cy] touches cells (cx-1,cy-1) (cx,cy-1) (cx-1,cy) (cx,cy).
-    // Each element grants bonus budget for its mechanic while controlled:
-    // fire → attack, earth → evolve, air → move, water → spawn.
-    obelisks: [
-      { element: 'fire', corner: [1, 1] },
-      { element: 'earth', corner: [4, 1] },
-      { element: 'air', corner: [1, 4] },
-      { element: 'water', corner: [4, 4] },
-    ],
+    // (Layout-supplied: obelisks — see LAYOUTS.)
     // Controlled obelisks also grant an active ability, once per obelisk per
     // turn (no budget cost — the piece spent is the price). The fuel is
     // always one of YOUR SCOUTS standing in a territory adjacent to that
