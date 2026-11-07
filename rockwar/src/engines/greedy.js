@@ -4,6 +4,7 @@
 
 import { legalPlacements, neighbors, xy, other, armyPieceCount, armyStrengthOnBoard, canAddPiece, combatRuleOf, obeliskCells, obeliskStatus, applyAction } from '../game.js';
 import { obeliskReach, reachDanger } from './obelisk-threat.js';
+import { choosePlacement } from './placement.js';
 
 const DEFAULT_WEIGHTS = {
   killPerPoint: 12,     // per point of enemy material destroyed
@@ -31,6 +32,7 @@ const DEFAULT_WEIGHTS = {
   spawnFloor: 3,        // ...but board presence never stops mattering
   costPenalty: 0.5,     // mild preference for cheaper actions
   passThreshold: 0,     // pass if the best score is below this
+  placement: 'split',   // scout placement style: single | split, optionally -stack
 };
 
 function manhattan(config, i, j) {
@@ -139,28 +141,9 @@ export function makeGreedyEngine(opts = {}) {
   return {
     name: 'greedy',
 
-    // Place scouts clustered together with a bias toward the center.
+    // Placement style (see placement.js): one central cluster by default.
     placeScout(state, army, rng) {
-      const { config } = state;
-      const open = legalPlacements(state);
-      const cx = (config.width - 1) / 2;
-      const cy = (config.height - 1) / 2;
-      let best = open[0];
-      let bestScore = -Infinity;
-      for (const i of open) {
-        const [x, y] = xy(config, i);
-        let score = -(Math.abs(x - cx) + Math.abs(y - cy)); // central
-        for (const n of neighbors(config, i)) {
-          if (state.cells[n].army === army) score += 2; // adjacent to own
-          if (state.cells[n].army === other(army)) score -= 0.5;
-        }
-        for (const ob of config.obelisks ?? []) {
-          if (obeliskCells(config, ob.corner).includes(i)) score += 1.5;
-        }
-        score += rng() * 0.1; // tiebreak
-        if (score > bestScore) { bestScore = score; best = i; }
-      }
-      return best;
+      return choosePlacement(state, army, rng, W.placement);
     },
 
     chooseAction(state, ctx, acts, rng) {

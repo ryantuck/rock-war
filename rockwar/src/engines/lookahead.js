@@ -12,6 +12,7 @@ import {
   obeliskStatus, obeliskCells, obeliskElementBonus, combatRuleOf,
 } from '../game.js';
 import { obeliskReach } from './obelisk-threat.js';
+import { choosePlacement } from './placement.js';
 
 const DEFAULT_WEIGHTS = {
   material: 10,     // per point of deployable strength difference
@@ -48,6 +49,7 @@ const DEFAULT_WEIGHTS = {
   passMargin: -3,   // act unless clearly harmful — passing doesn't freeze the
                     // game, the opponent moves next, so idling has real cost
   jitter: 0.05,     // random tiebreak
+  placement: 'split', // scout placement style: single | split, optionally -stack
 };
 
 // Deployable strength: board material plus sideboard scouts (bigger sideboard
@@ -289,11 +291,11 @@ function retreatPolicy(state, attackInfo, options) {
 // (receding horizon), so enemy reactions and mid-turn surprises are
 // absorbed naturally.
 export function makePlannerEngine(opts = {}) {
-  const { depth = 3, beam = 6, expand = 40, ...rest } = opts;
-  // The planner finds its own within-turn obelisk finishes by search, so the
-  // own-reach bonus only double-counts them (it cost planner-obelisk ~6
-  // points against an obelisk rusher); the enemy-threat term stays.
-  const weightOpts = { obeliskSetup: 0, ...rest };
+  // The beam search covers only THIS turn, so the evaluator's own-reach bonus
+  // (obeliskSetup) is the planner's only reason to set up an obelisk finish
+  // for its NEXT turn — without it, a planner holding two obelisks against a
+  // helpless opponent shuffled pieces instead of walking into the win.
+  const { depth = 3, beam = 6, expand = 40, ...weightOpts } = opts;
   const W = { ...DEFAULT_WEIGHTS, ...weightOpts };
   const base = makeLookaheadEngine(weightOpts);
   const simStub = { planRetreats: (s, info, options) => retreatPolicy(s, info, options) };
@@ -372,27 +374,9 @@ export function makeLookaheadEngine(opts = {}) {
   return {
     name: 'lookahead',
 
-    // Same opening as greedy: clustered scouts near the center.
+    // Placement style (see placement.js): one central cluster by default.
     placeScout(state, army, rng) {
-      const { config } = state;
-      const cx = (config.width - 1) / 2;
-      const cy = (config.height - 1) / 2;
-      let best = null;
-      let bestScore = -Infinity;
-      for (const i of legalPlacements(state)) {
-        const [x, y] = xy(config, i);
-        let score = -(Math.abs(x - cx) + Math.abs(y - cy));
-        for (const n of neighbors(config, i)) {
-          if (state.cells[n].army === army) score += 2;
-          if (state.cells[n].army === other(army)) score -= 0.5;
-        }
-        for (const ob of config.obelisks ?? []) {
-          if (obeliskCells(config, ob.corner).includes(i)) score += 1.5;
-        }
-        score += rng() * 0.1;
-        if (score > bestScore) { bestScore = score; best = i; }
-      }
-      return best;
+      return choosePlacement(state, army, rng, W.placement);
     },
 
     chooseAction(state, ctx, acts, rng) {

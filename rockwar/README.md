@@ -14,6 +14,8 @@ node src/sim.js --games 500 --a greedy --b random --seed 42
 node src/sim.js --games 500 --a greedy --b greedy
 node src/sim.js --games 100 --a greedy --b random --verbose   # per-game lines
 node src/sim.js --games 500 --a greedy --b random --config my-rules.json
+node src/sim.js --games 500 --a greedy --b greedy --layout 5x5-classic   # another board
+node src/sim.js --layouts                                                 # list layouts
 
 # Round-robin tournament across all engines (the balance dashboard):
 # standings by points (win 1, draw 0.5) plus a head-to-head grid
@@ -55,16 +57,64 @@ Under the hood the rules engine emits a structured event stream
 animations and renders the exact snapshot after each, so the displayed
 board can never drift from the real state. Sims ignore the stream.
 
+## Board layouts
+
+*[AI - Claude]: Board layouts*
+
+A **layout** (`LAYOUTS` in `src/game.js`) bundles a board size, its obelisk
+positions, and the rule variants measured to suit it. `defaultConfig(name)`
+builds the full config: shared base rules plus the layout. A partial
+config naming a `layout` is completed from it (`resolveConfig`). Pick one
+in the frontend's layout menu (it reloads the rules editor), or with
+`--layout` on the CLI. `--config` keys apply on top.
+
+| Layout | Board | Obelisk corners | Scouts | Stack on own scout |
+|---|---|---|---|---|
+| `4x4-partition` (default) | 4×4 | [1,1] [3,1] [1,3] [3,3] — every territory touches exactly one | 5 | yes |
+| `5x5-classic` | 5×5 | [1,1] [4,1] [1,4] [4,4] — center and edges free | 5 | no |
+| `4x4-diamond` (experimental) | 4×4 | [2,1] [3,2] [1,2] [2,3] — center territories touch two, corners none | 3 | no |
+
+How they play under the current engines (split placement; 100–400 games
+per matchup, seat shares ±3–5 pts):
+
+| | 4x4-partition | 5x5-classic | 4x4-diamond |
+|---|---|---|---|
+| Seat A: greedy / lookahead / planner-obelisk mirrors | 44.5 / 46 / 48% | 52 / 33.5 / 36% | 47 / 48 / 54% |
+| Obelisk wins: lookahead / planner-obelisk mirror | 13 / 28% | 14.5 / 36% | 40.5 / 62% |
+| Draws: greedy / lookahead mirror | 20 / 5% | 8.8 / 1.5% | 8.8 / 4.5% |
+| Median length: lookahead / planner-obelisk mirror | 14 / 15 | 18 / 16 | 10 / 7 |
+| Obelisk held before turn 1 | ~30% | ~90% | 0% |
+| Lookahead vs greedy | 90% | 86% | 82% |
+
+- **4x4-partition (default):** the most even overall, and obelisks matter
+  without dominating. Greedy mirrors stall into draws often.
+- **5x5-classic:** longer games and the most room. The lookahead and
+  planner mirrors favor seat B, and split placement usually hands someone
+  an obelisk before turn 1.
+- **4x4-diamond:** even and quick, but a race. Most search-engine games
+  end in an obelisk win within ~10 turns.
+
+To add a layout, add an entry to `LAYOUTS`: `width`, `height`,
+`obelisks` (four corner points), `initialScouts`, `placementStacking`, and
+a one-line `description`. The CLI, frontend and engines pick it up.
+
+The findings sections further down were measured on the 5×5 board
+(`5x5-classic`) unless they say otherwise. The 4×4 section and the tables
+above are on 4×4.
+
 ## Rules as implemented
 
-- **Board**: 5×5 grid of 25 territories, orthogonal adjacency.
+- **Board**: set by the **layout** (see *Board layouts* below) —
+  `4x4-partition` by default (16 territories), also `5x5-classic` and an
+  experimental `4x4-diamond`. Orthogonal adjacency.
 - **Armies**: each side's sideboard holds 8×1 (scouts), 5×2 (soldiers),
   3×3 (chieftains), 2×5 (warlords), 1×8 (behemoth) — fibonacci counts of
   fibonacci values, 45 points total. Any piece of value 2 or more is a
   **warrior**.
 - **Placement**: snake order (A B B A A B B A A B …), one scout per slot onto
-  any empty territory, until each army has placed `initialScouts` (default 5;
-  B makes the final placement). Remaining
+  any empty territory — or, with `placementStacking`, onto one of your own
+  lone scouts, making a (1,1) pair — until each army has placed
+  `initialScouts` (default 5; B makes the final placement). Remaining
   sideboard pieces — including the other scouts — enter play by spawning and
   evolving. Then A moves first.
 - **Territories** hold at most 2 pieces, which must be fibonacci-adjacent:
@@ -128,9 +178,10 @@ board can never drift from the real state. Sims ignore the stream.
 - **First-turn handicap**: on turn 1, the opening player acts with only one
   contingent (their engine chooses which); it takes the normal 2 actions.
   Tunable via `firstTurnContingents` / `firstTurnActions`.
-- **Obelisks**: four elemental obelisks sit on corner points where four
-  territories meet — fire (red) at [1,1], earth (green) at [4,1], air
-  (yellow) at [1,4], water (blue) at [4,4]. Each maps to a mechanic:
+- **Obelisks**: four elemental obelisks — fire (red), earth (green), air
+  (yellow), water (blue) — sit on corner points where four territories
+  meet, placed by the layout (4×4 partition: [1,1] [3,1] [1,3] [3,3];
+  5×5 classic: [1,1] [4,1] [1,4] [4,4]). Each maps to a mechanic:
   fire → attack, earth → evolve, air → move, water → spawn. An army
   *controls* an obelisk by occupying **at least 2** of its adjacent
   territories with the **strictly greatest** total adjacent piece value of
@@ -209,7 +260,8 @@ box or via `--config file.json` on the CLI:
 | `firstTurnContingents` | 1 | contingents the opening player may act with on turn 1 (0 = skip turn 1, null = no handicap) |
 | `firstTurnActions` | 2 | actions per contingent on turn 1 (1 = the old single-action opening; null = normal cap) |
 | `minAttackValue` | 2 | minimum piece value that may attack — scouts can't (1 = anyone can) |
-| `obelisks` | 4 corners | element + corner position per obelisk; empty array disables them |
+| `layout` | `4x4-partition` | named board layout: supplies `width`/`height`, `obelisks`, `initialScouts`, `placementStacking`; other keys apply on top |
+| `obelisks` | per layout | element + corner position per obelisk; empty array disables them |
 | `obeliskAbilities` | `true` | controlled obelisks grant their active ability |
 | `obeliskPowers` | `true` | passive auras: air retreat budget, water combat saves, earth attack tax |
 | `obeliskVictory` | `true` | controlling `obeliskVictoryCount` obelisks simultaneously wins immediately |
@@ -218,11 +270,12 @@ box or via `--config file.json` on the CLI:
 | destroyed pieces | removed | destroyed pieces leave the game entirely (they do *not* return to the sideboard) |
 | capture on retreat | yes | if all defenders retreat, the attacker advances into the vacated territory |
 | simultaneous wipe | draw | mutual destruction can empty both boards at once → draw |
-| `initialScouts` | 5 | scouts each army places in the placement phase (capped at scout supply) |
+| `initialScouts` | per layout (5; diamond 3) | scouts each army places in the placement phase (capped at scout supply) |
+| `placementStacking` | per layout (on for 4×4 partition) | placement may double up on your own lone scout ((1,1), evolvable from turn 1) |
 | `maxTurns` | 200 | game ends here; tiebreak decides unless dead even |
 | `turnLimitTiebreak` | `true` | at the cap: most board strength wins, obelisks break ties |
 | `supply` | 8/5/3/2/1 | change piece mix freely; placement uses the scout count |
-| `width`/`height` | 5×5 | any board size; the frontend adapts |
+| `width`/`height` | per layout (4×4) | any board size; the frontend adapts |
 
 ## Engines
 
@@ -254,14 +307,22 @@ box or via `--config file.json` on the CLI:
   `obeliskLethal` (300) for an enemy finish, fading to 50% / 25% / 10% when
   it's one / two / three units short (`reachCurve`, the early warning that
   pushes a threat back before it's lethal), and pays `obeliskSetup` (60) on
-  the same curve for our own (one-ply engines only — the planners find
-  their own within-turn finishes by search, so `obeliskSetup` defaults to 0
-  there). Our obelisk annuities still fade against a
+  the same curve for our own. The planners need it too: their beam search
+  covers only the current turn, so this bonus is what makes them set up a
+  finish for the next one. Our obelisk annuities still fade against a
   nearly-dead enemy (`obeliskFadeAt`); the enemy's obelisk terms no longer
   do. `obeliskBrink` (flat cost of an enemy one obelisk from victory) and
   `obeliskReach(..., { approach: true })` (can an enemy one short of the
   brink step onto it?) exist but are off: in sweeps both bought
   over-defense — engines out-fought while guarding corners.
+- **Placement styles** (`src/engines/placement.js`, engine option
+  `placement`) — `split` (default): two separate starting contingents,
+  opening the second away from the first, growing the smaller, never
+  merging. `single`: one central cluster (the original heuristic).
+  `-stack` variants double up on their own lone scouts (up to two pairs)
+  when `placementStacking` allows it. Split wins head-to-head for every
+  engine tested, on both boards. Two contingents mean twice the actions
+  from turn 2 on, for the same material.
 - **lookahead-aggro / -obelisk / -turtle / -tempo** — strategy-archetype
   presets of the same search with re-weighted evaluators (attrition, map
   control, defense/clock, economy). Tournaments between them measure which
@@ -419,9 +480,18 @@ evaluator. Defenders are compared old → new on the same seeds (100 games,
   ~40–60%, and it wins more obelisk races itself (obelisk wins vs `rush`
   15 → 27).
 - **The planners hold steady.** Their obelisk losses don't change, and
-  the point swings are within noise (±5–6 pts at these sizes). An
-  own-reach bonus made them worse (planner-obelisk 53% vs 48%), so it is
-  off for planners.
+  the point swings are within noise (±5–6 pts at these sizes).
+- **Correction: planners need the own-reach bonus.** It was briefly off for
+  planners, on the theory that their search already finds their own
+  finishes. A human game showed that theory was wrong. The planner held
+  earth and water against an army of two 3s. A two-turn air win was
+  available (5 to a4, a scout toward a3, then 5×b4 and the scout into a4),
+  and it shuffled scouts back and forth instead. The search only spans the
+  current turn. From that position: 0 of 20 playouts won within 10 turns
+  with the bonus off; 20 of 20 won in 3 turns with it on (30 or 60 alike).
+  With the bonus on, planner mirrors end on obelisks more often
+  (planner-obelisk mirror 63%, seat B 76% of decided games) — a balance
+  question for the rules, not an engine bug.
 - **What remains is mostly double threats.** When the rusher holds two
   obelisks with two reachable thirds, no single defense works. Defending
   earlier (a flat brink cost, an approach term) made engines over-defend
@@ -437,6 +507,61 @@ evaluator. Defenders are compared old → new on the same seeds (100 games,
   - Round robin: planner-obelisk 72.2%, lookahead-obelisk 69.4% (was
     64.5%), planner 63.9%, lookahead 62.5%, turtle 62.5%, tempo 61.6%,
     aggro 40.6%, greedy 14.8%, random 2.5%. Draws ~2%.
+
+## 4×4 partition board and placement styles
+
+*[AI - Claude]: 4×4 partition and split-placement findings*
+
+Layout `4x4-partition` (now the default): a 4×4 board, obelisks on
+interior corners [1,1] [3,1] [1,3] [3,3] (every territory touches exactly
+one), five starting scouts, and `placementStacking` on. The old 5×5 corners
+don't work on 4×4: water would touch a single cell and could never be
+controlled. (Measured when it was a `configs/` preset; the numbers below
+are unchanged under the layout.)
+
+**Placement styles, head-to-head within each engine** (4×4 preset, 200
+games per pairing for greedy, 100 for the rest):
+
+| Engine | split | split-stack | single | single-stack |
+|---|---|---|---|---|
+| greedy | **60.5%** | 51.1% | 47.9% | 40.5% |
+| lookahead | **72.8%** | 47.5% | 54.0% | 25.7% |
+| planner | **71.7%** | 55.2% | 49.7% | 23.5% |
+| planner-obelisk | **66.7%** | 60.2% | 37.3% | 35.8% |
+
+On the default 5×5 board, split beats single too: lookahead 59%, greedy
+56.5%, planner-obelisk 73.8%. So `split` is now the engines' default
+placement. Two contingents take two actions each from turn 2 for the
+same material, and the turn-1 one-contingent limit costs the opener less
+than that is worth. Stacking hurts in nearly every pairing: a (1,1)
+pair's turn-1 soldier doesn't pay for the territory it gives up (on the
+partition board, territories are obelisk presence). Engines therefore
+don't stack, though the rule still lets a human player do it.
+
+**The game itself** (split placement for all engines; seat A = A's share
+of decided games, ±3–5 pts):
+
+| | 5×5, single (old) | 5×5, split | 4×4 preset, single | 4×4 preset, split |
+|---|---|---|---|---|
+| Seat A: greedy / lookahead / p-obelisk mirrors | 60 / 45 / 25% | 52 / 33.5 / 36% | 68 / 63 / 68% | 44.5 / 46 / 48% |
+| Obelisk wins: lookahead / p-obelisk mirror | 40 / 63% | 14.5 / 36% | 8 / 10% | 13 / 28% |
+| Draws: greedy / lookahead mirror | 9.5 / 5% | 8.8 / 1.5% | 16 / 7% | 20 / 5% |
+| Median length: lookahead / p-obelisk mirror | 27 / 22 | 18 / 16 | 14 / 12 | 14 / 15 |
+| Obelisk held before turn 1 | 33% | ~90% | 100% | ~30% |
+| Lookahead vs greedy | 95% | 86% | 88.5% | 90% |
+
+- **The 4×4 preset with split placement is the most even setup measured
+  so far.** Every mirror sits within ~2 SE of 50%, including the planner
+  mirror that favors B 75% on 5×5. Games run half as long as on 5×5, and
+  obelisk wins matter without dominating.
+- **The costs.** Greedy mirrors stall into draws more often (20%), and
+  skill separates less than on 5×5. Round robin on the preset:
+  planner-obelisk 77.7%, planner 66.6%, lookahead-obelisk 65.2%, tempo
+  62.7%, lookahead 57.8%, aggro 50.9%, turtle 48.8%, greedy 19.7%, random
+  0.8%. Draws 3%.
+- **On 5×5, split placement parks groups beside obelisks.** About 90% of
+  games start with an obelisk held. The lookahead mirror tilts toward B
+  (33.5% A), while the greedy and planner mirrors move closer to even.
 
 ## Current observations (300-game matchups, seats swapped, 5×5, devolve combat)
 
