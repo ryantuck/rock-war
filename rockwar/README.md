@@ -73,18 +73,19 @@ in the frontend's layout menu (it reloads the rules editor), or with
 | `4x4-partition` (default) | 4×4 | [1,1] [3,1] [1,3] [3,3] — every territory touches exactly one | 5 | yes |
 | `5x5-classic` | 5×5 | [1,1] [4,1] [1,4] [4,4] — center and edges free | 5 | no |
 | `4x4-diamond` (experimental) | 4×4 | [2,1] [3,2] [1,2] [2,3] — center territories touch two, corners none | 3 | no |
+| `hex13` | 13 hexagons, rows 1-3-5-3-1 | four hex corners, each touching 3 territories; only the center touches none | 5 | yes |
 
 How they play under the current engines (split placement; 100–400 games
 per matchup, seat shares ±3–5 pts):
 
-| | 4x4-partition | 5x5-classic | 4x4-diamond |
-|---|---|---|---|
-| Seat A: greedy / lookahead / planner-obelisk mirrors | 44.5 / 46 / 48% | 52 / 33.5 / 36% | 47 / 48 / 54% |
-| Obelisk wins: lookahead / planner-obelisk mirror | 13 / 28% | 14.5 / 36% | 40.5 / 62% |
-| Draws: greedy / lookahead mirror | 20 / 5% | 8.8 / 1.5% | 8.8 / 4.5% |
-| Median length: lookahead / planner-obelisk mirror | 14 / 15 | 18 / 16 | 10 / 7 |
-| Obelisk held before turn 1 | ~30% | ~90% | 0% |
-| Lookahead vs greedy | 90% | 86% | 82% |
+| | 4x4-partition | 5x5-classic | 4x4-diamond | hex13 |
+|---|---|---|---|---|
+| Seat A: greedy / lookahead / planner-obelisk mirrors | 44.5 / 46 / 48% | 52 / 33.5 / 36% | 47 / 48 / 54% | 44.5 / 45 / 50% |
+| Obelisk wins: lookahead / planner-obelisk mirror | 13 / 28% | 14.5 / 36% | 40.5 / 62% | 7 / 22% |
+| Draws: greedy / lookahead mirror | 20 / 5% | 8.8 / 1.5% | 8.8 / 4.5% | 6.2 / 6.5% |
+| Median length: lookahead / planner-obelisk mirror | 14 / 15 | 18 / 16 | 10 / 7 | 14 / 14 |
+| Obelisk held before turn 1 | ~30% | ~90% | 0% | ~60% |
+| Lookahead vs greedy | 90% | 86% | 82% | 85.5% |
 
 - **4x4-partition (default):** the most even overall, and obelisks matter
   without dominating. Greedy mirrors stall into draws often.
@@ -93,10 +94,31 @@ per matchup, seat shares ±3–5 pts):
   an obelisk before turn 1.
 - **4x4-diamond:** even and quick, but a race. Most search-engine games
   end in an obelisk win within ~10 turns.
+- **hex13:** as even as 4×4 partition, with fewer draws (greedy mirror
+  6% vs 20%). Obelisk wins are rarer than on the grids, and games are
+  decided mostly by fighting. The shape came from a search of all
+  180°-symmetric 13-hex boards within two rings of the center: this is
+  the most compact one where four three-hex obelisks cover every
+  territory but the center, mirroring 4×4 partition. It is symmetric
+  under a half turn (each side's half maps onto the other's), not under
+  mirroring. Starting scouts were swept from 2 to 5. Five gave the most
+  even seats; with 3–4, the lookahead mirror favored B 68–72%. Round
+  robin: planner-obelisk 72.8%, lookahead-obelisk 66.7%, planner 62.5%,
+  tempo 60.2%, lookahead 59.4%, turtle 56.6%, aggro 49.2%, greedy 22.5%,
+  random 0.2%. Draws 3.7%.
 
-To add a layout, add an entry to `LAYOUTS`: `width`, `height`,
-`obelisks` (four corner points), `initialScouts`, `placementStacking`, and
-a one-line `description`. The CLI, frontend and engines pick it up.
+To add a layout, add an entry to `LAYOUTS` with `initialScouts`,
+`placementStacking`, a one-line `description`, and a board:
+- **Grid:** `width` and `height`, plus `obelisks` as four `corner` points.
+- **Hex:** `shape: 'hex'` and `hexes` (axial `[q, r]` coordinates of
+  pointy-top hexagons), plus `obelisks` listing the `hexes` each one
+  touches (a hex corner touches three).
+
+The CLI, frontend and engines pick it up. Engines and the UI go through
+the topology functions in `src/game.js` (`cellCount`, `neighbors`,
+`cellDistance`, `centerDistance`, `obeliskTerritories`, `fmtCell`).
+Hex cells are labelled by row (1 at the top) and by letter left to right
+within the row (`c3` is hex13's center).
 
 The findings sections further down were measured on the 5×5 board
 (`5x5-classic`) unless they say otherwise. The 4×4 section and the tables
@@ -105,8 +127,9 @@ above are on 4×4.
 ## Rules as implemented
 
 - **Board**: set by the **layout** (see *Board layouts* below) —
-  `4x4-partition` by default (16 territories), also `5x5-classic` and an
-  experimental `4x4-diamond`. Orthogonal adjacency.
+  `4x4-partition` by default (16 territories), also `5x5-classic`, an
+  experimental `4x4-diamond`, and `hex13` (13 hexagons). Grids use
+  orthogonal adjacency; hex boards use six-way adjacency.
 - **Armies**: each side's sideboard holds 8×1 (scouts), 5×2 (soldiers),
   3×3 (chieftains), 2×5 (warlords), 1×8 (behemoth) — fibonacci counts of
   fibonacci values, 45 points total. Any piece of value 2 or more is a
@@ -179,9 +202,11 @@ above are on 4×4.
   contingent (their engine chooses which); it takes the normal 2 actions.
   Tunable via `firstTurnContingents` / `firstTurnActions`.
 - **Obelisks**: four elemental obelisks — fire (red), earth (green), air
-  (yellow), water (blue) — sit on corner points where four territories
-  meet, placed by the layout (4×4 partition: [1,1] [3,1] [1,3] [3,3];
-  5×5 classic: [1,1] [4,1] [1,4] [4,4]). Each maps to a mechanic:
+  (yellow), water (blue) — sit on corner points, placed by the layout. On
+  grids a corner touches four territories (4×4 partition: [1,1] [3,1]
+  [1,3] [3,3]; 5×5 classic: [1,1] [4,1] [1,4] [4,4]). On hex13 a corner
+  touches three: fire a1 a2 b2, earth c2 d3 e3, air a3 a4 b3, water a5 b4
+  c4. Each maps to a mechanic:
   fire → attack, earth → evolve, air → move, water → spawn. An army
   *controls* an obelisk by occupying **at least 2** of its adjacent
   territories with the **strictly greatest** total adjacent piece value of
@@ -275,7 +300,8 @@ box or via `--config file.json` on the CLI:
 | `maxTurns` | 200 | game ends here; tiebreak decides unless dead even |
 | `turnLimitTiebreak` | `true` | at the cap: most board strength wins, obelisks break ties |
 | `supply` | 8/5/3/2/1 | change piece mix freely; placement uses the scout count |
-| `width`/`height` | per layout (4×4) | any board size; the frontend adapts |
+| `width`/`height` | per layout (4×4) | grid board size; the frontend adapts |
+| `shape` / `hexes` | per layout (`hex13`) | `'hex'` plus axial `[q, r]` hex coordinates for hex boards; obelisks then list the `hexes` they touch |
 
 ## Engines
 

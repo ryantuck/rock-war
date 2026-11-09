@@ -30,7 +30,8 @@ node src/sim.js --layouts   # list board layouts
 **Board layouts** bundle a board size, obelisk positions and the rule
 variants that suit it: `4x4-partition` (default — every territory touches
 exactly one obelisk; five scouts, which may double up), `5x5-classic` (the
-earlier 5×5 board), and experimental `4x4-diamond`. Pick one in the
+earlier 5×5 board), experimental `4x4-diamond`, and `hex13` (13 hexagons,
+obelisks on hex corners touching three territories each). Pick one in the
 frontend's layout menu or with `--layout`.
 
 ## Rules in brief

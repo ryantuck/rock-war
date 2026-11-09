@@ -63,6 +63,24 @@ export const LAYOUTS = {
     initialScouts: 3,
     placementStacking: false,
   },
+  hex13: {
+    description: '13 hexagons in rows of 1-3-5-3-1. Four obelisks on hex ' +
+      'corners, each touching three territories; only the center touches none. ' +
+      'Five scouts each, and placement may double up on your own scout.',
+    shape: 'hex',
+    // Axial [q, r], pointy-top, listed top-to-bottom, left-to-right.
+    hexes: [[1, -2], [0, -1], [1, -1], [2, -1], [-2, 0], [-1, 0], [0, 0], [1, 0],
+      [2, 0], [-2, 1], [-1, 1], [0, 1], [-1, 2]],
+    // Fire faces water and earth faces air through the center.
+    obelisks: [
+      { element: 'fire', hexes: [[1, -2], [0, -1], [1, -1]] },
+      { element: 'earth', hexes: [[2, -1], [1, 0], [2, 0]] },
+      { element: 'air', hexes: [[-2, 0], [-2, 1], [-1, 0]] },
+      { element: 'water', hexes: [[-1, 2], [-1, 1], [0, 1]] },
+    ],
+    initialScouts: 5,
+    placementStacking: true,
+  },
 };
 export const DEFAULT_LAYOUT = '4x4-partition';
 
@@ -82,8 +100,8 @@ export function resolveConfig(partial = {}) {
   return { ...defaultConfig(partial.layout ?? DEFAULT_LAYOUT), ...partial };
 }
 
-// Rules shared by every layout (layouts supply width, height, obelisks,
-// initialScouts and placementStacking).
+// Rules shared by every layout (layouts supply the board — width/height, or
+// shape 'hex' with hexes — plus obelisks, initialScouts and placementStacking).
 function baseRules() {
   return {
     // Per-army sideboard: value -> count. 8 scouts, 5 soldiers, 3 chieftains,
@@ -190,6 +208,18 @@ export function combatRuleOf(config) {
   return 'margin';
 }
 
+// ---------------------------------------------------------------------------
+// Board topology
+// ---------------------------------------------------------------------------
+// Two board shapes: square grids (width × height, orthogonal adjacency — the
+// default) and hex boards (config.shape === 'hex': config.hexes lists the
+// territories as axial [q, r] coordinates of pointy-top hexagons, six-way
+// adjacency). Engines and frontends go through cellCount / neighbors /
+// cellDistance / centerDistance / obeliskTerritories / fmtCell rather than
+// assuming a grid; idx/xy are grid-only.
+
+export const isHex = (config) => config.shape === 'hex';
+
 export function idx(config, x, y) {
   return y * config.width + x;
 }
@@ -198,7 +228,39 @@ export function xy(config, i) {
   return [i % config.width, Math.floor(i / config.width)];
 }
 
+const HEX_DIRS = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
+const hexDist = (dq, dr) => (Math.abs(dq) + Math.abs(dr) + Math.abs(dq + dr)) / 2;
+// Derived hex data (adjacency, centroid, labels), cached per config object.
+const hexCache = new WeakMap();
+function hexInfo(config) {
+  let info = hexCache.get(config);
+  if (info) return info;
+  const hexes = config.hexes;
+  const index = new Map(hexes.map(([q, r], i) => [`${q},${r}`, i]));
+  const adj = hexes.map(([q, r]) => HEX_DIRS
+    .map(([dq, dr]) => index.get(`${q + dq},${r + dr}`))
+    .filter((j) => j !== undefined));
+  const cq = hexes.reduce((t, h) => t + h[0], 0) / hexes.length;
+  const cr = hexes.reduce((t, h) => t + h[1], 0) / hexes.length;
+  // Labels: rows numbered top to bottom, letters left to right within a row.
+  const rows = [...new Set(hexes.map((h) => h[1]))].sort((a, b) => a - b);
+  const labels = [];
+  rows.forEach((r, k) => {
+    hexes.map((h, i) => [h, i]).filter(([h]) => h[1] === r)
+      .sort(([a], [b]) => (a[0] + a[1] / 2) - (b[0] + b[1] / 2))
+      .forEach(([, i], j) => { labels[i] = `${'abcdefghijklmnop'[j]}${k + 1}`; });
+  });
+  info = { index, adj, cq, cr, labels };
+  hexCache.set(config, info);
+  return info;
+}
+
+export function cellCount(config) {
+  return isHex(config) ? config.hexes.length : config.width * config.height;
+}
+
 export function neighbors(config, i) {
+  if (isHex(config)) return hexInfo(config).adj[i];
   const [x, y] = xy(config, i);
   const out = [];
   if (x > 0) out.push(i - 1);
@@ -208,13 +270,45 @@ export function neighbors(config, i) {
   return out;
 }
 
+// Steps between two territories (grid: Manhattan; hex: hex distance).
+export function cellDistance(config, i, j) {
+  if (isHex(config)) {
+    const [a, b] = [config.hexes[i], config.hexes[j]];
+    return hexDist(a[0] - b[0], a[1] - b[1]);
+  }
+  const [x1, y1] = xy(config, i);
+  const [x2, y2] = xy(config, j);
+  return Math.abs(x1 - x2) + Math.abs(y1 - y2);
+}
+
+// Distance from the board's center (fractional for off-center centroids).
+export function centerDistance(config, i) {
+  if (isHex(config)) {
+    const { cq, cr } = hexInfo(config);
+    const [q, r] = config.hexes[i];
+    return hexDist(q - cq, r - cr);
+  }
+  const [x, y] = xy(config, i);
+  return Math.abs(x - (config.width - 1) / 2) + Math.abs(y - (config.height - 1) / 2);
+}
+
 // ---------------------------------------------------------------------------
 // Obelisks
 // ---------------------------------------------------------------------------
 
 export const ELEMENT_ACTIONS = { fire: 'attack', earth: 'evolve', air: 'move', water: 'spawn' };
 
-// The up-to-4 territories touching an obelisk's corner point.
+// The territories an obelisk touches: on grids, the up-to-4 around its
+// corner point; on hex boards, the hexes it lists (a hex corner touches 3).
+export function obeliskTerritories(config, ob) {
+  if (ob.hexes) {
+    const { index } = hexInfo(config);
+    return ob.hexes.map(([q, r]) => index.get(`${q},${r}`)).filter((i) => i !== undefined);
+  }
+  return obeliskCells(config, ob.corner);
+}
+
+// The up-to-4 grid territories touching a corner point.
 export function obeliskCells(config, corner) {
   const [cx, cy] = corner;
   const out = [];
@@ -226,7 +320,7 @@ export function obeliskCells(config, corner) {
 
 // Who controls this obelisk, and at what bonus tier?
 export function obeliskStatus(state, ob) {
-  const cells = obeliskCells(state.config, ob.corner);
+  const cells = obeliskTerritories(state.config, ob);
   const score = { A: 0, B: 0 };
   const count = { A: 0, B: 0 };
   for (const i of cells) {
@@ -293,7 +387,7 @@ export function placementOrder(config) {
 
 export function newGame(config = defaultConfig()) {
   const cells = [];
-  for (let i = 0; i < config.width * config.height; i++) {
+  for (let i = 0; i < cellCount(config); i++) {
     cells.push({ army: null, pieces: [] });
   }
   return {
@@ -634,7 +728,7 @@ export function abilityActions(state, army, cellFilter = null) {
     if (st.controller !== army || st.bonus === 0) continue;
     const maxFuel = st.bonus; // fibonacci fuel cap from the fervor tier
     // Fuel: one of our pieces (value <= maxFuel) adjacent to THIS obelisk.
-    for (const t of obeliskCells(config, ob.corner)) {
+    for (const t of obeliskTerritories(config, ob)) {
       if (cellFilter && !cellFilter.has(t)) continue;
       const cell = state.cells[t];
       if (cell.army !== army) continue;
@@ -1366,6 +1460,7 @@ export function playGame({ engines, config = defaultConfig(), rng, onState }) {
 }
 
 export function fmtCell(config, i) {
+  if (isHex(config)) return hexInfo(config).labels[i];
   const [x, y] = xy(config, i);
   return `${'abcdefgh'[x]}${y + 1}`;
 }

@@ -30,7 +30,7 @@
 // brink next turn?), trace: array that receives the committed plan steps }.
 
 import {
-  contingents, obeliskBonuses, obeliskCells, obeliskStatus, neighbors,
+  contingents, obeliskBonuses, obeliskTerritories, obeliskStatus, neighbors,
   canAddPiece, moveCost, isFib, fibAdjacent, other, obeliskElementBonus, FIBS,
 } from '../game.js';
 
@@ -73,7 +73,7 @@ export function obeliskReach(state, army, opts = {}) {
   const tier0 = (config.obeliskTiers ?? [3])[0];
   const enemy = other(army);
 
-  const rings = obs.map((ob) => obeliskCells(config, ob.corner));
+  const rings = obs.map((ob) => obeliskTerritories(config, ob));
   const statuses = obs.map((ob) => obeliskStatus(state, ob));
   const heldIdx = [];
   statuses.forEach((st, k) => { if (st.controller === army) heldIdx.push(k); });

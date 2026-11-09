@@ -2,7 +2,7 @@
 // No search — just material, tempo, and position heuristics. Weights are
 // exposed so you can tune behavior while iterating on rules.
 
-import { legalPlacements, neighbors, xy, other, armyPieceCount, armyStrengthOnBoard, canAddPiece, combatRuleOf, obeliskCells, obeliskStatus, applyAction } from '../game.js';
+import { legalPlacements, neighbors, other, armyPieceCount, armyStrengthOnBoard, canAddPiece, combatRuleOf, obeliskTerritories, obeliskStatus, applyAction, cellDistance } from '../game.js';
 import { obeliskReach, reachDanger } from './obelisk-threat.js';
 import { choosePlacement } from './placement.js';
 
@@ -35,12 +35,6 @@ const DEFAULT_WEIGHTS = {
   placement: 'split',   // scout placement style: single | split, optionally -stack
 };
 
-function manhattan(config, i, j) {
-  const [x1, y1] = xy(config, i);
-  const [x2, y2] = xy(config, j);
-  return Math.abs(x1 - x2) + Math.abs(y1 - y2);
-}
-
 function enemyCells(state, army) {
   const out = [];
   state.cells.forEach((c, i) => { if (c.army === other(army)) out.push(i); });
@@ -66,7 +60,7 @@ function obeliskPull(state, army, target, pieceValue, W, from = null) {
   const tiers = config.obeliskTiers ?? [3, 5, 8, 13, 21, 34];
   let s = 0;
   for (const ob of config.obelisks ?? []) {
-    const adj = obeliskCells(config, ob.corner);
+    const adj = obeliskTerritories(config, ob);
     if (!adj.includes(target)) continue;
     if (from !== null && adj.includes(from)) continue; // shuttle, not progress
     const st = obeliskStatus(state, ob);
@@ -84,7 +78,7 @@ function obeliskPull(state, army, target, pieceValue, W, from = null) {
 function distToNearestEnemy(state, army, i) {
   const es = enemyCells(state, army);
   if (es.length === 0) return 0;
-  return Math.min(...es.map((e) => manhattan(state.config, i, e)));
+  return Math.min(...es.map((e) => cellDistance(state.config, i, e)));
 }
 
 function retreatPolicy(state, attackInfo, options) {

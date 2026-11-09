@@ -20,7 +20,7 @@
 // attacks or two-territory fire splits.
 
 import {
-  newGame, defaultConfig, resolveConfig, LAYOUTS, DEFAULT_LAYOUT,
+  newGame, defaultConfig, resolveConfig, LAYOUTS, DEFAULT_LAYOUT, isHex,
   playTurn, playGame, applyPlacement, legalPlacements,
   armyStrengthOnBoard, fmtCell, obeliskStatus, legalActions, applyAction,
   contingents, obeliskBonuses, offerReactions, finishTurn, checkGameEnd, other,
@@ -131,6 +131,45 @@ function startGame() {
   state.captureSnapshots = true;
   render();
   if (interactive) advance();
+}
+
+// Board geometry for the config's shape: cell size (the --cell variable that
+// pieces and ghosts scale from), how to position each cell, and where each
+// obelisk's marker goes. Grids lay out with CSS grid (6px gaps); hex boards
+// position pointy-top hexagons absolutely, centres one hex width (+gap)
+// apart horizontally and sqrt(3)/2 of that vertically.
+function boardGeometry(config, avail) {
+  const GAP = 6;
+  if (!isHex(config)) {
+    const cellPx = Math.max(40, Math.min(84, Math.floor((avail - (config.width - 1) * GAP) / config.width)));
+    const pitch = cellPx + GAP;
+    return {
+      hex: false, cellPx,
+      boardStyle: { display: 'grid', gridTemplateColumns: `repeat(${config.width}, ${cellPx}px)`, width: '', height: '' },
+      place: () => {},
+      obeliskAt: (ob) => [ob.corner[0] * pitch - 3 - 12, ob.corner[1] * pitch - 3 - 12],
+    };
+  }
+  const us = config.hexes.map(([q, r]) => q + r / 2);
+  const rs = config.hexes.map(([, r]) => r);
+  const uMin = Math.min(...us), uSpan = Math.max(...us) - uMin;
+  const rMin = Math.min(...rs), rSpan = Math.max(...rs) - rMin;
+  const w = Math.max(44, Math.min(92, Math.floor((avail - uSpan * GAP) / (uSpan + 1))));
+  const h = (2 * w) / Math.sqrt(3);
+  const pitchX = w + GAP, pitchY = (pitchX * Math.sqrt(3)) / 2;
+  const center = ([q, r]) => [(q + r / 2 - uMin) * pitchX + w / 2, (r - rMin) * pitchY + h / 2];
+  return {
+    hex: true, cellPx: w,
+    boardStyle: { display: 'block', gridTemplateColumns: '', width: `${uSpan * pitchX + w}px`, height: `${rSpan * pitchY + h}px` },
+    place: (el, i) => {
+      const [x, y] = center(config.hexes[i]);
+      Object.assign(el.style, { position: 'absolute', left: `${x - w / 2}px`, top: `${y - h / 2}px`, width: `${w}px`, height: `${h}px` });
+    },
+    obeliskAt: (ob) => {
+      const pts = ob.hexes.map(center);
+      return [pts.reduce((t, p) => t + p[0], 0) / pts.length - 12, pts.reduce((t, p) => t + p[1], 0) / pts.length - 12];
+    },
+  };
 }
 
 // Advance the real game by one placement or one full turn, and queue the
@@ -604,14 +643,15 @@ function render(after = null) {
   // the measurement source.
   const chrome = board.getBoundingClientRect().left;
   const avail = document.documentElement.clientWidth - 2 * Math.max(0, chrome);
-  const cellPx = Math.max(40, Math.min(84, Math.floor((avail - (config.width - 1) * 6) / config.width)));
-  document.documentElement.style.setProperty('--cell', `${cellPx}px`);
-  board.style.gridTemplateColumns = `repeat(${config.width}, ${cellPx}px)`;
+  const geo = boardGeometry(config, avail);
+  document.documentElement.style.setProperty('--cell', `${geo.cellPx}px`);
+  Object.assign(board.style, geo.boardStyle);
   board.innerHTML = '';
   cells.forEach((c, i) => {
     const cell = document.createElement('div');
-    cell.className = 'cell' + (c.army ? ` army-${c.army}` : '');
+    cell.className = 'cell' + (geo.hex ? ' hex' : '') + (c.army ? ` army-${c.army}` : '');
     cell.dataset.i = i;
+    geo.place(cell, i);
     const coord = document.createElement('span');
     coord.className = 'coord';
     coord.textContent = fmtCell(config, i);
@@ -638,14 +678,14 @@ function render(after = null) {
     }
   }
 
-  // Obelisks sit on the corner points between cells (cell size + 6px gap).
-  const pitch = cellPx + 6;
+  // Obelisks sit on the corner points where their territories meet.
   for (const ob of config.obelisks ?? []) {
     const st = obeliskStatus(view, ob);
     const el = document.createElement('div');
     el.className = `obelisk ${ob.element}` + (st.controller ? ` ctrl-${st.controller}` : '');
-    el.style.left = `${ob.corner[0] * pitch - 3 - 12}px`;
-    el.style.top = `${ob.corner[1] * pitch - 3 - 12}px`;
+    const [left, top] = geo.obeliskAt(ob);
+    el.style.left = `${left}px`;
+    el.style.top = `${top}px`;
     el.title = `${ob.element} → ${st.action}` +
       (st.controller ? `: ${st.controller} +${st.bonus}` : ' (uncontrolled)') +
       ` | adjacent value A ${st.score.A} · B ${st.score.B}`;
