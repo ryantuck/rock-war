@@ -7,9 +7,10 @@
 // not noticing when an action swings obelisk control.
 
 import {
-  legalPlacements, legalActions, applyAction, contingents, neighbors, xy,
+  legalPlacements, legalActions, applyAction, contingents, neighbors,
   other, armyPieceCount, armyStrengthOnBoard, canAddPiece, obeliskBonuses,
-  obeliskStatus, obeliskCells, obeliskElementBonus, combatRuleOf,
+  obeliskStatus, obeliskElementBonus, combatRuleOf,
+  cellDistance,
 } from '../game.js';
 import { obeliskReach } from './obelisk-threat.js';
 import { choosePlacement } from './placement.js';
@@ -142,12 +143,8 @@ function avgDistToEnemy(state, army) {
   if (!mine.length || !theirs.length) return 0;
   let sum = 0;
   for (const m of mine) {
-    const [x1, y1] = xy(state.config, m);
     let best = Infinity;
-    for (const t of theirs) {
-      const [x2, y2] = xy(state.config, t);
-      best = Math.min(best, Math.abs(x1 - x2) + Math.abs(y1 - y2));
-    }
+    for (const t of theirs) best = Math.min(best, cellDistance(state.config, m, t));
     sum += best;
   }
   return sum / mine.length;

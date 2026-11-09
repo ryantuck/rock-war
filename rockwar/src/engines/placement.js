@@ -11,7 +11,7 @@
 //                   (placementStacking) — a (1,1) pair evolves to a soldier
 //                   from turn 1. Without '-stack', engines never stack.
 
-import { legalPlacements, neighbors, xy, other, obeliskCells, contingents } from '../game.js';
+import { legalPlacements, neighbors, other, obeliskTerritories, contingents, cellDistance, centerDistance } from '../game.js';
 
 export const PLACEMENT_STYLES = ['single', 'single-stack', 'split', 'split-stack'];
 const MAX_STACKS = 2;
@@ -20,9 +20,7 @@ export function choosePlacement(state, army, rng, style = 'single') {
   const { config } = state;
   const split = style.startsWith('split');
   const stack = style.endsWith('-stack');
-  const cx = (config.width - 1) / 2;
-  const cy = (config.height - 1) / 2;
-  const rings = (config.obelisks ?? []).map((ob) => obeliskCells(config, ob.corner));
+  const rings = (config.obelisks ?? []).map((ob) => obeliskTerritories(config, ob));
   const enemy = other(army);
   const stacks = state.cells.filter((c) => c.army === army && c.pieces.length === 2).length;
   // Contingent id per own territory, for split placement.
@@ -34,8 +32,7 @@ export function choosePlacement(state, army, rng, style = 'single') {
   let best = null;
   let bestScore = -Infinity;
   for (const i of legalPlacements(state)) {
-    const [x, y] = xy(config, i);
-    let score = -(Math.abs(x - cx) + Math.abs(y - cy));
+    let score = -centerDistance(config, i);
     const isStack = state.cells[i].army === army;
     const adjGroups = new Set();
     let ownAdj = 0;
@@ -66,13 +63,9 @@ export function choosePlacement(state, army, rng, style = 'single') {
 }
 
 function distToOwn(state, army, i) {
-  const { config } = state;
-  const [x, y] = xy(config, i);
   let d = Infinity;
   state.cells.forEach((c, j) => {
-    if (c.army !== army) return;
-    const [x2, y2] = xy(config, j);
-    d = Math.min(d, Math.abs(x - x2) + Math.abs(y - y2));
+    if (c.army === army) d = Math.min(d, cellDistance(state.config, i, j));
   });
   return d;
 }
