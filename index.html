@@ -11,6 +11,7 @@
     --panel: #1d2026;
     --line: #2c313a;
     --text: #e6e8ec;
+    --body: #bcc2cc;
     --muted: #8b93a1;
     /* rocky palette: matte stone territories, beige river-stones for A,
        brown cut-stone squares for B */
@@ -169,14 +170,14 @@
     height: calc(var(--cell) * var(--ps, 0.4));
     font-size: calc(var(--cell) * var(--ps, 0.4) * 0.45);
   }
-  .piece.A {
+  .piece.A, .pc.A {
     /* smooth beige-white river stone */
     border-radius: 50%;
     background: radial-gradient(circle at 34% 28%, #f7f0e1, var(--army-a) 60%, #cfc3a8);
     color: #4a4335;
     box-shadow: 0 2px 3px rgba(0,0,0,0.4), inset 0 -2px 3px rgba(120,105,80,0.35);
   }
-  .piece.B {
+  .piece.B, .pc.B {
     /* brown cut-stone block */
     border-radius: 16%;
     background: linear-gradient(145deg, #b57a45, var(--army-b) 55%, #7a4c27);
@@ -248,18 +249,126 @@
   #batchOut { margin-top: 14px; white-space: pre; font-size: 13px; color: var(--text); }
   #batchProgress { color: var(--muted); margin-left: 12px; }
 
-  /* rules overview */
-  .rules { margin-top: 24px; max-width: 1060px; }
-  .rulescols { display: flex; gap: 32px; flex-wrap: wrap; }
-  .rulescols > div { flex: 1; min-width: 320px; }
-  .rules h3 { font-size: 13px; margin: 14px 0 4px; color: var(--text); }
-  .rules p, .rules li { color: var(--muted); font-size: 13px; }
-  .rules ul { margin: 6px 0; padding-left: 18px; }
+  /* rules overview — a reference sheet: one block per topic, one row per rule,
+     edge cases in smaller type at the foot of each block (.fine) */
+  .rules { margin-top: 24px; max-width: 1060px; color: var(--body); font-size: 13px; line-height: 1.55; }
+  .rules h3, .rules p { margin: 0; }
   .rules b { color: var(--text); font-weight: 600; }
   .rules a { color: var(--army-a); }
-  .ob { font-weight: 700; }
-  .ob.fire { color: #e05252; } .ob.earth { color: #58b368; }
-  .ob.water { color: #4a9fe0; } .ob.air { color: #e0c94a; }
+  .rules p, .rules ul, .rules ol { max-width: 84ch; }
+  .rules ul, .rules ol { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+  .rules .byline { margin: -6px 0 10px; font-size: 11px; color: var(--muted); }
+  .rules .goal { margin-bottom: 12px; color: var(--text); }
+  .rules .nb { white-space: nowrap; }
+  .rules .lbl { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .rules .grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; }
+  .rules .blk {
+    grid-column: span 12; display: flex; flex-direction: column; gap: 10px; min-width: 0;
+    padding: 12px 14px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+  }
+  .rules .blk h3 { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--army-a); }
+  .rules .fine {
+    margin-top: auto; padding-top: 10px; border-top: 1px dashed var(--line);
+    color: var(--muted); font-size: 12.5px;
+  }
+  .rules .fine b { color: var(--body); }
+  /* rule rows: name | cost | effect, or name | effect with .two */
+  .rules .rows { display: grid; min-width: 0; }
+  .rules .row {
+    display: grid; grid-template-columns: 12ch 28ch minmax(0, 1fr); gap: 2px 16px; align-items: baseline;
+    padding: 8px 0; border-top: 1px solid var(--line);
+  }
+  .rules .two .row { grid-template-columns: 17ch minmax(0, 1fr); }
+  .rules .row:first-child { border-top: 0; padding-top: 0; }
+  .rules .row:last-child { padding-bottom: 0; }
+  .rules .row > * { min-width: 0; }
+  .rules .k { color: var(--text); font-weight: 600; }
+  .rules .c { color: var(--army-a); }
+  .rules .tag {
+    margin-left: 4px; padding: 0 5px; border: 1px solid var(--line); border-radius: 4px;
+    font-weight: 400; font-size: 11px; color: var(--muted); white-space: nowrap;
+  }
+  .rules .duo { display: flex; flex-wrap: wrap; gap: 12px 28px; align-items: flex-start; }
+  .rules .duo > ul { flex: 1 1 22ch; }
+  .rules .duo > .rows { flex: 1 1 380px; }
+  .rules .scroll { flex: 0 1 auto; max-width: 100%; overflow-x: auto; }
+  .rules table { border-collapse: collapse; }
+  .rules .pieces th {
+    padding: 0 12px 4px 0; font-size: 11px; font-weight: 400; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--muted); text-align: left; white-space: nowrap;
+  }
+  .rules .pieces td { height: 30px; padding: 2px 12px 2px 0; color: var(--text); }
+  .rules .pieces td:first-child { width: 32px; padding-right: 8px; text-align: center; }
+  .rules .pieces .n { text-align: right; font-variant-numeric: tabular-nums; }
+  .rules .pieces th:last-child, .rules .pieces td:last-child { padding-right: 0; }
+  .rules .tiers th { padding: 5px 16px 5px 0; font-weight: 400; color: var(--muted); text-align: left; white-space: nowrap; }
+  .rules .tiers td {
+    min-width: 46px; padding: 5px 6px; border-left: 1px solid var(--line);
+    color: var(--text); text-align: center; font-variant-numeric: tabular-nums;
+  }
+  .rules .tiers tr + tr > * { border-top: 1px solid var(--line); }
+  /* diagrams: piece tokens (stone looks shared with .piece) inside territories */
+  .pc {
+    display: inline-flex; align-items: center; justify-content: center; flex: none;
+    width: var(--d); height: var(--d); vertical-align: middle;
+    font-style: normal; font-weight: 700; font-size: calc(var(--d) * 0.56); line-height: 1;
+  }
+  .pc.v1 { --d: 16px; } .pc.v2 { --d: 18px; } .pc.v3 { --d: 20px; }
+  .pc.v5 { --d: 23px; } .pc.v8 { --d: 26px; }
+  .rules .tr {
+    display: inline-flex; align-items: center; justify-content: center; gap: 3px;
+    min-width: 32px; height: 32px; padding: 0 5px; vertical-align: middle;
+    border-radius: 5px; border: 1px solid var(--stone-line); background: var(--stone);
+  }
+  .rules .tr.A { background: var(--army-a-dim); border-color: rgba(233, 223, 201, 0.55); }
+  .rules .tr.B { background: var(--army-b-dim); border-color: rgba(156, 101, 56, 0.7); }
+  .rules .tr.empty { background: none; border-style: dashed; border-color: var(--stone); }
+  .rules .strip, .rules .scene, .rules .evo { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .rules .scene { margin-top: 6px; font-size: 12px; color: var(--muted); }
+  .rules .evo { gap: 4px 16px; margin-top: 6px; color: var(--muted); }
+  .rules .evo span { display: inline-flex; align-items: center; gap: 4px; }
+  .rules .grp { display: inline-grid; gap: 3px; }
+  .rules .grp > span { display: flex; gap: 4px; }
+  .rules .grp > em {
+    padding-top: 2px; border-top: 1px solid var(--muted);
+    font-style: normal; font-size: 11px; color: var(--muted); text-align: center;
+  }
+  .rules .snake .A { color: var(--army-a); }
+  .rules .snake .B { color: #cf9561; }
+  /* one card per obelisk element */
+  .rules .els { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+  .rules .el {
+    display: grid; gap: 8px; align-content: start; min-width: 0;
+    padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px;
+  }
+  .rules .el.fire { --c: #e05252; } .rules .el.earth { --c: #58b368; }
+  .rules .el.air { --c: #e0c94a; } .rules .el.water { --c: #4a9fe0; }
+  .rules .el h4 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 13px; color: var(--c); }
+  .rules .el h4 span { margin-left: auto; font-weight: 400; font-size: 12px; color: var(--muted); }
+  .rules .dia { flex: none; width: 10px; height: 10px; border-radius: 2px; transform: rotate(45deg); background: var(--c); }
+  .rules .el dl { display: grid; gap: 6px; margin: 0; }
+  .rules .el dt { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .rules .el dd { margin: 0; }
+  /* outline swatches matching the board highlights */
+  .rules .sw {
+    display: inline-block; width: 12px; height: 12px; margin-right: 3px;
+    border: 2px solid var(--c); border-radius: 3px; vertical-align: -1px;
+  }
+  .rules .sw.sel { --c: #f2c14e; } .rules .sw.move { --c: #58b368; } .rules .sw.atk { --c: #e05252; }
+  .rules .sw.place { --c: #58b368; border-style: dashed; }
+  .rules .sw.target { --c: #4a9fe0; border-style: dashed; }
+  @media (min-width: 1100px) {
+    .rules .s3 { grid-column: span 3; } .rules .s4 { grid-column: span 4; }
+    .rules .s5 { grid-column: span 5; } .rules .s6 { grid-column: span 6; }
+    .rules .s7 { grid-column: span 7; }
+    .rules .narrow .row { grid-template-columns: minmax(0, 1fr); }
+    .rules .full .fine { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 36px; max-width: none; }
+  }
+  @media (max-width: 720px) {
+    .rules .row, .rules .two .row { grid-template-columns: minmax(0, 1fr); }
+    .rules .grid { gap: 0; }
+    .rules .blk { padding: 14px 0; background: none; border: 0; border-top: 1px solid var(--line); border-radius: 0; }
+  }
 </style>
 </head>
 <body>
@@ -328,90 +437,314 @@
 
   <div class="panel rules">
     <h2>Rules overview</h2>
-    <div class="rulescols">
-      <div>
-        <h3>Setup</h3>
-        <p>The <b>board layout</b> sets the board, the obelisk positions and
-        a few rules. The default, <b>4×4 partition</b>, is a 4×4 board where
-        every territory touches exactly one obelisk. <b>5×5 classic</b>, an
-        experimental <b>4×4 diamond</b>, and <b>hex13</b> (13 hexagons, each
-        obelisk on a hex corner touching three territories) are also
-        available. Each army
-        fields <b>8×1 scouts, 5×2 soldiers, 3×3 chieftains, 2×5 warlords,
-        1×8 behemoth</b> (45 pts); any piece of 2+ is a <b>warrior</b>.
-        Placement snakes A&nbsp;B&nbsp;B&nbsp;A — five scouts each (three on
-        the diamond) onto empty territories, or, on 4×4 partition and hex13,
-        doubled up on your own scout. Everything else deploys later by spawning and
-        evolving.</p>
-        <h3>Territories &amp; contingents</h3>
-        <p>A territory holds at most <b>2 pieces</b>, and they must be
-        fibonacci-adjacent: (1,1) (1,2) (2,3) (3,5) (5,8). A
-        <b>contingent</b> is a contiguous group of one army's territories;
-        its strength is the sum of its pieces.</p>
-        <h3>Turns &amp; actions</h3>
-        <p>Each of your contingents takes up to <b>2 actions</b> whose
-        fibonacci-valued costs sum to at most its strength. On turn&nbsp;1 the
-        opener acts with only one contingent.</p>
-        <ul>
-          <li><b>Spawn</b> (1): place a scout from your sideboard into a
-          contingent territory.</li>
-          <li><b>Move</b> (cost = |mover − occupant|, scouts always 1): step
-          to an adjacent empty or friendly territory.</li>
-          <li><b>Evolve</b> (cost = smaller piece): merge a territory's pair
-          into its fibonacci sum — 1+1→2, 1+2→3, 2+3→5, 3+5→8 — via the
-          sideboard.</li>
-          <li><b>Attack</b> (cost = attacker's value): strike an adjacent
-          enemy territory. Scouts can't attack, and the attacker must be
-          ≥ the territory's total.</li>
-          <li><b>Coordinated attack</b> (cost = sum): several pieces strike
-          at once — separate territories or combining on one, even from
-          different contingents (each pays its share and spends an action).
-          Defenders can't retreat into any attacked territory — the squeeze
-          comes from geometry, not a shared escape quota.</li>
+    <p class="byline">[AI - Claude]: Rules overview</p>
+    <p class="goal"><b>Goal.</b> Destroy the enemy's army on the board, leave it with no legal
+    action, or control three obelisks at once.</p>
+    <div class="grid">
+
+      <section class="blk s3 narrow">
+        <h3>Pieces</h3>
+        <div class="duo">
+          <table class="pieces">
+            <thead><tr><th></th><th>Piece</th><th class="n">Value</th><th class="n">Per army</th></tr></thead>
+            <tbody>
+              <tr><td><i class="pc A v1">1</i></td><td>Scout</td><td class="n">1</td><td class="n">8</td></tr>
+              <tr><td><i class="pc A v2">2</i></td><td>Soldier</td><td class="n">2</td><td class="n">5</td></tr>
+              <tr><td><i class="pc A v3">3</i></td><td>Chieftain</td><td class="n">3</td><td class="n">3</td></tr>
+              <tr><td><i class="pc A v5">5</i></td><td>Warlord</td><td class="n">5</td><td class="n">2</td></tr>
+              <tr><td><i class="pc A v8">8</i></td><td>Behemoth</td><td class="n">8</td><td class="n">1</td></tr>
+            </tbody>
+          </table>
+          <ul>
+            <li><b>45 points</b> per army. Any piece worth 2 or more is a <b>warrior</b>.</li>
+            <li>Every piece starts in your <b>sideboard</b>, your off-board reserve.</li>
+            <li><b>Destroyed</b> and <b>sacrificed</b> pieces leave the game for good.</li>
+            <li><b>Returned</b> pieces go back to the sideboard and can come out again.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="blk s5 narrow">
+        <h3>Board &amp; placement</h3>
+        <p><b>Placement.</b> Armies place one scout at a time on any empty territory, in snake
+        order <span class="snake"><b class="A">A</b> <b class="B">B</b> <b class="B">B</b>
+        <b class="A">A</b> <b class="A">A</b> <b class="B">B</b> …</span> B places last, then A
+        takes the first turn.</p>
+        <p>The <b>layout</b> sets the board, the obelisk spots and the starting scouts:</p>
+        <div class="rows two">
+          <div class="row"><div class="k">4×4 partition<span class="tag">default</span></div>
+            <div class="v">Every territory touches exactly one obelisk. 5 scouts each, and they
+            may double up.</div></div>
+          <div class="row"><div class="k">5×5 classic</div>
+            <div class="v">One obelisk in each corner block. The middle row and column touch
+            none. 5 scouts each.</div></div>
+          <div class="row"><div class="k">4×4 diamond<span class="tag">experimental</span></div>
+            <div class="v">Obelisks ring the center: center territories touch two, corners none.
+            3 scouts each.</div></div>
+          <div class="row"><div class="k">hex13</div>
+            <div class="v">13 hexagons in rows of 1-3-5-3-1. Each obelisk touches three
+            territories; the center touches none. 5 scouts each, and they may double up.</div></div>
+        </div>
+        <ul class="fine">
+          <li><b>Adjacent</b> means sharing an edge: up to 4 neighbors on squares (no diagonals),
+          up to 6 on hexes.</li>
+          <li><b>Doubling up:</b> a placement may go on one of your own lone scouts instead of an
+          empty territory.</li>
         </ul>
-      </div>
-      <div>
+      </section>
+
+      <section class="blk s4 narrow">
+        <h3>Territories &amp; contingents</h3>
+        <ul>
+          <li>A territory holds one army's pieces, <b>2 at most</b>.</li>
+          <li><b>Pair rule:</b> two pieces can share a territory only if their values sit next to
+          each other in 1, 1, 2, 3, 5, 8.</li>
+        </ul>
+        <div class="strip" role="img" aria-label="The five legal pairs: 1 and 1, 2 and 1, 3 and 2, 5 and 3, 8 and 5">
+          <span class="tr A"><i class="pc A v1">1</i><i class="pc A v1">1</i></span>
+          <span class="tr A"><i class="pc A v2">2</i><i class="pc A v1">1</i></span>
+          <span class="tr A"><i class="pc A v3">3</i><i class="pc A v2">2</i></span>
+          <span class="tr A"><i class="pc A v5">5</i><i class="pc A v3">3</i></span>
+          <span class="tr A"><i class="pc A v8">8</i><i class="pc A v5">5</i></span>
+        </div>
+        <ul>
+          <li>A <b>contingent</b> is a connected group of your territories. Its <b>strength</b>
+          is the total value of its pieces.</li>
+        </ul>
+        <div class="strip" role="img" aria-label="Example: territories holding 2 and 1, then 1, form a contingent of strength 4. Past an empty territory, a lone 3 is a second contingent of strength 3.">
+          <span class="grp"><span><span class="tr A"><i class="pc A v2">2</i><i class="pc A v1">1</i></span><span class="tr A"><i class="pc A v1">1</i></span></span><em>strength 4</em></span>
+          <span class="grp"><span><span class="tr empty"></span></span><em>&nbsp;</em></span>
+          <span class="grp"><span><span class="tr A"><i class="pc A v3">3</i></span></span><em>strength 3</em></span>
+        </div>
+        <ul class="fine">
+          <li>Contingents and their strengths are fixed when your turn starts.</li>
+          <li>A territory that a contingent moves into or captures joins it for the rest of the
+          turn.</li>
+        </ul>
+      </section>
+
+      <section class="blk full">
+        <h3>Your turn</h3>
+        <p>Each of your contingents takes up to <b>2 actions</b>. Their costs together can't
+        exceed its strength.</p>
+        <div class="rows">
+          <div class="row"><div class="k">Spawn</div><div class="c">cost 1</div>
+            <div class="v">Add a scout from your sideboard to one of the contingent's
+            territories.</div></div>
+          <div class="row"><div class="k">Move</div>
+            <div class="c">cost = gap between the mover and the piece it joins; scouts always 1</div>
+            <div class="v">Step a piece into an adjacent empty or friendly territory. A 3 into
+            empty costs 3. A 3 onto your own 2 costs 1.</div></div>
+          <div class="row"><div class="k">Evolve</div><div class="c">cost = the smaller piece</div>
+            <div class="v">Merge a territory's pair into one piece worth their sum.
+              <div class="evo" role="img" aria-label="1 plus 1 makes 2, 2 plus 1 makes 3, 3 plus 2 makes 5, 5 plus 3 makes 8">
+                <span><i class="pc A v1">1</i>+<i class="pc A v1">1</i>→<i class="pc A v2">2</i></span>
+                <span><i class="pc A v2">2</i>+<i class="pc A v1">1</i>→<i class="pc A v3">3</i></span>
+                <span><i class="pc A v3">3</i>+<i class="pc A v2">2</i>→<i class="pc A v5">5</i></span>
+                <span><i class="pc A v5">5</i>+<i class="pc A v3">3</i>→<i class="pc A v8">8</i></span>
+              </div></div></div>
+          <div class="row"><div class="k">Attack</div><div class="c">cost = the attacker's value</div>
+            <div class="v">A warrior strikes an adjacent enemy territory. Its value must be at
+            least the territory's total. Scouts can't attack.</div></div>
+          <div class="row"><div class="k">Coordinated attack</div>
+            <div class="c">cost = both strikers' values</div>
+            <div class="v">Two warriors strike in one action: at two territories, each strong
+            enough alone, or together at one, with combined value at least its total.</div></div>
+        </div>
+        <ul class="fine">
+          <li><b>Turn 1:</b> the opening player acts with only one contingent.</li>
+          <li><b>Spawn</b> needs room under the pair rule: a territory holding a lone scout or a
+          lone soldier.</li>
+          <li><b>Move</b> obeys the pair rule. An empty territory counts as 0 when working out
+          the cost.</li>
+          <li><b>Evolve</b> returns both pieces to your sideboard, and the new piece must be
+          available there.</li>
+          <li><b>Coordinated attack</b> across two contingents: each pays for its own striker and
+          uses one of its actions.</li>
+        </ul>
+      </section>
+
+      <section class="blk s7">
         <h3>Combat</h3>
-        <p>Defenders may retreat free into adjacent friendly territories
-        (plus one scout per attack into an empty one). An exact-value tie is
-        <b>mutual destruction</b> — everything dies. A stronger attacker
-        kills the rest: if they were worth more than <b>half the attacker</b>,
-        it <b>devolves</b> into its constituents (3→2+1, 5→3+2, 8→5+3) as it
-        advances; weaker defense dies cleanly.</p>
+        <ol>
+          <li><b>Retreat.</b> Each defender may retreat free into an adjacent territory its army
+          already holds. One scout per attack may retreat into an adjacent empty territory
+          instead.</li>
+          <li><b>Fight.</b> Defenders that stayed die. The attacker's fate depends on how much
+          defense stayed:</li>
+        </ol>
+        <div class="rows two">
+          <div class="row"><div class="k">Nothing stayed</div>
+            <div class="v">The attacker moves in intact.</div></div>
+          <div class="row"><div class="k">Half its value or less</div>
+            <div class="v">The attacker moves in intact.
+              <div class="scene"><span class="tr A"><i class="pc A v3">3</i></span>attacks<span class="tr B"><i class="pc B v1">1</i></span>→<span class="tr A"><i class="pc A v3">3</i></span>moves in</div></div></div>
+          <div class="row"><div class="k">More than half</div>
+            <div class="v">The attacker moves in and <b>devolves</b> into its two parts: 3 into
+            2+1, 5 into 3+2, 8 into 5+3.
+              <div class="scene"><span class="tr A"><i class="pc A v3">3</i></span>attacks<span class="tr B"><i class="pc B v2">2</i></span>→<span class="tr A"><i class="pc A v2">2</i><i class="pc A v1">1</i></span>moves in</div></div></div>
+          <div class="row"><div class="k">Equal to its value</div>
+            <div class="v"><b>Mutual destruction.</b> The attacker dies too.
+              <div class="scene"><span class="tr A"><i class="pc A v3">3</i></span>attacks<span class="tr B"><i class="pc B v2">2</i><i class="pc B v1">1</i></span>→ all three pieces die</div></div></div>
+        </div>
+        <ul class="fine">
+          <li>Retreats obey the pair rule.</li>
+          <li>A devolving piece returns to the sideboard and its parts deploy from there. A part
+          that isn't available is lost.</li>
+          <li>After mutual destruction the territory is left empty.</li>
+        </ul>
+      </section>
+
+      <section class="blk s5">
+        <h3>Coordinated attacks</h3>
+        <ul>
+          <li>Defenders can't retreat into any territory that is also under attack.</li>
+          <li>Each territory fights the <b>total value</b> striking it:</li>
+        </ul>
+        <div class="rows two">
+          <div class="row"><div class="k">Equal</div>
+            <div class="v">Every striker on it dies.</div></div>
+          <div class="row"><div class="k">More than half</div>
+            <div class="v">Every striker devolves where it stands (a 2 splits into 1+1). Nobody
+            moves in.</div></div>
+          <div class="row"><div class="k">Half or less</div>
+            <div class="v">The largest striker moves in. The same if every defender
+            retreated.</div></div>
+        </div>
+        <div class="scene"><span class="tr A"><i class="pc A v3">3</i></span>+<span class="tr A"><i class="pc A v3">3</i></span>attack<span class="tr B"><i class="pc B v3">3</i><i class="pc B v2">2</i></span>→<span class="tr A"><i class="pc A v2">2</i><i class="pc A v1">1</i></span><span class="tr A"><i class="pc A v2">2</i><i class="pc A v1">1</i></span>stay put</div>
+      </section>
+
+      <section class="blk full">
         <h3>Obelisks</h3>
-        <p>Four elemental obelisks sit on corner intersections (where
-        depends on the layout):
-        <span class="ob fire">fire</span>→attack,
-        <span class="ob earth">earth</span>→evolve,
-        <span class="ob air">air</span>→move,
-        <span class="ob water">water</span>→spawn. Control one by occupying
-        ≥2 adjacent territories with the strictly greatest adjacent value ≥3.
-        Control grants bonus budget for that mechanic (3→+1, 5→+2, 8→+3,
-        13→+5 …) that can even fund <b>extra actions past the cap</b> — and
-        an <b>ability</b>, once per obelisk per turn, castable on either
-        player's turn, fueled by <b>sacrificing</b> a piece adjacent to the
-        obelisk. Abilities <b>scale with fervor</b> (your total adjacent
-        value): higher fervor permits bigger fuel, bigger fuel bigger
-        effects — fire deals fuel-value damage split across up to
-        prevFib(fuel) territories; water bounces a piece ≤ fuel to its
-        sideboard; air swaps the locations of one of your lone pieces and a
-        lone enemy piece (both ≤ fuel); earth uses the sacrifice as remote
-        evolution material to level up one of your own pieces.</p>
+        <p>Four obelisks stand on points where territories meet. Each one boosts one action.</p>
+        <div>
+          <div class="lbl">You control an obelisk when all three hold</div>
+          <ul>
+            <li>You occupy at least <b>2</b> of the territories it touches.</li>
+            <li>Your total value on them, your <b>fervor</b>, is at least <b>3</b>.</li>
+            <li>Your fervor is strictly higher than the enemy's.</li>
+          </ul>
+        </div>
+        <div class="duo">
+          <div class="rows two">
+            <div class="row"><div class="k">Bonus budget</div>
+              <div class="v">Extra budget for the obelisk's action. It can also pay for
+              <b>extra actions</b> past the 2-action cap.</div></div>
+            <div class="row"><div class="k">Ability</div>
+              <div class="v">Sacrifice one of your pieces on a territory it touches as
+              <b>fuel</b>, of value F. The effect reaches anywhere on the board. Once per obelisk
+              per turn, on your turn or the enemy's.</div></div>
+            <div class="row"><div class="k">Aura</div>
+              <div class="v">A standing defensive effect for your whole army while control
+              holds.</div></div>
+          </div>
+          <div class="scroll">
+            <table class="tiers">
+              <tr><th>Fervor</th><td>3+</td><td>5+</td><td>8+</td><td>13+</td><td>21+</td></tr>
+              <tr><th>Bonus budget</th><td>+1</td><td>+2</td><td>+3</td><td>+5</td><td>+8</td></tr>
+              <tr><th>Largest fuel</th><td><i class="pc A v1">1</i></td><td><i class="pc A v2">2</i></td><td><i class="pc A v3">3</i></td><td><i class="pc A v5">5</i></td><td><i class="pc A v8">8</i></td></tr>
+            </table>
+          </div>
+        </div>
+        <div class="els">
+          <article class="el fire">
+            <h4><i class="dia"></i>Fire<span>boosts attack</span></h4>
+            <dl>
+              <dt>Ability</dt>
+              <dd>Deal F damage to one enemy territory, or split it in two (3 as 2+1, 5 as
+              3+2).</dd>
+              <dt>Aura</dt>
+              <dd>None.</dd>
+            </dl>
+          </article>
+          <article class="el earth">
+            <h4><i class="dia"></i>Earth<span>boosts evolve</span></h4>
+            <dl>
+              <dt>Ability</dt>
+              <dd>Evolve at range. The fuel merges with one of your pieces anywhere, if the two
+              could legally pair. Sacrifice a 2 and your 3 becomes a 5.</dd>
+              <dt>Aura</dt>
+              <dd>Attacks on your territories cost the attacker its value plus your earth
+              bonus.</dd>
+            </dl>
+          </article>
+          <article class="el air">
+            <h4><i class="dia"></i>Air<span>boosts move</span></h4>
+            <dl>
+              <dt>Ability</dt>
+              <dd>Swap the positions of one of your pieces and one enemy piece. Both must be
+              worth F or less and alone in their territories.</dd>
+              <dt>Aura</dt>
+              <dd>On each attack against you, more scouts may retreat into empty territories: 1
+              plus your air bonus.</dd>
+            </dl>
+          </article>
+          <article class="el water">
+            <h4><i class="dia"></i>Water<span>boosts spawn</span></h4>
+            <dl>
+              <dt>Ability</dt>
+              <dd>Send one enemy piece worth F or less back to its owner's sideboard.</dd>
+              <dt>Aura</dt>
+              <dd>Your defenders that die in combat return to your sideboard and do not leave
+              the game.</dd>
+            </dl>
+          </article>
+        </div>
+        <ul class="fine">
+          <li><b>Bonus budget</b> is shared by your whole army and refills every turn.
+          Contingents spend their own strength first. An extra action past the cap must be paid
+          for entirely from the bonus.</li>
+          <li><b>An ability on your turn</b> uses one of the fueling contingent's 2 actions and
+          no budget. It can't be taken as an extra action.</li>
+          <li><b>An ability on the enemy's turn</b> is free. After each enemy action you may fire
+          any ability not yet used that turn.</li>
+          <li><b>Fire damage</b> lowers a territory's total value. What is left re-forms from its
+          owner's sideboard. Parts that are unavailable or don't fit are lost.</li>
+          <li><b>Earth's</b> new piece must be available in your sideboard, as with a normal
+          evolve.</li>
+          <li>If fervor is level, nobody controls the obelisk.</li>
+        </ul>
+      </section>
+
+      <section class="blk s6">
         <h3>Winning</h3>
-        <p>Eliminate the enemy's board pieces, leave them with no legal
-        action, or <b>control any three obelisks at once</b> — the completing
-        move wins on the spot. At the turn limit, the army with more board
-        strength wins (obelisks break ties). Full rules, tunable knobs, and
-        sim findings live in
+        <div class="rows two">
+          <div class="row"><div class="k">Elimination</div>
+            <div class="v">The enemy has no pieces left on the board. You win.</div></div>
+          <div class="row"><div class="k">Three obelisks</div>
+            <div class="v">You control any 3 at once. This is checked after every action and
+            ability, on either turn, and the move that completes it wins on the spot.</div></div>
+          <div class="row"><div class="k">No legal action</div>
+            <div class="v">The enemy starts a turn unable to act. You win.</div></div>
+          <div class="row"><div class="k">Turn limit</div>
+            <div class="v">After 200 turns (100 each), the army with more total value on the
+            board wins. If level, more obelisks wins. If still level, it's a draw.</div></div>
+          <div class="row"><div class="k">Draw</div>
+            <div class="v">Also when a single fight wipes both armies off the board.</div></div>
+        </div>
+      </section>
+
+      <section class="blk s6">
+        <h3>Playing against an engine</h3>
+        <ol>
+          <li>Pick <b>human</b> for either engine, then press <b>New game</b>.</li>
+          <li>Placement: click a territory outlined in
+          <span class="nb"><i class="sw place"></i>dashed green</span>.</li>
+          <li>On your turn, click one of your territories to select it
+          <span class="nb">(<i class="sw sel"></i>gold)</span>. Then click
+          <span class="nb"><i class="sw move"></i>green</span> to move there or
+          <span class="nb"><i class="sw atk"></i>red</span> to attack. Buttons appear for spawn,
+          evolve and obelisk abilities; ability targets show in
+          <span class="nb"><i class="sw target"></i>dashed blue</span>.</li>
+          <li>Press <b>end turn</b> when done.</li>
+        </ol>
+        <p>Every tunable knob and the simulation findings are in
         <a href="https://github.com/ryantuck/rock-war/blob/master/rockwar/README.md">rockwar/README.md</a>.</p>
-        <h3>Playing yourself</h3>
-        <p>Pick <b>human</b> as either engine and start a new game. Click a
-        highlighted cell to place scouts; on your turn, click a territory to
-        select it (green = move, red = attack, buttons for spawn / evolve /
-        obelisk abilities), then <b>end turn</b>. Retreats are auto-planned
-        for you, and reaction-window casts, coordinated attacks, and
-        split fire hits aren't offered interactively yet.</p>
-      </div>
+        <p class="fine"><b>Not offered to the human side yet:</b> choosing retreats (they are
+        planned automatically), abilities on the engine's turn, coordinated attacks, and split
+        fire hits.</p>
+      </section>
+
     </div>
   </div>
 
