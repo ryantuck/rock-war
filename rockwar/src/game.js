@@ -156,16 +156,15 @@ function baseRules() {
     firstTurnActions: 2,
     // (Layout-supplied: obelisks — see LAYOUTS.)
     // Controlled obelisks also grant an active ability, once per obelisk per
-    // turn (no budget cost — the piece spent is the price). The fuel is
-    // always one of YOUR SCOUTS standing in a territory adjacent to that
-    // obelisk; targets can be anywhere:
-    //   fire  — sacrifice the scout to slay an enemy scout in any territory
-    //   water — return the scout to bounce an enemy piece of strength <= 2
-    //           back to its owner's sideboard
-    //   earth — DEVOLVE one of your adjacent warriors (in place) to devolve
-    //           an enemy warrior in place
-    //   air   — return the scout to displace ANY enemy piece into an
-    //           adjacent legal territory of your choice
+    // turn (no budget cost — the piece spent is the price). The fuel is ANY
+    // one of your pieces, of value F up to the obelisk's bonus tier, and it
+    // is sacrificed; every target must be adjacent to the fuel's territory:
+    //   fire  — F damage to adjacent enemy territories
+    //   water — bounce an adjacent enemy piece of value <= F to its sideboard
+    //   air   — swap an adjacent lone piece of yours with an adjacent lone
+    //           enemy piece (both <= F)
+    //   earth — level up an adjacent piece of yours that pairs with the fuel
+    // (Details: abilityActions.)
     obeliskAbilities: true,
     // Controlled obelisks also project passive defensive powers, army-wide,
     // while control holds (magnitudes scale with the obelisk's bonus tier):
@@ -693,30 +692,36 @@ export function legalActions(state, cont, remainingBudget, actionsTaken, bonusPo
   }
 
   // Obelisk abilities: once per controlled obelisk per player-turn,
-  // budget-free (the spent scout is the price), fueled from this contingent.
+  // budget-free (the sacrificed piece is the price), fueled from this contingent.
   // Not available as bonus-funded extra actions — they respect the cap.
   if (!beyondCap) acts.push(...abilityActions(state, army, cont.terrs));
   return acts;
 }
 
 // All obelisk ability actions available to `army` right now. When cellFilter
-// (a Set of territory indices) is given, fuel scouts must stand in it — the
-// contingent restriction during the army's own turn. Without it, any
-// obelisk-adjacent scout qualifies (used for reactions on the enemy's turn).
+// (a Set of territory indices) is given, the fuel must stand in it — the
+// contingent restriction during the army's own turn. Without it, any of the
+// army's pieces qualifies (used for reactions on the enemy's turn).
+// Every ability SACRIFICES one of the army's pieces as fuel (the piece
+// leaves the game). The fuel may stand anywhere on the board — it need not
+// touch the obelisk — and the effect is local to the place of sacrifice:
+// every target must be in a territory adjacent to the fuel's.
 // Fervor scales obelisk abilities: the controller's total adjacent value
 // (the same score that sets the bonus tier) caps the FUEL piece that may be
 // spent, and bigger fuel means bigger effects. Fervor 3 permits scout fuel,
 // fervor 5 a soldier, fervor 8 a chieftain, ... — i.e. max fuel value
-// equals the obelisk's bonus tier value. Every ability SACRIFICES its fuel
-// (the piece leaves the game).
-//   fire  — F damage to enemy territories, splittable across up to
-//           prevFib(F) of them (3 can hit 2 territories, 5 can hit 3)
-//   water — bounce an enemy piece of value <= F to its owner's sideboard
-//   air   — swap the locations of one of your pieces and an enemy piece
-//           (both of value <= F, both alone in their territories)
-//   earth — the sacrificed piece acts as remote evolution material: level
-//           up one of your own pieces fib-adjacent to the fuel into their
-//           sum (sac a 2 to turn a 3 into a 5), drawn from the sideboard
+// equals the obelisk's bonus tier value.
+//   fire  — F damage to adjacent enemy territories, splittable across up
+//           to prevFib(F) of them (3 can hit 2 territories, 5 can hit 3)
+//   water — bounce an adjacent enemy piece of value <= F to its owner's
+//           sideboard
+//   air   — swap the locations of one of your pieces and an enemy piece,
+//           both adjacent to the fuel (both of value <= F, both alone in
+//           their territories)
+//   earth — the sacrificed piece is evolution material for a neighbor:
+//           level up one of your own adjacent pieces fib-adjacent to the
+//           fuel into their sum (sac a 2 to turn the 3 next door into a
+//           5), drawn from the sideboard
 export function abilityActions(state, army, cellFilter = null) {
   const { config } = state;
   const acts = [];
@@ -727,19 +732,19 @@ export function abilityActions(state, army, cellFilter = null) {
     const st = obeliskStatus(state, ob);
     if (st.controller !== army || st.bonus === 0) continue;
     const maxFuel = st.bonus; // fibonacci fuel cap from the fervor tier
-    // Fuel: one of our pieces (value <= maxFuel) adjacent to THIS obelisk.
-    for (const t of obeliskTerritories(config, ob)) {
-      if (cellFilter && !cellFilter.has(t)) continue;
-      const cell = state.cells[t];
-      if (cell.army !== army) continue;
+    // Fuel: any of our pieces (value <= maxFuel), wherever it stands.
+    // Targets: only the territories adjacent to the fuel's.
+    state.cells.forEach((cell, t) => {
+      if (cell.army !== army) return;
+      if (cellFilter && !cellFilter.has(t)) return;
+      const near = neighbors(config, t);
       for (const fuel of new Set(cell.pieces)) {
         if (fuel > maxFuel) continue;
         if (ob.element === 'fire') {
-          // F damage across up to prevFib(F) enemy territories. Engines
-          // enumerate single-territory full hits plus two-territory
-          // prevFib splits (3 → 2+1, 5 → 3+2); rules accept any split.
-          const enemyTerrs = [];
-          state.cells.forEach((ec, e) => { if (ec.army === enemy) enemyTerrs.push(e); });
+          // F damage across up to prevFib(F) adjacent enemy territories.
+          // Offered: single-territory full hits plus two-territory
+          // prevFib splits (3 → 2+1, 5 → 3+2).
+          const enemyTerrs = near.filter((e) => state.cells[e].army === enemy);
           for (const e of enemyTerrs) {
             acts.push({ type: 'ability', element: 'fire', from: t, fuel, hits: [{ target: e, dmg: fuel }], cost: 0 });
           }
@@ -757,38 +762,37 @@ export function abilityActions(state, army, cellFilter = null) {
             }
           }
         } else if (ob.element === 'water') {
-          state.cells.forEach((ec, e) => {
-            if (ec.army !== enemy) return;
+          for (const e of near) {
+            const ec = state.cells[e];
+            if (ec.army !== enemy) continue;
             for (const v of new Set(ec.pieces)) {
               if (v <= fuel) acts.push({ type: 'ability', element: 'water', from: t, fuel, target: e, piece: v, cost: 0 });
             }
-          });
+          }
         } else if (ob.element === 'air') {
-          // Swap the locations of one of our pieces and an enemy piece.
-          // Both must be <= F and alone in their territories (a partial
-          // swap would create an illegal mixed-army cell).
-          const mines = [];
-          const theirs = [];
-          state.cells.forEach((c, i) => {
-            if (c.pieces.length !== 1 || c.pieces[0] > fuel) return;
-            if (c.army === army && i !== t) mines.push({ i, p: c.pieces[0] });
-            else if (c.army === enemy) theirs.push({ i, p: c.pieces[0] });
-          });
-          for (const m of mines) {
-            for (const th of theirs) {
+          // Swap the locations of one of our pieces and an enemy piece,
+          // both adjacent to the fuel. Both must be <= F and alone in
+          // their territories (a partial swap would create an illegal
+          // mixed-army cell).
+          const lone = (i, who) => {
+            const c = state.cells[i];
+            return c.army === who && c.pieces.length === 1 && c.pieces[0] <= fuel;
+          };
+          for (const m of near.filter((i) => lone(i, army))) {
+            for (const th of near.filter((i) => lone(i, enemy))) {
               acts.push({
                 type: 'ability', element: 'air', from: t, fuel, cost: 0,
-                mine: m.i, myPiece: m.p, theirs: th.i, theirPiece: th.p,
+                mine: m, myPiece: state.cells[m].pieces[0], theirs: th, theirPiece: state.cells[th].pieces[0],
               });
             }
           }
         } else if (ob.element === 'earth') {
-          // The sacrificed fuel is remote evolution material: level up one
-          // of our own pieces fib-adjacent to it into their sum.
-          state.cells.forEach((oc, o) => {
-            if (oc.army !== army) return;
+          // The sacrificed fuel is evolution material for a neighbor: level
+          // up one of our adjacent pieces fib-adjacent to it into their sum.
+          for (const o of near) {
+            const oc = state.cells[o];
+            if (oc.army !== army) continue;
             for (const p of new Set(oc.pieces)) {
-              if (o === t && p === fuel && oc.pieces.filter((x) => x === p).length < 2) continue; // fuel can't level itself
               if (!fibAdjacent(fuel, p)) continue;
               const result = fuel + p;
               if ((state.sideboard[army][result] || 0) <= 0) continue;
@@ -797,10 +801,10 @@ export function abilityActions(state, army, cellFilter = null) {
               if (!mates.every((m) => fibAdjacent(m, result))) continue;
               acts.push({ type: 'ability', element: 'earth', from: t, fuel, target: o, piece: p, cost: 0 });
             }
-          });
+          }
         }
       }
-    }
+    });
   }
   return acts;
 }
@@ -1124,8 +1128,8 @@ function resolveAbility(state, army, action) {
       return;
     }
     case 'earth': {
-      // The sacrificed fuel is remote evolution material: an own piece
-      // fib-adjacent to it levels up into their sum (target returns to the
+      // The sacrificed fuel is evolution material for a neighbor: an own
+      // piece fib-adjacent to it levels up into their sum (target returns to the
       // sideboard, the result deploys from it in place).
       const result = fuel + action.piece;
       removePiece(state, action.target, action.piece);
@@ -1246,8 +1250,8 @@ function checkElimination(state) {
 }
 
 // Reaction window: after each of the active player's actions, the other army
-// may fire its unused obelisk abilities (any obelisk-adjacent scout as fuel,
-// no budget or action cost). Engines opt in via chooseReaction; loop is
+// may fire its unused obelisk abilities (any of its pieces as fuel, no
+// budget or action cost). Engines opt in via chooseReaction; loop is
 // bounded by the once-per-element-per-turn ledger.
 export function offerReactions(state, reactor, engines, rng) {
   const eng = engines[reactor];

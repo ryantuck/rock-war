@@ -16,6 +16,9 @@
 //   the ring to spread) · attack an enemy ring cell, from adjacent or after
 //   a move · controlled obelisks' abilities: water bounce, fire damage, air
 //   swap (optionally after moving a stack-mate out), earth level-up.
+//   Any own piece within the obelisk's fuel cap may fuel an ability, and
+//   it only reaches territories adjacent to that piece (which may step
+//   next to its target first).
 // Sources standing in a held obelisk's ring are only used if that obelisk
 // stays controlled — the finish must keep everything already held.
 //
@@ -209,44 +212,47 @@ export function obeliskReach(state, army, opts = {}) {
           }
         }
       });
-      // Abilities of controlled obelisks (fuel = largest allowed piece in its ring).
-      for (const ab of abilities) {
-        let fc = -1, F = 0;
-        for (const t of rings[ab.k]) {
-          if (cells[t].army !== army) continue;
-          for (const p of cells[t].pieces) if (p <= ab.maxFuel && p > F) { F = p; fc = t; }
-        }
-        if (fc < 0) continue;
-        const spend = (cs) => setCell(cs, fc, army, removeOne(cs[fc].pieces, F));
-        const cont = owner.get(fc);
-        const abStep = { type: 'ability', cost: 0, ability: true };
-        for (const r of ringArr) {
+      // Abilities of controlled obelisks: any own piece within the fuel cap
+      // is fuel, and the effect lands in a territory adjacent to it. The
+      // fuel casts from where it stands, or steps next to the target first
+      // (`pre`: that move — its cost, and the cells after it).
+      const abStep = { type: 'ability', cost: 0, ability: true };
+      const castFrom = (ab, fc, F, cont, pre) => {
+        const steps = pre ? [{ type: 'move', cost: pre.cost }, abStep] : [abStep];
+        const tos = pre ? [fc] : [];
+        const base = pre ? pre.apply : (cs) => cs;
+        const spend = (cs) => { const out = base(cs); return setCell(out, fc, army, removeOne(out[fc].pieces, F)); };
+        const near = neighbors(config, fc);
+        for (const r of near) {
+          if (!ring.has(r)) continue;
           const rc = cells[r];
           if (ab.element === 'water' && rc.army === enemy) {
             for (const v of new Set(rc.pieces)) {
-              if (v <= F) consider({ cont, steps: [abStep], ability: ab, tos: [], apply: (cs) => setCell(spend(cs), r, enemy, removeOne(cs[r].pieces, v)) });
+              if (v <= F) consider({ cont, steps, ability: ab, tos, apply: (cs) => setCell(spend(cs), r, enemy, removeOne(cs[r].pieces, v)) });
             }
           } else if (ab.element === 'fire' && rc.army === enemy) {
             const left = Math.max(0, sum(rc.pieces) - F);
             const parts = left === 0 ? [] : [FIBS.filter((f) => f <= left).pop()];
-            consider({ cont, steps: [abStep], ability: ab, tos: [], apply: (cs) => setCell(spend(cs), r, enemy, parts) });
-          } else if (ab.element === 'air' && rc.army === enemy && rc.pieces.length === 1 && rc.pieces[0] <= F) {
-            cells.forEach((mc, m) => {
-              if (mc.army !== army || m === fc || ring.has(m)) return;
+            consider({ cont, steps, ability: ab, tos, apply: (cs) => setCell(spend(cs), r, enemy, parts) });
+          } else if (ab.element === 'air' && !pre && rc.army === enemy && rc.pieces.length === 1 && rc.pieces[0] <= F) {
+            // Our swap partner must also stand next to the fuel.
+            for (const m of near) {
+              const mc = cells[m];
+              if (mc.army !== army || ring.has(m)) continue;
               const swap = (cs, mm) => {
                 const out = spend(cs);
                 const mine = out[mm].pieces, theirs = out[r].pieces;
                 return setCell(setCell(out, mm, enemy, theirs), r, army, mine);
               };
               if (mc.pieces.length === 1 && mc.pieces[0] <= F) {
-                consider({ cont, steps: [abStep], ability: ab, tos: [r], apply: (cs) => swap(cs, m) });
+                consider({ cont, steps, ability: ab, tos: [r], apply: (cs) => swap(cs, m) });
               } else if (mc.pieces.length === 2) {
                 // Move one stack-mate out first so the other stands alone.
                 for (const q of new Set(mc.pieces)) {
                   const stay = removeOne(mc.pieces, q)[0];
                   if (stay > F) continue;
                   for (const n of neighbors(config, m)) {
-                    if (!canEnter(n, q)) continue;
+                    if (n === fc || !canEnter(n, q)) continue;
                     const cq = stepCost(q, n);
                     if (!cq) continue;
                     consider({ cont, steps: [{ type: 'move', cost: cq }, abStep], ability: ab, tos: [n, r],
@@ -255,17 +261,31 @@ export function obeliskReach(state, army, opts = {}) {
                   }
                 }
               }
-            });
-          } else if (ab.element === 'earth' && rc.army === army) {
+            }
+          } else if (ab.element === 'earth' && rc.army === army && !(pre && r === pre.from)) {
             for (const p of new Set(rc.pieces)) {
-              if (r === fc && p === F && rc.pieces.filter((x) => x === p).length < 2) continue;
               if (!fibAdjacent(F, p) || (state.sideboard[army][F + p] || 0) <= 0) continue;
               if (!removeOne(rc.pieces, p).every((x) => fibAdjacent(x, F + p))) continue;
-              consider({ cont, steps: [abStep], ability: ab, tos: [],
+              consider({ cont, steps, ability: ab, tos,
                 apply: (cs) => { const out = spend(cs); return setCell(out, r, army, [...removeOne(out[r].pieces, p), F + p]); } });
             }
           }
         }
+      };
+      for (const ab of abilities) {
+        cells.forEach((fcell, a) => {
+          if (fcell.army !== army) return;
+          const cont = owner.get(a);
+          for (const F of new Set(fcell.pieces)) {
+            if (F > ab.maxFuel) continue;
+            castFrom(ab, a, F, cont, null);
+            for (const n of neighbors(config, a)) {
+              if (!canEnter(n, F)) continue;
+              const cost = stepCost(F, n);
+              if (cost) castFrom(ab, n, F, cont, { cost, from: a, apply: (cs) => movePiece(cs, a, n, army, F) });
+            }
+          }
+        });
       }
 
       if (!pick) break;

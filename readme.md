@@ -61,8 +61,8 @@ frontend's layout menu or with `--layout`.
   earth→evolve, air→move, water→spawn). Occupying ≥2 adjacent territories
   with the greatest adjacent value ≥3 grants bonus budget for that mechanic
   (fibonacci-scaled, can fund extra actions past the cap) and a once-per-turn
-  active ability — castable on either player's turn, fueled by an
-  obelisk-adjacent scout.
+  active ability — castable on either player's turn, fueled by sacrificing
+  any one of your pieces, and reaching only the territories next to it.
 - **Winning**: eliminate the enemy's board pieces, leave them unable to
   act, or control any three obelisks simultaneously. At the turn limit,
   most board strength wins (obelisks break ties).
