@@ -631,9 +631,9 @@
               <div class="v">Extra budget for the obelisk's action. It can also pay for
               <b>extra actions</b> past the 2-action cap.</div></div>
             <div class="row"><div class="k">Ability</div>
-              <div class="v">Sacrifice one of your pieces on a territory it touches as
-              <b>fuel</b>, of value F. The effect reaches anywhere on the board. Once per obelisk
-              per turn, on your turn or the enemy's.</div></div>
+              <div class="v">Sacrifice any one of your pieces, anywhere on the board, as
+              <b>fuel</b>, of value F. The effect reaches only the territories adjacent to the
+              fuel. Once per obelisk per turn, on your turn or the enemy's.</div></div>
             <div class="row"><div class="k">Aura</div>
               <div class="v">A standing defensive effect for your whole army while control
               holds.</div></div>
@@ -651,8 +651,8 @@
             <h4><i class="dia"></i>Fire<span>boosts attack</span></h4>
             <dl>
               <dt>Ability</dt>
-              <dd>Deal F damage to one enemy territory, or split it in two (3 as 2+1, 5 as
-              3+2).</dd>
+              <dd>Deal F damage to one enemy territory next to the fuel, or split it between
+              two (3 as 2+1, 5 as 3+2).</dd>
               <dt>Aura</dt>
               <dd>None.</dd>
             </dl>
@@ -661,8 +661,9 @@
             <h4><i class="dia"></i>Earth<span>boosts evolve</span></h4>
             <dl>
               <dt>Ability</dt>
-              <dd>Evolve at range. The fuel merges with one of your pieces anywhere, if the two
-              could legally pair. Sacrifice a 2 and your 3 becomes a 5.</dd>
+              <dd>Evolve across a border. The fuel merges with one of your pieces in a territory
+              next to it, if the two could legally pair. Sacrifice a 2 and the 3 next door
+              becomes a 5.</dd>
               <dt>Aura</dt>
               <dd>Attacks on your territories cost the attacker its value plus your earth
               bonus.</dd>
@@ -672,8 +673,8 @@
             <h4><i class="dia"></i>Air<span>boosts move</span></h4>
             <dl>
               <dt>Ability</dt>
-              <dd>Swap the positions of one of your pieces and one enemy piece. Both must be
-              worth F or less and alone in their territories.</dd>
+              <dd>Swap the positions of one of your pieces and one enemy piece, both next to
+              the fuel. Both must be worth F or less and alone in their territories.</dd>
               <dt>Aura</dt>
               <dd>On each attack against you, more scouts may retreat into empty territories: 1
               plus your air bonus.</dd>
@@ -683,7 +684,8 @@
             <h4><i class="dia"></i>Water<span>boosts spawn</span></h4>
             <dl>
               <dt>Ability</dt>
-              <dd>Send one enemy piece worth F or less back to its owner's sideboard.</dd>
+              <dd>Send one enemy piece next to the fuel, worth F or less, back to its owner's
+              sideboard.</dd>
               <dt>Aura</dt>
               <dd>Your defenders that die in combat return to your sideboard and do not leave
               the game.</dd>
@@ -698,6 +700,8 @@
           no budget. It can't be taken as an extra action.</li>
           <li><b>An ability on the enemy's turn</b> is free. After each enemy action you may fire
           any ability not yet used that turn.</li>
+          <li><b>Fuel</b> doesn't have to touch the obelisk. Its largest allowed value comes
+          from your fervor at that obelisk.</li>
           <li><b>Fire damage</b> lowers a territory's total value. What is left re-forms from its
           owner's sideboard. Parts that are unavailable or don't fit are lost.</li>
           <li><b>Earth's</b> new piece must be available in your sideboard, as with a normal
