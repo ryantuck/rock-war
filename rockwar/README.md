@@ -590,6 +590,55 @@ of decided games, ±3–5 pts):
   games start with an obelisk held. The lookahead mirror tilts toward B
   (33.5% A), while the greedy and planner mirrors move closer to even.
 
+## Local abilities: any fuel, adjacent targets
+
+*[AI - Claude]: Local obelisk abilities — simulation findings*
+
+The rule changed from "fuel must touch the obelisk, the effect reaches
+anywhere" to "fuel is any one of your pieces, the effect reaches only the
+territories adjacent to it". Same seeds before and after; 4×4 partition
+unless noted; split placement. "Cap" = games reaching `maxTurns`.
+Earlier sections and the layout table above were measured under the old
+rule.
+
+| Matchup (4×4 partition) | Obelisk wins | Cap | Draws | Seat A | Median turns | Abilities per game |
+|---|---|---|---|---|---|---|
+| greedy mirror (400) | 0 → 0.5% | 27.8 → 31.0% | 20.2 → 21.2% | 44.5 → 54% | 18 → 21 | 4.9 → 4.5 |
+| lookahead mirror (400) | 12.5 → 26.2% | 6.8 → 13.5% | 5.8 → 5.5% | 45 → 50% | 15 → 20 | 5.8 → 6.7 |
+| planner-obelisk mirror (200) | 26.5 → 35% | 3.5 → 3.5% | 0 → 3.5% | 47 → 53% | 14 → 16 | 7.1 → 7.3 |
+| planner-obelisk vs lookahead (200) | 22.5 → 36% | 3.0 → 6.5% | 3.5 → 2.0% | 47 → 58% | 14 → 17 | 6.5 → 7.0 |
+| lookahead vs greedy (200) | 13.5 → 17.5% | 6.5 → 6.5% | 5.0 → 3.0% | 48 → 50% | 13 → 15 | 4.7 → 4.8 |
+
+- **Obelisk wins rise in every search-engine matchup**, roughly doubling
+  in the lookahead mirror. Fuel no longer comes out of the obelisk's own
+  ring, so casting doesn't lower the caster's fervor, and the enemy can't
+  reach into a held ring from across the board. Held obelisks stay held.
+- **Games run a little longer.** Medians go up 2–5 turns, and the
+  lookahead mirror reaches the turn cap twice as often.
+- **Most fuel now stands away from the obelisk.** 50–60% of casts use a
+  piece that doesn't touch the casting obelisk (planner-obelisk mirror:
+  850 of 1455). Fuel is still a scout about 80% of the time.
+- **Fire gains, air nearly disappears.** Lookahead mirror casts per 400
+  games: fire 911 → 1337, earth 799 → 813, water 480 → 507, air 121 →
+  37. An air swap now needs a lone own piece and a lone enemy piece both
+  next to the fuel, which rarely lines up. Air is the element to revisit.
+- **Engine strength order holds.** Planner-obelisk vs lookahead goes
+  63.8 → 57%; lookahead vs greedy 92 → 95%. Round robin (40 games per
+  pairing, ±3 pts is noise): planner-obelisk 77.7 → 74.7%, planner 66.6
+  → 70.0%, lookahead-obelisk 65.2 → 63.1%, tempo 62.7 → 59.8%, lookahead
+  57.8 → 58.4%, turtle 48.8 → 55.5%, aggro 50.9 → 47.8%, greedy 19.7 →
+  18.8%, random 0.8 → 1.9%.
+- **Other layouts (lookahead mirror, 200 games).** 5×5 classic changes
+  most: obelisk wins 14.5 → 44.5%, cap finishes 14.5 → 39.5%, median
+  length 18 → 33 turns. hex13: obelisk wins 7 → 20%, draws 6.5 → 11%,
+  median 14 → 18.
+- **Reach estimate.** `obeliskReach` now casts from any own piece within
+  the fuel cap at a ring territory next to it, or after one step toward
+  it. Against a real-rules search of the turn on brink positions it
+  raised no false alarms (0 of 150 lookahead-mirror positions, 0 of 100
+  planner-obelisk), with recall on par with the old rule (about 62–64%
+  of the finishes the search found, 69% and 57% before).
+
 ## Current observations (300-game matchups, seats swapped, 5×5, devolve combat)
 
 These observations predate the five-scout change (two scouts per army).
