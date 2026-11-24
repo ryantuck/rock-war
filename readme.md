@@ -47,10 +47,14 @@ frontend's layout menu or with `--layout`.
   Each turn one spends its strength as budget on fibonacci-valued actions
   of at most **two mechanics**, as many as the budget pays for (strength 5:
   move three scouts, then spawn twice).
-- **Actions**: *spawn* a scout (1) · *move* (cost = value difference, scouts
-  always 1) · *evolve* a pair into its fibonacci sum (1+2→3, 2+3→5, 3+5→8)
-  · *attack* an adjacent enemy territory (cost = attacker's value; scouts
-  can't attack; attacker must be ≥ the territory's total) · *coordinated
+- **Costs**: moving into empty territory, attacking, and evolving cost one
+  fibonacci step below the piece involved — soldier 1, chieftain 2,
+  warlord 3, behemoth 5 (for evolve, the piece made). Moving onto your own
+  piece costs the difference (a 5 onto a 3 costs 2); scouts move for 1.
+- **Actions**: *spawn* a scout (1) · *move* · *evolve* a pair into its
+  fibonacci sum (1+2→3, 2+3→5, 3+5→8) · *attack* an adjacent enemy
+  territory (scouts can't attack; attacker must be ≥ the territory's
+  total) · *coordinated
   attack*: several pieces strike simultaneously, denying retreats into any
   attacked territory. A pair that breaks a territory together moves in
   together: two 2s land as (2,1), the enemy pushing the spare scout one

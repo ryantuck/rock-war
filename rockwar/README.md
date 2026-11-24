@@ -158,19 +158,27 @@ above are on 4×4.
 - **Actions**:
   - *Spawn* (cost 1): place a scout from the sideboard into one of the
     contingent's territories.
-  - *Move* (cost = |mover − occupant|, empty counts as 0, scouts always cost 1):
-    move a piece to an adjacent empty or friendly territory, respecting the
-    2-piece / fib-adjacency limits. Example: a 3 into open territory costs 3; a
-    3 onto a friendly 2 costs 1.
-  - *Evolve* (cost = smaller constituent, configurable): combine the two
-    co-located pieces into their fibonacci sum (1+1→2, 1+2→3, 2+3→5). Both
-    constituents return to the sideboard; the new piece must be available there.
-  - *Attack* (cost = attacking piece's value): strike an adjacent enemy
+  - **Rank costs** (`rankCosts`): committing a piece — moving it into an
+    empty territory, attacking with it, or evolving it into being — costs
+    **one fibonacci step below its value**: soldier (2) 1, chieftain (3) 2,
+    warlord (5) 3, behemoth (8) 5. Scouts always move for 1.
+  - *Move* (into empty: rank cost; onto a friendly piece: the value
+    difference; scouts always 1): move a piece to an adjacent empty or
+    friendly territory, respecting the 2-piece / fib-adjacency limits.
+    Examples: a 3 into open territory costs 2; a 5 onto a friendly 3
+    costs 2; a 3 onto a friendly 2 costs 1.
+  - *Evolve* (cost = the result's rank cost, i.e. the larger constituent;
+    configurable): combine the two co-located pieces into their fibonacci
+    sum — 1+1→2 costs 1, 1+2→3 costs 2, 2+3→5 costs 3, 3+5→8 costs 5. Both
+    constituents return to the sideboard; the new piece must be available
+    there.
+  - *Attack* (cost = attacker's rank cost): strike an adjacent enemy
     territory with one piece. **Scouts cannot attack** (`minAttackValue: 2`),
     and attacking requires the piece's value to be **≥ the target
     territory's total** — weaker attacks could never connect, so they are
     simply illegal.
-  - *Coordinated attack* (one action, cost = sum of the pieces): several of
+  - *Coordinated attack* (one action, cost = the strikers' rank costs
+    summed — 2+2 costs 2, 3+5 costs 5): several of
     a contingent's pieces strike **simultaneously** — at different
     territories (each strike must connect on its own) or jointly at one
     (their combined value must connect, and resolves as a single combined
@@ -278,7 +286,7 @@ above are on 4×4.
     is increased by the air bonus.
   - *water*: your pieces that would die in combat **return to your
     sideboard** instead of leaving the game.
-  - *earth*: attacking your territories costs the attacker piece value
+  - *earth*: attacking your territories costs the attacker its usual cost
     **plus the earth bonus**.
   Disable with `obeliskPowers: false`.
 - **Winning**: eliminate all enemy pieces from the board, leave the enemy
@@ -303,7 +311,8 @@ box or via `--config file.json` on the CLI:
 | `maxActionTypesPerContingent` | 2 | "two types of actions" read literally: *at most two distinct mechanics per contingent per turn*, any number of actions within the budget (null = no limit) |
 | `maxActionsPerContingent` | null | cap on the number of actions per contingent per turn; the older reading was 2 (with the mechanic limit null) |
 | budget | ≤ strength | action costs sum *up to* strength (exact sums are usually impossible with 2 fib values) |
-| `evolveCost` | `'smaller'` | evolve's cost wasn't specified; also supports `'larger'` and `'result'` |
+| `rankCosts` | `true` | moving into empty territory and attacking cost one fibonacci step below the piece's value (2→1, 3→2, 5→3, 8→5); `false` = the piece's full value (the older costs) |
+| `evolveCost` | `'larger'` | the larger constituent — one step below the result, matching rank costs; also `'smaller'` (the older default) and `'result'` |
 | `scoutRetreatBudget` | 1 | read as *1 scout per attack* may flee to an empty territory |
 | `combatRule` | `'devolve'` | attacker devolves through stiff defense; also `'margin'` (dies on exact tie), `'mutual'` (always dies), `'attacker-survives'` (never dies) |
 | `devolveThreshold` | 0.5 | devolution triggers when defense > this fraction of the attacker |

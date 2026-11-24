@@ -528,15 +528,17 @@
         <p>Each of your contingents spends its strength as budget, on actions of at most
         <b>2 mechanics</b> — as many of them as the budget pays for. Strength 5 could move
         three scouts, then spawn twice. An ability counts as its obelisk's mechanic.</p>
+        <p>A piece's <b>rank cost</b> is one step down the fibonacci ladder from its value:
+        soldier 1, chieftain 2, warlord 3, behemoth 5.</p>
         <div class="rows">
           <div class="row"><div class="k">Spawn</div><div class="c">cost 1</div>
             <div class="v">Add a scout from your sideboard to one of the contingent's
             territories.</div></div>
           <div class="row"><div class="k">Move</div>
-            <div class="c">cost = gap between the mover and the piece it joins; scouts always 1</div>
+            <div class="c">into empty: rank cost · onto your own piece: the gap · scouts always 1</div>
             <div class="v">Step a piece into an adjacent empty or friendly territory. A 3 into
-            empty costs 3. A 3 onto your own 2 costs 1.</div></div>
-          <div class="row"><div class="k">Evolve</div><div class="c">cost = the smaller piece</div>
+            empty costs 2. A 5 onto your own 3 costs 2.</div></div>
+          <div class="row"><div class="k">Evolve</div><div class="c">cost = rank cost of the piece made</div>
             <div class="v">Merge a territory's pair into one piece worth their sum.
               <div class="evo" role="img" aria-label="1 plus 1 makes 2, 2 plus 1 makes 3, 3 plus 2 makes 5, 5 plus 3 makes 8">
                 <span><i class="pc A v1">1</i>+<i class="pc A v1">1</i>→<i class="pc A v2">2</i></span>
@@ -544,11 +546,11 @@
                 <span><i class="pc A v3">3</i>+<i class="pc A v2">2</i>→<i class="pc A v5">5</i></span>
                 <span><i class="pc A v5">5</i>+<i class="pc A v3">3</i>→<i class="pc A v8">8</i></span>
               </div></div></div>
-          <div class="row"><div class="k">Attack</div><div class="c">cost = the attacker's value</div>
+          <div class="row"><div class="k">Attack</div><div class="c">cost = the attacker's rank cost</div>
             <div class="v">A warrior strikes an adjacent enemy territory. Its value must be at
             least the territory's total. Scouts can't attack.</div></div>
           <div class="row"><div class="k">Coordinated attack</div>
-            <div class="c">cost = both strikers' values</div>
+            <div class="c">cost = both strikers' rank costs</div>
             <div class="v">Two warriors strike in one action: at two territories, each strong
             enough alone, or together at one, with combined value at least its total.</div></div>
         </div>
@@ -556,8 +558,8 @@
           <li><b>Turn 1:</b> the opening player acts with only one contingent.</li>
           <li><b>Spawn</b> needs room under the pair rule: a territory holding a lone scout or a
           lone soldier.</li>
-          <li><b>Move</b> obeys the pair rule. An empty territory counts as 0 when working out
-          the cost.</li>
+          <li><b>Move</b> obeys the pair rule. Moving onto your own piece costs the gap in value,
+          so it's never dearer than moving into empty ground.</li>
           <li><b>Evolve</b> returns both pieces to your sideboard, and the new piece must be
           available there.</li>
           <li><b>Coordinated attack</b> across two contingents: each pays for its own striker and
@@ -669,8 +671,8 @@
               <dd>Evolve at range. The fuel merges with one of your pieces anywhere, if the two
               could legally pair. Sacrifice a 2 and your 3 becomes a 5.</dd>
               <dt>Aura</dt>
-              <dd>Attacks on your territories cost the attacker its value plus your earth
-              bonus.</dd>
+              <dd>Attacks on your territories cost the attacker its usual cost plus your
+              earth bonus.</dd>
             </dl>
           </article>
           <article class="el air">

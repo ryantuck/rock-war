@@ -10,7 +10,7 @@ import {
   legalPlacements, legalActions, applyAction, contingents, neighbors,
   other, armyPieceCount, armyStrengthOnBoard, canAddPiece, obeliskBonuses,
   obeliskStatus, obeliskElementBonus, combatRuleOf,
-  cellDistance, turnLimits, withinLimits, mechanicOf,
+  cellDistance, turnLimits, withinLimits, mechanicOf, pieceCost,
 } from '../game.js';
 import { obeliskReach } from './obelisk-threat.js';
 import { choosePlacement } from './placement.js';
@@ -201,7 +201,7 @@ function maxAttackThreat(state, enemy, W) {
       const cell = state.cells[t];
       if (cell.army !== enemy) continue;
       for (const p of new Set(cell.pieces)) {
-        if (p < minAtk || p + earthTax > budget) continue;
+        if (p < minAtk || pieceCost(config, p) + earthTax > budget) continue;
         for (const n of neighbors(config, t)) {
           const nc = state.cells[n];
           if (!nc.army || nc.army === enemy) continue;

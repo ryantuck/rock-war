@@ -125,8 +125,17 @@ function baseRules() {
     // The older rule was 2 actions of any mechanics: set this to 2 and
     // maxActionTypesPerContingent to null.
     maxActionsPerContingent: null,
-    // Cost of an evolve action: 'smaller' | 'larger' | 'result' constituent value.
-    evolveCost: 'smaller',
+    // Rank costs: moving into an EMPTY territory or attacking costs one
+    // fibonacci step below the piece's value — soldier (2) 1, chieftain (3)
+    // 2, warlord (5) 3, behemoth (8) 5; scouts always move for 1. Moving onto
+    // your own piece costs the difference (a 5 onto a 3 costs 2). false = the
+    // older costs: the piece's full value.
+    rankCosts: true,
+    // Cost of an evolve action: 'larger' constituent (default — one step below
+    // the result, matching rank costs: making a soldier costs 1, a chieftain
+    // 2, a warlord 3, the behemoth 5) | 'smaller' (the older default) |
+    // 'result'.
+    evolveCost: 'larger',
     // Per attack, how many scouts may retreat into EMPTY territories.
     // (Retreats into own-occupied territories are always free.)
     scoutRetreatBudget: 1,
@@ -557,10 +566,21 @@ export function contingents(state, army) {
 // Actions
 // ---------------------------------------------------------------------------
 
-export function moveCost(piece, targetCell) {
+// What committing a piece costs — moving it into open ground, or attacking
+// with it (before any earth tax): one fibonacci step below its value under
+// rankCosts (2→1, 3→2, 5→3, 8→5; a scout 1), else its full value.
+export function pieceCost(config, piece) {
+  if (config.rankCosts === false || piece <= 1) return piece;
+  const i = FIBS.indexOf(piece);
+  return i > 0 ? FIBS[i - 1] : piece;
+}
+
+// Move cost: scouts always 1; onto a friendly piece, the value difference;
+// into an empty territory, pieceCost.
+export function moveCost(piece, targetCell, config) {
   if (piece === 1) return 1; // scouts always move for 1
-  const occupant = targetCell.pieces.length ? targetCell.pieces[0] : 0;
-  return Math.abs(piece - occupant);
+  if (targetCell.pieces.length === 0) return config ? pieceCost(config, piece) : piece;
+  return Math.abs(piece - targetCell.pieces[0]);
 }
 
 export function evolveCostOf(config, a, b) {
@@ -664,18 +684,19 @@ export function legalActions(state, cont, ledger, bonusPool = {}, allies = null)
         const nc = state.cells[n];
         if (nc.army === null || nc.army === army) {
           if (!canAddPiece(config, nc, p)) continue;
-          const cost = moveCost(p, nc);
+          const cost = moveCost(p, nc, config);
           if (cost >= 1 && isFib(cost) && afford('move', cost)) {
             acts.push({ type: 'move', from: t, piece: p, to: n, cost });
           }
         } else {
-          // Attack: cost equals the attacking piece's value. Pieces below
+          // Attack: cost = the attacker's pieceCost (+ earth tax). Pieces below
           // minAttackValue (scouts by default) cannot attack, and attacking
           // requires value >= the target territory's total — a weaker attack
           // could never connect (defenders would simply stand and repel it).
           const defSum = nc.pieces.reduce((s, x) => s + x, 0);
-          if (p >= (config.minAttackValue ?? 1) && p >= defSum && afford('attack', p + earthTax)) {
-            acts.push({ type: 'attack', from: t, piece: p, to: n, cost: p + earthTax });
+          const cost = pieceCost(config, p) + earthTax;
+          if (p >= (config.minAttackValue ?? 1) && p >= defSum && afford('attack', cost)) {
+            acts.push({ type: 'attack', from: t, piece: p, to: n, cost });
           }
         }
       }
@@ -685,7 +706,7 @@ export function legalActions(state, cont, ledger, bonusPool = {}, allies = null)
   // Coordinated attacks: pairs of attack-capable pieces striking at once —
   // two different territories (each strike must individually connect) or
   // one territory jointly (their combined value must connect). One action,
-  // cost = sum of piece values (+ earth tax per strike).
+  // cost = the strikers' pieceCosts summed (+ earth tax per strike).
   if (config.coordinatedAttacks !== false) {
     const minAtk = config.minAttackValue ?? 1;
     const collectUnits = (terrs) => {
@@ -707,6 +728,7 @@ export function legalActions(state, cont, ledger, bonusPool = {}, allies = null)
       }
       return units;
     };
+    const strikeCost = (p) => pieceCost(config, p) + earthTax;
     const pairUp = (a, b) => {
       for (const ta of a.targets) {
         for (const tb of b.targets) {
@@ -714,7 +736,7 @@ export function legalActions(state, cont, ledger, bonusPool = {}, allies = null)
             { from: a.from, piece: a.piece, to: ta.to },
             { from: b.from, piece: b.piece, to: tb.to },
           ];
-          const cost = a.piece + b.piece + 2 * earthTax;
+          const cost = strikeCost(a.piece) + strikeCost(b.piece);
           if (ta.to === tb.to) {
             // Joint strike: combined value must connect.
             if (a.piece + b.piece >= ta.defSum) acts.push({ type: 'coordAttack', cost, strikes });
@@ -729,13 +751,13 @@ export function legalActions(state, cont, ledger, bonusPool = {}, allies = null)
     // Pairs within this contingent: the whole cost comes from our budget.
     for (let i = 0; i < units.length; i++) {
       for (let j = i + 1; j < units.length; j++) {
-        if (afford('attack', units[i].piece + units[j].piece + 2 * earthTax)) {
+        if (afford('attack', strikeCost(units[i].piece) + strikeCost(units[j].piece))) {
           pairUp(units[i], units[j]);
         }
       }
     }
     // Cross-contingent pairs: each contingent pays its own striker's share
-    // (piece + earth tax) and spends one of its actions. Contingent footprints
+    // (pieceCost + earth tax) and spends one of its actions. Contingent footprints
     // grow mid-turn (captures, moves into an ally's territory), so they can
     // overlap: territories this contingent already covers are excluded from
     // the ally's units, or one piece could be paired with itself.
@@ -743,9 +765,9 @@ export function legalActions(state, cont, ledger, bonusPool = {}, allies = null)
       for (const ally of allies) {
         const allyUnits = collectUnits([...ally.cont.terrs].filter((t) => !cont.terrs.has(t)));
         for (const u of units) {
-          if (!afford('attack', u.piece + earthTax)) continue;
+          if (!afford('attack', strikeCost(u.piece))) continue;
           for (const au of allyUnits) {
-            if (au.piece + earthTax > ally.remaining) continue;
+            if (strikeCost(au.piece) > ally.remaining) continue;
             pairUp(u, au);
           }
         }
@@ -1523,7 +1545,7 @@ export function playTurn(state, engines, rng) {
           const mine = match.strikes.filter((st) => s.cont.terrs.has(st.from) &&
             (s === slot || !slot.cont.terrs.has(st.from)));
           if (mine.length === 0) continue;
-          const share = mine.reduce((sum, st) => sum + st.piece, 0) + tax * mine.length;
+          const share = mine.reduce((sum, st) => sum + pieceCost(config, st.piece), 0) + tax * mine.length;
           if (s === slot) {
             const drawn = beyondCap ? share : Math.max(0, share - s.remaining);
             if (drawn > 0) {

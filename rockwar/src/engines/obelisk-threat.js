@@ -32,7 +32,7 @@
 import {
   contingents, obeliskBonuses, obeliskTerritories, obeliskStatus, neighbors,
   canAddPiece, moveCost, isFib, fibAdjacent, other, obeliskElementBonus, FIBS,
-  turnLimits, ELEMENT_ACTIONS,
+  turnLimits, ELEMENT_ACTIONS, pieceCost,
 } from '../game.js';
 
 const NONE = Object.freeze({ held: 0, need: Infinity, deficit: Infinity, lethal: false });
@@ -164,7 +164,7 @@ export function obeliskReach(state, army, opts = {}) {
         if (!pick || rank > pick.rank) pick = { rank, cand, plan, next, nd };
       };
       const canEnter = (i, p) => cells[i].army !== enemy && canAddPiece(config, cells[i], p);
-      const stepCost = (p, i) => { const c = moveCost(p, cells[i]); return c >= 1 && isFib(c) ? c : 0; };
+      const stepCost = (p, i) => { const c = moveCost(p, cells[i], config); return c >= 1 && isFib(c) ? c : 0; };
 
       // Spawns into own ring cells.
       if (scouts > 0) {
@@ -199,7 +199,7 @@ export function obeliskReach(state, army, opts = {}) {
               const rc = cells[r];
               if (rc.army === enemy && p >= minAtk && p >= sum(rc.pieces)) {
                 const tie = p === sum(rc.pieces);
-                consider({ cont, steps: [{ type: 'move', cost: c1 }, { type: 'attack', cost: p + earthTax }], tos: tie ? [n] : [n, r],
+                consider({ cont, steps: [{ type: 'move', cost: c1 }, { type: 'attack', cost: pieceCost(config, p) + earthTax }], tos: tie ? [n] : [n, r],
                   apply: (cs) => {
                     const out = movePiece(cs, a, n, army, p);
                     return setCell(setCell(out, n, army, removeOne(out[n].pieces, p)), r, army, tie ? [] : [p]);
@@ -212,7 +212,7 @@ export function obeliskReach(state, army, opts = {}) {
             const rc = cells[r];
             if (!ring.has(r) || rc.army !== enemy || p < minAtk || p < sum(rc.pieces)) continue;
             const tie = p === sum(rc.pieces);
-            consider({ cont, steps: [{ type: 'attack', cost: p + earthTax }], tos: tie ? [] : [r],
+            consider({ cont, steps: [{ type: 'attack', cost: pieceCost(config, p) + earthTax }], tos: tie ? [] : [r],
               apply: (cs) => setCell(setCell(cs, a, army, removeOne(cs[a].pieces, p)), r, army, tie ? [] : [p]) });
           }
         }
