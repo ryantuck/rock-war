@@ -51,7 +51,9 @@ frontend's layout menu or with `--layout`.
   · *attack* an adjacent enemy territory (cost = attacker's value; scouts
   can't attack; attacker must be ≥ the territory's total) · *coordinated
   attack*: several pieces strike simultaneously, denying retreats into any
-  attacked territory.
+  attacked territory. A pair that breaks a territory together moves in
+  together: two 2s land as (2,1), the enemy pushing the spare scout one
+  step.
 - **Combat**: defenders retreat free into adjacent friendly territories or
   die. Exact-value ties are mutual destruction. A stronger attacker breaking
   a defense worth more than half its value **devolves** into its fibonacci

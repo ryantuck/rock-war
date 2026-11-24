@@ -167,8 +167,8 @@ above are on 4×4.
     a contingent's pieces strike **simultaneously** — at different
     territories (each strike must connect on its own) or jointly at one
     (their combined value must connect, and resolves as a single combined
-    attacker: ties annihilate every striker, stiff defense devolves them
-    all in place, clean breaks advance the largest striker). Because the
+    attacker: a tie annihilates every striker, and any break moves the
+    whole group in — see *group advance*). Because the
     strikes are simultaneous, **defenders cannot retreat into any territory
     under attack** — two scouts side by side can no longer shelter each
     other, and a 2 can't retreat into an also-attacked 1's territory. The
@@ -178,6 +178,21 @@ above are on 4×4.
     pays its own strikers' share from its budget and spends one of its
     actions on the assault. `coordinatedAttacks` knob; engines generate
     pairs.
+  - *Group advance* (`groupAdvance`): when a joint strike breaks a
+    territory, **both strikers move in**. If they can't share it (2+2, 3+3
+    and 5+5 aren't fib-adjacent pairs), the smaller **splits into its
+    fibonacci parts on arrival** (through the sideboard, like devolution),
+    the larger keeps the part that pairs with it, and the **enemy displaces
+    the leftover one step**: into an adjacent empty territory, or one of the
+    attacker's own where it fits. With nowhere to go, it returns to the
+    attacker's sideboard. Two 2s breaking a 3 land as (2,1) with a scout
+    pushed next door; 3+3 through a (3,2) lands as (3,2) plus a pushed 1;
+    5+5 through an 8 lands as (5,3) plus a pushed 2. A pair that fits —
+    (2,3), (3,5) — moves in whole. Value is conserved. Twin strikes (one
+    striker per territory) are unchanged: a stiff defense devolves the
+    striker where it stands, a clean break moves it in. With the knob off,
+    a joint break moves only the largest striker in, and a stiff defense
+    devolves every striker in place.
 - **Combat**: the defender may retreat each piece for free into an adjacent
   territory it occupies (respecting stacking limits), plus up to 1 scout per
   attack may retreat into an adjacent *empty* territory. Then the defenders
@@ -284,6 +299,7 @@ box or via `--config file.json` on the CLI:
 | `devolveThreshold` | 0.5 | devolution triggers when defense > this fraction of the attacker |
 | `firstTurnContingents` | 1 | contingents the opening player may act with on turn 1 (0 = skip turn 1, null = no handicap) |
 | `firstTurnActions` | 2 | actions per contingent on turn 1 (1 = the old single-action opening; null = normal cap) |
+| `groupAdvance` | `true` | a joint strike that breaks a territory moves both strikers in; a pair that can't share splits its smaller striker on arrival and the enemy displaces the leftover one step (`false`: only the largest striker moves in, stiff defense devolves every striker in place) |
 | `minAttackValue` | 2 | minimum piece value that may attack — scouts can't (1 = anyone can) |
 | `layout` | `4x4-partition` | named board layout: supplies `width`/`height`, `obelisks`, `initialScouts`, `placementStacking`; other keys apply on top |
 | `obelisks` | per layout | element + corner position per obelisk; empty array disables them |
@@ -375,6 +391,9 @@ Add an engine by implementing three functions and registering it in
   planRetreats(state, attackInfo, options, rng) -> [{ piece, dest }, ...]
   chooseContingents(state, conts, limit, rng) -> subset of conts  // optional:
     // which contingents act under the first-turn handicap
+  planDisplacement(state, info, dests, rng) -> one of dests  // optional:
+    // where to push the attacker's group-advance leftover piece
+    // (info: { army, piece, from }); default: defaultDisplacement in game.js
 }
 ```
 
@@ -588,6 +607,77 @@ of decided games, ±3–5 pts):
 - **On 5×5, split placement parks groups beside obelisks.** About 90% of
   games start with an obelisk held. The lookahead mirror tilts toward B
   (33.5% A), while the greedy and planner mirrors move closer to even.
+
+## Group advance (`groupAdvance` off → on)
+
+*[AI - Claude]: Group advance — simulation findings*
+
+A joint strike that breaks a territory now moves both strikers in. Pairs
+that can't share a territory split the smaller striker on arrival, and the
+enemy pushes the leftover one step (see *Rules as implemented*). Same seeds
+for both settings, seats swapped; 400 games per greedy and lookahead
+mirror, 150 per planner-obelisk mirror. "Joint" = joint strikes per game;
+"pushed" = pieces displaced per game. Lengths are means.
+
+| Mirror | Layout | Joint | Pushed | Draws | Mean turns | Seat A | Obelisk wins |
+|---|---|---|---|---|---|---|---|
+| greedy | 4x4-partition | 1.00 → 2.34 | 0.36 | 20.3 → 16.5% | 68.5 → 63.6 | 44.5 → 43.4% | 0 → 0.3% |
+| lookahead | 4x4-partition | 0.48 → 0.82 | 0.19 | 5.8 → 5.8% | 27.9 → 28.4 | 44.8 → 47.7% | 12.5 → 12.8% |
+| planner-obelisk | 4x4-partition | 0.55 → 0.55 | 0.25 | 0 → 0% | 22.6 → 19.2 | 49.3 → 50.7% | 26 → 22% |
+| greedy | 5x5-classic | 2.24 → 2.35 | 0.30 | 8.8 → 8.0% | 53.1 → 50.7 | 52.1 → 53.5% | 0 → 0% |
+| lookahead | 5x5-classic | 0.26 → 0.40 | 0.15 | 2.0 → 2.3% | 40.6 → 38.1 | 34.4 → 36.1% | 14.3 → 13.8% |
+| planner-obelisk | 5x5-classic | 0.08 → 0.11 | 0.04 | 0.7 → 0.7% | 39.5 → 42.2 | 40.3 → 40.9% | 35.3 → 35.3% |
+| greedy | hex13 | 2.20 → 1.23 | 0.38 | 6.3 → 4.3% | 48.2 → 44.0 | 44.5 → 42.0% | 0 → 0% |
+| lookahead | hex13 | 0.60 → 0.86 | 0.26 | 6.3 → 8.0% | 25.9 → 27.5 | 45.9 → 45.1% | 7.3 → 5.8% |
+| planner-obelisk | hex13 | 0.44 → 0.45 | 0.31 | 2.0 → 0% | 21.6 → 17.7 | 53.1 → 53.3% | 22 → 22.7% |
+
+- **Joint strikes get more attractive, and still stay rare.** Lookahead
+  uses them ~40–70% more often, but it's under one per game out of 3–5
+  attacks. Moving the whole group in beats the old outcomes: largest
+  striker alone, or every striker devolved at home with nobody taking the
+  territory.
+- **What engines strike with** (rule on, all joint strikes over the
+  runs above):
+
+  | Pair vs defense | lookahead 4×4 | planner-obelisk 4×4 | lookahead hex13 | planner-obelisk hex13 |
+  |---|---|---|---|---|
+  | 2+3 vs 3 — moves in whole as (3,2) | 164 | 29 | 149 | 12 |
+  | 2+2 vs 3 — (2,1) + a pushed scout | 54 | 32 | 80 | 30 |
+  | 2+3 vs 1 or 2 | 78 | 5 | 77 | 6 |
+  | 2+2 vs 1 or 2 | 9 | 8 | 12 | 15 |
+  | 3+3 (any) — (3,2) + a pushed 1 | 12 | 6 | 14 | 5 |
+  | other | 12 | 3 | 11 | 0 |
+
+  2+3 into a 3 leads for lookahead: a lone 3 would only trade evenly
+  (exact tie), and the old rule devolved both strikers at home. The
+  2+2-into-a-3 split leads for the planner. Only 2+2 and 3+3 groups push
+  a piece: 23% of lookahead's joint strikes and 55% of planner-obelisk's on
+  4×4 (31% and 74% on hex13).
+- **Planner games end sooner on the small boards** (4×4 22.6 → 19.2
+  turns, hex13 21.6 → 17.7), with a few more eliminations. On 5×5 the
+  rule barely comes up (0.1 joint strikes per game).
+- **The pushed piece always found room.** No displaced piece went back
+  to the sideboard in these runs: the strikers' vacated origins are
+  always adjacent to the captured territory.
+- **Seat balance and the obelisk race don't move** beyond noise (±2.5–4
+  pts). Greedy mirrors draw less on 4×4 (20.3 → 16.5%). Greedy's own
+  joint-strike use moves both ways (more on 4×4, fewer on hex13): its
+  flat scoring now prices the forced split on every 2+2, including the
+  redundant ones where a single 2 would have done.
+- **Round robin on 4x4-partition (40 games per pairing), off → on:**
+  planner-obelisk 77.7 → 78.6%, lookahead-obelisk 65.2 → 66.4%, tempo
+  62.7 → 64.2%, planner 66.6 → 63.3%, lookahead 57.8 → 59.4%, turtle
+  48.8 → 49.4%, aggro 50.9 → 48.4%, greedy 19.7 → 19.2%, random
+  0.8 → 1.1%. Every shift is within noise (±2.8 pts). Draws 3.0 → 2.5%.
+  The off run reproduces the 4×4 section's standings exactly, so the
+  knob's off path is the old rule.
+- **Who picks the landing spot:** lookahead and the planners simulate
+  each legal spot and take the one that scores best for them. Greedy
+  (and the human side, auto-planned) uses `defaultDisplacement`: an
+  empty territory, beside as many of its own territories as possible
+  (exposed), off the obelisk rings. Random picks at random.
+- The layout tables at the top were measured before this rule. Their
+  shifts are the deltas above.
 
 ## Current observations (300-game matchups, seats swapped, 5×5, devolve combat)
 

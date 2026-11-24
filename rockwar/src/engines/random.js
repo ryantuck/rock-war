@@ -40,5 +40,10 @@ export function makeRandomEngine({ passChance = 0.1 } = {}) {
       }
       return plan;
     },
+
+    // Group advance overflow: push the attacker's leftover piece anywhere legal.
+    planDisplacement(state, info, dests, rng) {
+      return rng.pick(dests);
+    },
   };
 }

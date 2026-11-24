@@ -15,8 +15,9 @@
 // ledger playTurn uses — per-contingent budget, action cap, obelisk bonus
 // pools, first-turn handicap — and executes clicked actions through the same
 // applyAction/offerReactions path, so the rules are identical to sim games.
-// v1 limits for the human side: retreats are auto-planned (greedy's policy),
-// no reaction-window casts on the opponent's turn, and no coordinated
+// v1 limits for the human side: retreats and displacements of the enemy's
+// group-advance overflow are auto-planned (greedy's policy), no
+// reaction-window casts on the opponent's turn, and no coordinated
 // attacks or two-territory fire splits.
 
 import {
@@ -66,8 +67,9 @@ $('layout').addEventListener('change', () => loadLayout($('layout').value));
 loadLayout(DEFAULT_LAYOUT);
 
 // A "human" engine slot: moves come from board clicks, not from the engine
-// interface. Retreats (and nothing else) are auto-planned with greedy's
-// policy — stand on repels and exact ties, otherwise flee what can flee.
+// interface. Retreats are auto-planned with greedy's policy — stand on
+// repels and exact ties, otherwise flee what can flee — as is where to push
+// an attacker's group-advance overflow piece.
 function makeHumanEngine() {
   const helper = makeEngine('greedy');
   return {
@@ -76,6 +78,8 @@ function makeHumanEngine() {
     placeScout: () => null,   // placements come from board clicks
     chooseAction: () => null, // actions come from board clicks
     planRetreats: (s, a, o, r) => helper.planRetreats(s, a, o, r),
+    // Pushing an attacker's overflow piece (group advance) is auto-planned too.
+    planDisplacement: (s, i, d, r) => helper.planDisplacement(s, i, d, r),
     // no chooseReaction: the human side doesn't cast on the enemy's turn (v1)
   };
 }
@@ -593,6 +597,11 @@ async function animateEvent(ev) {
       return fly(ev.army, ev.piece, cellRect(ev.from), cellRect(ev.to), { hide: ev.from });
     case 'toSideboard':
       return fly(ev.army, ev.piece, cellRect(ev.from), sideRect(ev.army), { hide: ev.from, fadeOut: true });
+    case 'displace': // group advance overflow, pushed out by the enemy
+      flash(ev.from);
+      return ev.to === null
+        ? fly(ev.army, ev.piece, cellRect(ev.from), sideRect(ev.army), { fadeOut: true })
+        : fly(ev.army, ev.piece, cellRect(ev.from), cellRect(ev.to));
     case 'evolve': {
       flash(ev.at, 'evolveflash');
       await Promise.all(ev.parts.map((p) => fade(ev.army, p, ev.at)));

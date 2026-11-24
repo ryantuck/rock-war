@@ -2,7 +2,7 @@
 // No search — just material, tempo, and position heuristics. Weights are
 // exposed so you can tune behavior while iterating on rules.
 
-import { legalPlacements, neighbors, other, armyPieceCount, armyStrengthOnBoard, canAddPiece, combatRuleOf, obeliskTerritories, obeliskStatus, applyAction, cellDistance } from '../game.js';
+import { legalPlacements, neighbors, other, armyPieceCount, armyStrengthOnBoard, canAddPiece, combatRuleOf, obeliskTerritories, obeliskStatus, applyAction, cellDistance, fibAdjacent, defaultDisplacement } from '../game.js';
 import { obeliskReach, reachDanger } from './obelisk-threat.js';
 import { choosePlacement } from './placement.js';
 
@@ -215,21 +215,28 @@ export function makeGreedyEngine(opts = {}) {
           score += obeliskPull(state, army, a.to, 1, W);
         } else if (a.type === 'coordAttack') {
           // Sum the per-territory outcomes: ties trade, breaks kill, stiff
-          // defenses devolve us. Coordination's retreat-denial upside isn't
-          // modeled here — the flat bonus stands in for it.
+          // defenses devolve us. Under group advance, a joint pair that breaks
+          // moves in together and only devolves (one split, one piece pushed
+          // out) when the two can't share a territory. Coordination's
+          // retreat-denial upside isn't modeled here — the flat bonus stands
+          // in for it.
           const rule = combatRuleOf(state.config);
           const byTarget = new Map();
           for (const st of a.strikes) {
-            byTarget.set(st.to, (byTarget.get(st.to) || 0) + st.piece);
+            if (!byTarget.has(st.to)) byTarget.set(st.to, []);
+            byTarget.get(st.to).push(st.piece);
           }
           let killed = 0;
           let lost = 0;
           let devols = 0;
-          for (const [t, S] of byTarget) {
+          for (const [t, ps] of byTarget) {
+            const S = ps.reduce((s, x) => s + x, 0);
             const D = state.cells[t].pieces.reduce((s, x) => s + x, 0);
             killed += D;
             if (rule === 'mutual' || ((rule === 'margin' || rule === 'devolve') && S === D)) lost += S;
-            else if (rule === 'devolve' && D > S * (state.config.devolveThreshold ?? 0.5)) devols++;
+            else if (state.config.groupAdvance !== false && ps.length > 1) {
+              if (!fibAdjacent(ps[0], ps[1])) devols++;
+            } else if (rule === 'devolve' && D > S * (state.config.devolveThreshold ?? 0.5)) devols++;
           }
           score += (killed - lost) * W.killPerPoint - devols * W.devolvePenalty + W.capture;
           if (lost > 0) {
@@ -259,6 +266,12 @@ export function makeGreedyEngine(opts = {}) {
     // so stand and trade. Otherwise stand only when the attack is repelled.
     planRetreats(state, attackInfo, options, rng) {
       return retreatPolicy(state, attackInfo, options);
+    },
+
+    // Group advance overflow: push the attacker's leftover piece wherever it
+    // helps them least (empty, exposed, off the obelisk rings).
+    planDisplacement(state, info, dests, rng) {
+      return defaultDisplacement(state, info, dests);
     },
 
     // On the opponent's turn, fire off any ability whose flat value clears

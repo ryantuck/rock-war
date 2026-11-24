@@ -395,6 +395,24 @@ export function makeLookaheadEngine(opts = {}) {
       return retreatPolicy(state, attackInfo, options);
     },
 
+    // Group advance overflow: the attacker's leftover piece is ours to place.
+    // Try each landing spot and keep the one that leaves our position best.
+    planDisplacement(state, info, dests, rng) {
+      const me = other(info.army);
+      let best = dests[0];
+      let bestScore = -Infinity;
+      for (const d of dests) {
+        const clone = structuredClone({ ...state, log: [], events: null, captureSnapshots: false });
+        const cell = clone.cells[d];
+        cell.army = info.army;
+        cell.pieces.push(info.piece);
+        cell.pieces.sort((a, b) => b - a);
+        const s = evaluate(clone, me, W) + rng() * W.jitter;
+        if (s > bestScore) { bestScore = s; best = d; }
+      }
+      return best;
+    },
+
     // On the opponent's turn: simulate each available ability and fire the
     // best one if it genuinely improves our position (reactions are free, but
     // the fuel scout isn't — demand a real gain, not jitter).

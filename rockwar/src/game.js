@@ -148,6 +148,15 @@ function baseRules() {
     // one of its actions. Defenders cannot retreat into ANY territory under
     // attack, and the scout retreat-to-empty budget is shared.
     coordinatedAttacks: true,
+    // Group advance: when two strikers jointly break a territory, BOTH move
+    // in. If they can't share it (2+2, 3+3 and 5+5 aren't fib-adjacent),
+    // the smaller splits into its fibonacci constituents on arrival, the
+    // larger keeps the constituent that pairs with it, and the ENEMY
+    // displaces the leftover one step — into an adjacent empty territory or
+    // one of the attacker's own where it fits (none: back to the sideboard).
+    // false = the older rule: the largest striker moves in alone, and a stiff
+    // defense devolves every striker where it stands.
+    groupAdvance: true,
     // First-turn handicap: the first player acts with at most this many
     // contingents on turn 1 (their engine chooses which). null = no handicap.
     firstTurnContingents: 1,
@@ -1026,7 +1035,7 @@ function resolveCoordAttack(state, army, action, engines, rng) {
         pushLog(state, `${army} [${label}] ${verb} [${destroyed.join(',')}] at ${fmtCell(config, t)} and dies`);
         continue;
       }
-      if (rule === 'devolve' && D > S * (config.devolveThreshold ?? 0.5)) {
+      if (!groupAdvances(config, strikes) && rule === 'devolve' && D > S * (config.devolveThreshold ?? 0.5)) {
         for (const st of strikes) {
           const placed = devolveInPlace(state, army, st.from, st.piece);
           emitEvent(state, { type: 'devolved', army, piece: st.piece, at: st.from, parts: placed });
@@ -1036,14 +1045,117 @@ function resolveCoordAttack(state, army, action, engines, rng) {
       }
       pushLog(state, `${army} [${label}] ${verb} [${destroyed.join(',')}] at ${fmtCell(config, t)}`);
     }
+    captured.push(t);
+    if (groupAdvances(config, strikes)) {
+      // Territory empty: the whole strike group moves in.
+      captured.push(...advanceGroup(state, army, t, strikes, engines, rng));
+      continue;
+    }
     // Territory empty: the largest striker advances.
     const adv = strikes.reduce((x, y) => (y.piece > x.piece ? y : x));
     removePiece(state, adv.from, adv.piece);
     addPiece(state, t, army, adv.piece);
     emitEvent(state, { type: 'move', army, piece: adv.piece, from: adv.from, to: t });
-    captured.push(t);
   }
   return { captured };
+}
+
+// Does this territory's strike group advance together (groupAdvance rule)?
+function groupAdvances(config, strikes) {
+  return config.groupAdvance !== false && strikes.length > 1;
+}
+
+// Group advance into the emptied territory `t`: the largest striker moves in,
+// then each other striker joins it if the pair rule allows. One that can't
+// (2 beside 2, 3 beside 3, 5 beside 5) splits into its fibonacci parts on
+// arrival — exchanged through the sideboard, like devolution — and its parts
+// seat where they fit (a 2 keeps one of its 1s: (2,1)). Parts that don't fit
+// are displaced one step by the enemy. Returns the territories the displaced
+// pieces landed in (adjacent to t, so they join the contingent).
+function advanceGroup(state, army, t, strikes, engines, rng) {
+  const { config } = state;
+  const order = [...strikes].sort((a, b) => b.piece - a.piece);
+  const leftovers = [];
+  for (const st of order) {
+    removePiece(state, st.from, st.piece);
+    if (canAddPiece(config, state.cells[t], st.piece)) {
+      addPiece(state, t, army, st.piece);
+      emitEvent(state, { type: 'move', army, piece: st.piece, from: st.from, to: t });
+      continue;
+    }
+    state.sideboard[army][st.piece] = (state.sideboard[army][st.piece] || 0) + 1;
+    const seated = [];
+    for (const part of fibParts(st.piece)) {
+      if ((state.sideboard[army][part] || 0) <= 0) continue; // unavailable: lost
+      state.sideboard[army][part]--;
+      if (canAddPiece(config, state.cells[t], part)) {
+        addPiece(state, t, army, part);
+        seated.push(part);
+      } else {
+        leftovers.push(part);
+      }
+    }
+    emitEvent(state, { type: 'attackDevolve', army, piece: st.piece, from: st.from, to: t, parts: seated });
+    pushLog(state, `${army} ${st.piece} splits on arrival at ${fmtCell(config, t)}` +
+      (seated.length ? ` (keeps ${seated.join(',')})` : ''));
+  }
+  const landed = [];
+  for (const p of leftovers) {
+    const dest = displacePiece(state, army, t, p, engines, rng);
+    if (dest !== null) landed.push(dest);
+  }
+  return landed;
+}
+
+// Where a piece pushed out of territory `t` may land: an adjacent empty
+// territory, or one of its own army's where the pair rule allows.
+export function displacementOptions(state, t, army, piece) {
+  return neighbors(state.config, t).filter((n) => {
+    const c = state.cells[n];
+    return c.army === null || (c.army === army && canAddPiece(state.config, c, piece));
+  });
+}
+
+// The enemy's default pick of where to push a displaced piece: somewhere it
+// helps least — an empty territory (it can't stack toward an evolve) beside
+// as many enemy territories as possible (exposed), off obelisk rings (no
+// presence gained). Ties go to the lowest index.
+export function defaultDisplacement(state, info, dests) {
+  const { config } = state;
+  const foe = other(info.army);
+  const rings = (config.obelisks ?? []).map((ob) => obeliskTerritories(config, ob));
+  let best = null;
+  let bestScore = -Infinity;
+  for (const d of dests) {
+    let s = state.cells[d].army === null ? 2 : 0;
+    for (const n of neighbors(config, d)) if (state.cells[n].army === foe) s += 1;
+    for (const ring of rings) if (ring.includes(d)) s -= 1;
+    if (s > bestScore) { bestScore = s; best = d; }
+  }
+  return best;
+}
+
+// Push a piece of `army` out of territory `t` one step; the enemy's engine
+// picks the destination (planDisplacement), else defaultDisplacement. With
+// nowhere to go it returns to its sideboard. Returns the landing index or null.
+function displacePiece(state, army, t, piece, engines, rng) {
+  const { config } = state;
+  const foe = other(army);
+  const dests = displacementOptions(state, t, army, piece);
+  if (dests.length === 0) {
+    state.sideboard[army][piece] = (state.sideboard[army][piece] || 0) + 1;
+    emitEvent(state, { type: 'displace', army, piece, from: t, to: null });
+    pushLog(state, `${army} ${piece} has nowhere to be displaced from ${fmtCell(config, t)}: back to the sideboard`);
+    return null;
+  }
+  const info = { army, piece, from: t };
+  const eng = engines && engines[foe];
+  let dest = eng && eng.planDisplacement ? eng.planDisplacement(state, info, dests, rng) : null;
+  if (!dests.includes(dest)) dest = defaultDisplacement(state, info, dests);
+  addPiece(state, dest, army, piece);
+  emitEvent(state, { type: 'displace', army, piece, from: t, to: dest });
+  pushLog(state, `${foe} displaces ${army} ${piece} ${fmtCell(config, t)}→${fmtCell(config, dest)}`);
+  return dest;
 }
 
 // Devolve `piece` where it stands: it returns to the sideboard and its
