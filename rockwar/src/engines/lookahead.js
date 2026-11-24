@@ -10,7 +10,7 @@ import {
   legalPlacements, legalActions, applyAction, contingents, neighbors,
   other, armyPieceCount, armyStrengthOnBoard, canAddPiece, obeliskBonuses,
   obeliskStatus, obeliskElementBonus, combatRuleOf,
-  cellDistance,
+  cellDistance, turnLimits, withinLimits, mechanicOf,
 } from '../game.js';
 import { obeliskReach } from './obelisk-threat.js';
 import { choosePlacement } from './placement.js';
@@ -47,6 +47,11 @@ const DEFAULT_WEIGHTS = {
   spawnLock: 15,    // penalty for scouts being permanently entombed
   spawnTempo: 6,    // milder penalty when spawning is one unlocking move away
   costPenalty: 0.3, // budget spent is tempo spent
+  passMarginActions: 2, // ...but only for a contingent's first this-many
+                    // actions each turn; past them an action must genuinely
+                    // improve the position. Turns aren't capped at 2 actions
+                    // any more, and a per-action allowance compounds: an
+                    // army could slide downhill one tolerable step at a time.
   passMargin: -3,   // act unless clearly harmful — passing doesn't freeze the
                     // game, the opponent moves next, so idling has real cost
   jitter: 0.05,     // random tiebreak
@@ -261,6 +266,42 @@ function evaluate(state, me, W) {
   return score;
 }
 
+// Pass threshold for the next action of a contingent: lenient for its first
+// few actions this turn, a real gain after that.
+function passBaseline(state, ctx, W) {
+  const margin = (ctx.actionsTaken ?? 0) < W.passMarginActions ? W.passMargin : 0;
+  return evaluate(state, ctx.army, W) + margin;
+}
+
+// Undo guard. Turns aren't capped at two actions, and a one-ply score can
+// rank a step and its reversal both acceptable — the engine then spends its
+// budget walking a piece out and back. Track this turn's moves per engine
+// and drop candidates that exactly reverse one (same piece value, swapped
+// ends). Keyed by game state + turn, so it resets every turn.
+function makeUndoGuard() {
+  let key = null;
+  let moves = [];
+  const sync = (state) => {
+    if (!key || key.state !== state || key.turn !== state.turn) {
+      key = { state, turn: state.turn };
+      moves = [];
+    }
+  };
+  return {
+    filter(state, acts) {
+      sync(state);
+      if (!moves.length) return acts;
+      const kept = acts.filter((a) => a.type !== 'move' ||
+        !moves.some((m) => m.from === a.to && m.to === a.from && m.piece === a.piece));
+      return kept;
+    },
+    record(state, a) {
+      sync(state);
+      if (a && a.type === 'move') moves.push({ from: a.from, to: a.to, piece: a.piece });
+    },
+  };
+}
+
 // Principled defender policy used both when this engine defends for real and
 // for the defenders inside simulations: stand when the attack fails or is an
 // exact-tie trade (margin rule), otherwise save what can be saved — under
@@ -295,6 +336,7 @@ export function makePlannerEngine(opts = {}) {
   const { depth = 3, beam = 6, expand = 40, ...weightOpts } = opts;
   const W = { ...DEFAULT_WEIGHTS, ...weightOpts };
   const base = makeLookaheadEngine(weightOpts);
+  const guard = makeUndoGuard();
   const simStub = { planRetreats: (s, info, options) => retreatPolicy(s, info, options) };
   const simEngines = { A: simStub, B: simStub };
 
@@ -303,11 +345,12 @@ export function makePlannerEngine(opts = {}) {
     name: 'planner',
 
     chooseAction(state, ctx, acts, rng) {
-      const { army, contingent, remainingBudget, actionsTaken, bonusPool } = ctx;
-      const cap = state.config.maxActionsPerContingent;
-      const baseline = evaluate(state, army, W) + W.passMargin;
+      const { army, contingent, remainingBudget, actionsTaken, typesUsed, bonusPool } = ctx;
+      const limits = turnLimits(state);
+      const baseline = passBaseline(state, ctx, W);
+      acts = guard.filter(state, acts);
 
-      const step = (fromState, terrs, remaining, taken, pool, action, spentSoFar, first) => {
+      const step = (fromState, terrs, remaining, taken, types, pool, action, spentSoFar, first) => {
         const clone = structuredClone({ ...fromState, log: [], events: null, captureSnapshots: false });
         const res = applyAction(clone, army, action, simEngines, rng);
         const nextTerrs = new Set(terrs);
@@ -318,7 +361,8 @@ export function makePlannerEngine(opts = {}) {
         if (action.type === 'ability' && action.element === 'air') nextTerrs.add(action.theirs);
         const poolKey = action.type === 'coordAttack' ? 'attack' : action.type;
         const nextPool = { ...pool };
-        const beyond = taken >= cap;
+        const mech = mechanicOf(action);
+        const beyond = !withinLimits({ taken, types }, mech, limits);
         const drawn = beyond ? action.cost : Math.max(0, action.cost - remaining);
         if (drawn > 0) nextPool[poolKey] = (nextPool[poolKey] || 0) - drawn;
         const spent = spentSoFar + action.cost;
@@ -327,6 +371,7 @@ export function makePlannerEngine(opts = {}) {
           terrs: nextTerrs,
           remaining: Math.max(0, remaining - (action.cost - drawn)),
           taken: taken + 1,
+          types: beyond || types.has(mech) ? types : new Set([...types, mech]),
           pool: nextPool,
           spent,
           first: first ?? action,
@@ -335,7 +380,7 @@ export function makePlannerEngine(opts = {}) {
       };
 
       let beamStates = acts.map((a) =>
-        step(state, contingent.terrs, remainingBudget, actionsTaken, bonusPool, a, 0, null)
+        step(state, contingent.terrs, remainingBudget, actionsTaken, typesUsed ?? new Set(), bonusPool, a, 0, null)
       );
       if (beamStates.length === 0) return null;
       beamStates.sort((x, y) => y.score - x.score);
@@ -347,9 +392,9 @@ export function makePlannerEngine(opts = {}) {
         for (const b of beamStates) {
           if (b.state.phase !== 'play') continue;
           const contLike = { army, terrs: b.terrs, strength: b.remaining };
-          const followups = legalActions(b.state, contLike, b.remaining, b.taken, b.pool, cap);
+          const followups = legalActions(b.state, contLike, { remaining: b.remaining, taken: b.taken, types: b.types }, b.pool);
           for (const a of followups.slice(0, expand)) {
-            next.push(step(b.state, b.terrs, b.remaining, b.taken, b.pool, a, b.spent, b.first));
+            next.push(step(b.state, b.terrs, b.remaining, b.taken, b.types, b.pool, a, b.spent, b.first));
           }
         }
         if (next.length === 0) break;
@@ -358,13 +403,16 @@ export function makePlannerEngine(opts = {}) {
         beamStates = next.slice(0, beam);
       }
 
-      return best.score > baseline ? best.first : null;
+      const choice = best.score > baseline ? best.first : null;
+      guard.record(state, choice);
+      return choice;
     },
   };
 }
 
 export function makeLookaheadEngine(opts = {}) {
   const W = { ...DEFAULT_WEIGHTS, ...opts };
+  const guard = makeUndoGuard();
   const simStub = { planRetreats: (s, info, options) => retreatPolicy(s, info, options) };
   const simEngines = { A: simStub, B: simStub };
 
@@ -378,16 +426,17 @@ export function makeLookaheadEngine(opts = {}) {
 
     chooseAction(state, ctx, acts, rng) {
       const me = ctx.army;
-      const baseline = evaluate(state, me, W) + W.passMargin;
+      const baseline = passBaseline(state, ctx, W);
       let best = null;
       let bestScore = baseline;
-      for (const a of acts) {
+      for (const a of guard.filter(state, acts)) {
         const clone = structuredClone({ ...state, log: [], events: null, captureSnapshots: false });
         applyAction(clone, me, a, simEngines, rng);
         const s = evaluate(clone, me, W) - W.costPenalty * a.cost + rng() * W.jitter;
         if (W.debug) console.log('  cand', JSON.stringify(a), '->', s.toFixed(2), '(baseline', baseline.toFixed(2) + ')');
         if (s > bestScore) { bestScore = s; best = a; }
       }
+      guard.record(state, best);
       return best;
     },
 

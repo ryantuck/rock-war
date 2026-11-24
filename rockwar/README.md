@@ -43,8 +43,8 @@ scouts; on your turn, click one of your territories to select it (green
 outline = move there, red = attack, with buttons for spawn / evolve /
 obelisk abilities and a piece picker when a territory holds two values),
 then end your turn. The human turn runs through the exact `playTurn`
-machinery — per-contingent fib budgets, the 2-action cap, obelisk bonus
-pools funding extra actions, the first-turn handicap (your first action
+machinery — per-contingent fib budgets, the two-mechanic limit, obelisk
+bonus pools funding extra actions, the first-turn handicap (your first action
 locks in your one acting contingent), and the opponent's reaction window
 after each of your actions. v1 limits for the human side: retreats are
 auto-planned (greedy's stand-on-repels-and-ties policy), you can't cast
@@ -145,9 +145,16 @@ above are on 4×4.
 - **Contingents**: a maximal contiguous group of one army's territories.
   Its strength is the sum of its piece values.
 - **Turns**: on your turn, each of your contingents (snapshotted at turn start)
-  takes up to 2 actions whose fibonacci-valued costs sum to at most the
-  contingent's strength. Territories a contingent captures or moves into
-  mid-turn count as part of it for its remaining action.
+  takes actions whose fibonacci-valued costs sum to at most the
+  contingent's strength, using **at most 2 mechanics** (spawn, move,
+  evolve, attack) but **any number of actions** of them: strength 5 could
+  move three scouts and then spawn twice. Coordinated attacks are attacks;
+  an obelisk ability counts as its element's mechanic (fire attack, earth
+  evolve, air move, water spawn). Territories a contingent captures or
+  moves into mid-turn count as part of it for its remaining actions.
+  (`maxActionTypesPerContingent` 2; the older rule — 2 actions of any
+  mechanics — is `maxActionsPerContingent: 2` with the mechanic limit
+  off.)
 - **Actions**:
   - *Spawn* (cost 1): place a scout from the sideboard into one of the
     contingent's territories.
@@ -214,8 +221,9 @@ above are on 4×4.
   constituent pair is fib-adjacent, so it fits). If every defender retreats,
   no combat happens and the attacker advances whole.
 - **First-turn handicap**: on turn 1, the opening player acts with only one
-  contingent (their engine chooses which); it takes the normal 2 actions.
-  Tunable via `firstTurnContingents` / `firstTurnActions`.
+  contingent (their engine chooses which); it plays a normal turn.
+  Tunable via `firstTurnContingents` / `firstTurnActions` (a turn-1 action
+  cap; off by default — see *Two mechanics per contingent* below).
 - **Obelisks**: four elemental obelisks — fire (red), earth (green), air
   (yellow), water (blue) — sit on corner points, placed by the layout. On
   grids a corner touches four territories (4×4 partition: [1,1] [3,1]
@@ -228,11 +236,12 @@ above are on 4×4.
   **at least 3**. Control grants bonus budget for that mechanic, scaling
   fibonacci with adjacent value: ≥3 → +1, ≥5 → +2, ≥8 → +3, ≥13 → +5,
   ≥21 → +8, … The bonus is an army-wide per-turn pool that refreshes each
-  turn while control holds, and it **breaks the 2-action cap**: after a
-  contingent's normal actions, it may keep taking extra actions whose full
-  cost is covered by the matching pool — e.g. with fire control, spawn,
-  evolve, then attack on the fire kicker. (Within the cap, actions spend
-  contingent budget first so the kicker stays available for extras.)
+  turn while control holds, and it **breaks the mechanic limit**: a
+  contingent that has used its 2 mechanics may still take extra actions of
+  a third whose full cost is covered by the matching pool — e.g. with fire
+  control, spawn and evolve, then attack on the fire kicker. Extras don't
+  claim their mechanic. (Within the limit, actions spend contingent budget
+  first so the kicker stays available for extras.)
 - **Obelisk abilities scale with fervor** — the controller's total adjacent
   value at that obelisk (the same score that sets the bonus tier). Fervor
   caps the **fuel** piece you may spend — a piece of your own standing
@@ -291,14 +300,15 @@ box or via `--config file.json` on the CLI:
 
 | Knob | Default | The call that was made |
 |---|---|---|
-| `maxActionsPerContingent` | 2 | "two types of actions" read as *at most two actions per contingent per turn* |
+| `maxActionTypesPerContingent` | 2 | "two types of actions" read literally: *at most two distinct mechanics per contingent per turn*, any number of actions within the budget (null = no limit) |
+| `maxActionsPerContingent` | null | cap on the number of actions per contingent per turn; the older reading was 2 (with the mechanic limit null) |
 | budget | ≤ strength | action costs sum *up to* strength (exact sums are usually impossible with 2 fib values) |
 | `evolveCost` | `'smaller'` | evolve's cost wasn't specified; also supports `'larger'` and `'result'` |
 | `scoutRetreatBudget` | 1 | read as *1 scout per attack* may flee to an empty territory |
 | `combatRule` | `'devolve'` | attacker devolves through stiff defense; also `'margin'` (dies on exact tie), `'mutual'` (always dies), `'attacker-survives'` (never dies) |
 | `devolveThreshold` | 0.5 | devolution triggers when defense > this fraction of the attacker |
 | `firstTurnContingents` | 1 | contingents the opening player may act with on turn 1 (0 = skip turn 1, null = no handicap) |
-| `firstTurnActions` | 2 | actions per contingent on turn 1 (1 = the old single-action opening; null = normal cap) |
+| `firstTurnActions` | null | actions per contingent on turn 1 (null = a normal turn; 2 was the default under the two-action rule) |
 | `groupAdvance` | `true` | a joint strike that breaks a territory moves both strikers in; a pair that can't share splits its smaller striker on arrival and the enemy displaces the leftover one step (`false`: only the largest striker moves in, stiff defense devolves every striker in place) |
 | `minAttackValue` | 2 | minimum piece value that may attack — scouts can't (1 = anyone can) |
 | `layout` | `4x4-partition` | named board layout: supplies `width`/`height`, `obelisks`, `initialScouts`, `placementStacking`; other keys apply on top |
@@ -335,14 +345,19 @@ box or via `--config file.json` on the CLI:
   immediate attack threat and its **next-turn obelisk-victory reach** (plus
   our own reach as a smaller bonus). ~40× slower than greedy (still ~tens of
   ms per game). Weights overridable; pass `debug: true` to log candidate
-  scores.
+  scores. Turns aren't capped at two actions, so two guards keep it from
+  drifting: the pass margin (act unless clearly harmful) covers only a
+  contingent's first `passMarginActions` (2) actions each turn, after which
+  an action must genuinely improve the position; and it never makes a move
+  that exactly reverses one of its own moves that turn (the planners share
+  both).
 - **Obelisk-victory reach** (`src/engines/obelisk-threat.js`) — one-ply and
   own-turn search can't see an obelisk win coming: an army holding two
   obelisks gets bonus moves/spawns and abilities, and takes the third from a
   distance in a 3–6 action turn. `obeliskReach(state, army)` estimates
   whether it can finish next turn — a greedy simulation of spawns, moves
   (1–2 steps), attacks (direct or after a move) and controlled abilities
-  into the target obelisk's territories, under playTurn's budget, cap and
+  into the target obelisk's territories, under playTurn's budget, mechanic-limit and
   bonus-pool rules, never breaking an obelisk already held. No state
   cloning (~140µs). Against a real-rules search of the next turn it raised
   no false alarms and caught 97% of finishes. The evaluator charges
@@ -678,6 +693,81 @@ mirror, 150 per planner-obelisk mirror. "Joint" = joint strikes per game;
   (exposed), off the obelisk rings. Random picks at random.
 - The layout tables at the top were measured before this rule. Their
   shifts are the deltas above.
+
+## Two mechanics per contingent (`maxActionTypesPerContingent` 2)
+
+*[AI - Claude]: Two-mechanic limit — simulation findings*
+
+A contingent's turn used to be at most 2 actions of any mechanics. Now it
+is any number of actions of at most 2 mechanics, paid from its strength.
+Strength 5 could move three scouts, then spawn twice. Obelisk bonuses
+still fund extra actions, of a third mechanic. The opener still acts with
+one contingent on turn 1, but now plays a normal turn (`firstTurnActions`
+null, was 2).
+
+Old rule (2 actions, opener capped at 2) → new rule, same seeds, seats
+swapped, both with the updated engines (below); 400 games per greedy and
+lookahead mirror, 150 per planner-obelisk mirror. "Actions" = mean actions
+per contingent per turn (max seen); under the old rule obelisk-funded
+extras could pass 2. Seat A = A's share of decided games.
+
+| Mirror | Layout | Actions | Mean turns | Seat A | Draws | Obelisk wins |
+|---|---|---|---|---|---|---|
+| greedy | 4x4-partition | 1.66 → 2.03 (max 13) | 63.6 → 49.8 | 43.4 → 49.0% | 16.5 → 12.3% | 0.3 → 0% |
+| lookahead | 4x4-partition | 1.62 → 2.03 (max 13) | 25.9 → 18.0 | 43.2 → 51.1% | 5.0 → 1.8% | 11.5 → 19.5% |
+| planner-obelisk | 4x4-partition | 1.71 → 2.18 (max 14) | 21.7 → 17.6 | 46.5 → 56.8% | 4.0 → 1.3% | 26.7 → 27.3% |
+| greedy | hex13 | 1.44 → 1.62 (max 10) | 44.0 → 47.7 | 42.0 → 39.9% | 4.3 → 5.5% | 0 → 0.3% |
+| lookahead | hex13 | 1.71 → 2.16 (max 14) | 27.7 → 16.9 | 43.5 → 53.1% | 7.5 → 3.5% | 6.0 → 9.8% |
+| planner-obelisk | hex13 | 1.78 → 2.52 (max 13) | 22.1 → 12.1 | 51.7 → 49.0% | 3.3 → 0.7% | 26.0 → 21.3% |
+| greedy | 5x5-classic | 1.52 → 1.90 (max 12) | 50.7 → 49.1 | 53.5 → 53.1% | 8.0 → 5.8% | 0 → 0% |
+| lookahead | 5x5-classic | 1.54 → 1.76 (max 14) | 41.6 → 35.4 | 35.3 → 51.2% | 1.5 → 3.8% | 16.0 → 13.8% |
+| planner-obelisk | 5x5-classic | 1.63 → 1.87 (max 12) | 32.2 → 29.0 | 37.3 → 43.8% | 0 → 2.7% | 33.3 → 35.3% |
+
+- **Turns get busier, not explosive.** About 2 actions per contingent per
+  turn on average (was ~1.6). The budget binds before the mechanic limit
+  does: most contingents are worth a few points. Big turns happen — 13–14
+  actions — when a large contingent spends on scouts.
+- **Development speeds up.** Spawns and evolves rise from ~43% to ~55% of
+  lookahead's actions on 4×4 and hex13; moves fall from ~47% to ~34%.
+  Spawn-then-evolve chains now fit in one turn.
+- **Search-engine games end sooner**: lookahead 26 → 18 turns on 4×4,
+  28 → 17 on hex13; planner-obelisk on hex13 22 → 12. The experimental
+  4x4-diamond shortens most (lookahead mirror 28 → 11.6, 200 games).
+- **Seat balance is better than under the old rule.** With the opener
+  capped at 2 actions while every later turn is uncapped, seat B won
+  60–71% of decided search-engine games. A normal opening turn is the most
+  even setting measured (A's share of decided games, 400 lookahead / 100
+  planner-obelisk games per cell):
+
+  | Turn-1 cap | lookahead 4×4 / hex13 / 5×5 | planner-obelisk 4×4 / hex13 / 5×5 | greedy 4×4 / hex13 / 5×5 |
+  |---|---|---|---|
+  | 2 actions | 38.9 / 32.1 / 40.2% | 33 / 36 / 29% | 41.9 / 34.5 / 50.9% |
+  | 3 actions | 49.5 / 56.3 / 49.0% | 58 / 48 / 37% | 45.5 / 42.7 / 52.6% |
+  | none (default) | 51.1 / 53.1 / 51.2% | 59 / 45 / 39% | 49.0 / 39.9 / 53.1% |
+
+  The planner-obelisk mirror on 5×5 still favors B (as it did before).
+- **Engines needed two guards** (lookahead and the planners). With
+  unchanged engines, they walked pieces out and back within a turn:
+  15–17 such reversals per lookahead game (was ~9.5) and 7.5–15 per
+  planner game (was 0.7–1.9). The lookahead's pass margin
+  (accept a slightly worse position rather than idle) was granted per
+  action, so many actions compounded it. Now the margin covers only a
+  contingent's first 2 actions each turn, and a move that exactly reverses
+  one of the engine's own moves that turn is never taken. Reversals drop
+  to 0. Greedy is unchanged and still shuttles (~12 per 4×4 game; ~13
+  under the old rule).
+- **Skill still separates.** Lookahead vs greedy (200 games): 4×4
+  86.5 → 90.0%, hex13 87.5 → 90.0%, 5×5 86.5 → 90.5%.
+- **Round robin on 4x4-partition (40 games per pairing), against the
+  group-advance run:** planner-obelisk 78.6 → 80.2%, planner
+  63.3 → 70.9%, lookahead-obelisk 66.4 → 66.9%, lookahead 59.4 → 58.6%,
+  tempo 64.2 → 58.4%, turtle 49.4 → 54.4%, aggro 48.4 → 43.4%, greedy
+  19.2 → 15.8%, random 1.1 → 1.4%. Draws 2.5 → 2.2%. Full-turn planning
+  gains most (planner +7.6 pts): longer turns reward planning them. These
+  shifts mix the rule with the engine guards, and ±2.8 pts is noise.
+- **Cost:** planner games take ~40–55% longer to simulate (4×4
+  242 → 373 ms per game).
+- The layout tables at the top were measured under the old rule.
 
 ## Current observations (300-game matchups, seats swapped, 5×5, devolve combat)
 

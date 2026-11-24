@@ -8,9 +8,9 @@
 // a greedy simulation on a light copy of the cells: repeatedly commit the
 // affordable plan that most reduces the control deficit (count < 2, value
 // below the first tier, not strictly ahead), under playTurn's budget rules
-// (2 actions per contingent within its strength, spending budget before the
-// type's obelisk pool; past the cap, extra actions fully funded by the pool;
-// abilities only within the cap). Plans are 1-2 actions aimed at the target
+// (per contingent: at most 2 mechanics within its strength, spending budget
+// before the type's obelisk pool; past the limit, extra actions fully funded
+// by the pool; abilities only within it). Plans are 1-2 actions aimed at the target
 // obelisk's adjacent territories ("ring"):
 //   spawn into an own ring cell · move in from 1 or 2 steps away (or along
 //   the ring to spread) · attack an enemy ring cell, from adjacent or after
@@ -32,6 +32,7 @@
 import {
   contingents, obeliskBonuses, obeliskTerritories, obeliskStatus, neighbors,
   canAddPiece, moveCost, isFib, fibAdjacent, other, obeliskElementBonus, FIBS,
+  turnLimits, ELEMENT_ACTIONS,
 } from '../game.js';
 
 const NONE = Object.freeze({ held: 0, need: Infinity, deficit: Infinity, lethal: false });
@@ -85,7 +86,8 @@ export function obeliskReach(state, army, opts = {}) {
   const conts = contingents(state, army);
   const contOf = new Map();
   conts.forEach((c, k) => { for (const t of c.terrs) contOf.set(t, k); });
-  const cap = config.maxActionsPerContingent ?? 2;
+  // Next turn's limits (never the first-turn handicap: that turn is over).
+  const limits = turnLimits({ config, turn: Math.max(2, state.turn + 1) });
   const pools0 = obeliskBonuses(state, army);
   const earthTax = obeliskElementBonus(state, enemy, 'earth');
   const minAtk = config.minAttackValue ?? 1;
@@ -112,7 +114,7 @@ export function obeliskReach(state, army, opts = {}) {
     const ring = new Set(ringArr);
     let cells = state.cells.map((c) => ({ army: c.army, pieces: [...c.pieces] }));
     const owner = new Map(contOf);
-    const slots = conts.map(() => cap);
+    const slots = conts.map(() => ({ taken: 0, types: new Set() }));
     const budget = conts.map((c) => c.strength);
     const pools = { ...pools0 };
     let scouts = scouts0;
@@ -120,21 +122,27 @@ export function obeliskReach(state, army, opts = {}) {
     let deficit = deficitOf(statusOn(cells, ringArr, army, tier0), tier0);
     const heldSafe = (cs) => heldIdx.every((h) => statusOn(cs, rings[h], army, tier0).controlled);
 
-    // Spend plan for a sequence of steps [{type, cost, ability}] by contingent c:
-    // each step takes a slot if one is left (budget first, then its pool),
-    // otherwise it must be a pool-funded extra action (never an ability).
+    // Spend plan for a sequence of steps [{type, cost, ability, mech}] by
+    // contingent c: a step within the contingent's limits (action count,
+    // distinct mechanics — an ability counts as its element's mechanic) pays
+    // budget first, then its pool; past them it must be a pool-funded extra
+    // action (never an ability).
     function afford(c, steps) {
       if (c === undefined) return null;
-      let s = slots[c], b = budget[c];
+      const s = { taken: slots[c].taken, types: new Set(slots[c].types) };
+      let b = budget[c];
       const p = { ...pools };
       for (const st of steps) {
-        if (s > 0) {
-          if (st.ability) { s--; continue; }
+        const mech = st.mech ?? st.type;
+        if (s.taken < limits.maxActions && (s.types.has(mech) || s.types.size < limits.maxTypes)) {
+          s.taken++; s.types.add(mech);
+          if (st.ability) continue;
           if (st.cost > b + (p[st.type] || 0)) return null;
           const fromB = Math.min(b, st.cost);
-          b -= fromB; p[st.type] = (p[st.type] || 0) - (st.cost - fromB); s--;
+          b -= fromB; p[st.type] = (p[st.type] || 0) - (st.cost - fromB);
         } else {
           if (st.ability || st.cost > (p[st.type] || 0)) return null;
+          s.taken++;
           p[st.type] -= st.cost;
         }
       }
@@ -219,7 +227,7 @@ export function obeliskReach(state, army, opts = {}) {
         if (fc < 0) continue;
         const spend = (cs) => setCell(cs, fc, army, removeOne(cs[fc].pieces, F));
         const cont = owner.get(fc);
-        const abStep = { type: 'ability', cost: 0, ability: true };
+        const abStep = { type: 'ability', mech: ELEMENT_ACTIONS[ab.element], cost: 0, ability: true };
         for (const r of ringArr) {
           const rc = cells[r];
           if (ab.element === 'water' && rc.army === enemy) {

@@ -12,7 +12,7 @@
 // Interactive play: pick "human" for either army. The advance() driver runs
 // engine placements/turns automatically (with the same animated replay) and
 // pauses whenever it's the human's move. A human turn keeps the exact slots
-// ledger playTurn uses — per-contingent budget, action cap, obelisk bonus
+// ledger playTurn uses — per-contingent budget, mechanic limit, obelisk bonus
 // pools, first-turn handicap — and executes clicked actions through the same
 // applyAction/offerReactions path, so the rules are identical to sim games.
 // v1 limits for the human side: retreats and displacements of the enemy's
@@ -25,6 +25,7 @@ import {
   playTurn, playGame, applyPlacement, legalPlacements,
   armyStrengthOnBoard, fmtCell, obeliskStatus, legalActions, applyAction,
   contingents, obeliskBonuses, offerReactions, finishTurn, checkGameEnd, other,
+  turnLimits, newLedger, withinLimits, recordAction, mechanicOf,
 } from './game.js';
 import { engineFactories, makeEngine } from './engines/index.js';
 import { mulberry32 } from './rng.js';
@@ -99,7 +100,7 @@ let shownSeq = Infinity; // log entries with seq beyond this are hidden
 // interactive play
 let interactive = false;
 let uiMode = null;       // 'place' | 'turn' | null
-let human = null;        // { army, slots, bonusPool, maxActions, limit }
+let human = null;        // { army, slots, bonusPool, limits, limit }
 let selCell = null;      // selected own territory
 let selSlot = null;      // its slot in the ledger
 let selActs = [];        // legal actions originating from selCell
@@ -285,7 +286,7 @@ async function humanPlace(i) {
 
 // Start a human turn with the same ledger playTurn builds: one slot per
 // contingent (snapshotted now), fib budget = strength, obelisk bonus pools,
-// and the turn-1 handicap on both contingent count and action cap.
+// and the turn-1 handicap on contingent count (and any turn-1 action cap).
 function beginHumanTurn() {
   const army = state.toMove;
   if (checkGameEnd(state)) { render(); advance(); return; }
@@ -293,15 +294,12 @@ function beginHumanTurn() {
   const conts = contingents(state, army);
   state.abilitiesUsedThisTurn = [];
   const bonusPool = obeliskBonuses(state, army);
-  const maxActions = state.turn === 1
-    ? Math.min(config.maxActionsPerContingent, config.firstTurnActions ?? Infinity)
-    : config.maxActionsPerContingent;
   const limit = state.turn === 1 ? (config.firstTurnContingents ?? Infinity) : Infinity;
   human = {
     army,
-    slots: conts.map((c) => ({ cont: c, remaining: c.strength, taken: 0 })),
+    slots: conts.map(newLedger),
     bonusPool,
-    maxActions,
+    limits: turnLimits(state),
     limit,
   };
   clearSelection();
@@ -329,8 +327,7 @@ function slotUsable(slot) {
 
 function actsForSlot(slot) {
   if (!slotUsable(slot)) return [];
-  return legalActions(state, slot.cont, slot.remaining, slot.taken,
-    human.bonusPool, human.maxActions, null)
+  return legalActions(state, slot.cont, slot, human.bonusPool, null)
     .filter((a) => a.type !== 'coordAttack'); // not offered interactively (v1)
 }
 
@@ -456,7 +453,8 @@ async function execHuman(act) {
   }
   const army = human.army;
   clearSelection();
-  const beyondCap = slot.taken >= human.maxActions;
+  const mech = mechanicOf(act);
+  const beyondCap = !withinLimits(slot, mech, human.limits);
   state.eventSeq = (state.eventSeq ?? 0) + 1;
   const before = state.events.length;
   const res = applyAction(state, army, act, engines, rng);
@@ -472,7 +470,7 @@ async function execHuman(act) {
     });
   }
   slot.remaining -= act.cost - drawn;
-  slot.taken++;
+  recordAction(slot, mech, !beyondCap);
   if (!checkGameEnd(state)) {
     // The other army may respond with obelisk abilities.
     offerReactions(state, other(army), engines, rng);
@@ -811,7 +809,11 @@ function renderActionBar() {
       .filter((t) => state.cells[t].army === human.army)
       .map((t) => fmtCell(cfg, t)).join(' ');
     const usable = slotUsable(s) ? '' : ' (locked by first-turn handicap)';
-    return `[${cells}] budget ${s.remaining} · actions ${s.taken}/${human.maxActions}${usable}`;
+    const { maxActions, maxTypes } = human.limits;
+    const used = [...s.types].join(' + ') || 'none';
+    const typeCap = Number.isFinite(maxTypes) ? ` (${s.types.size}/${maxTypes})` : '';
+    const countCap = Number.isFinite(maxActions) ? ` · actions ${s.taken}/${maxActions}` : '';
+    return `[${cells}] budget ${s.remaining} · mechanics ${used}${typeCap}${countCap}${usable}`;
   });
   const pools = Object.entries(human.bonusPool)
     .filter(([, v]) => v > 0)

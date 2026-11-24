@@ -113,9 +113,18 @@ function baseRules() {
     // placementStacking — placement may also double up on your own lone
     // scout, a (1,1) pair evolvable to a soldier from turn 1.)
     maxPiecesPerTerritory: 2,
-    // Each contingent takes at most this many actions per turn...
-    maxActionsPerContingent: 2,
-    // ...whose fibonacci-valued costs sum to at most the contingent's strength.
+    // Each contingent's turn: actions whose fibonacci-valued costs sum to at
+    // most the contingent's strength, using at most this many distinct
+    // MECHANICS (spawn, move, evolve, attack) — as many actions of them as
+    // the budget pays for: strength 5 could move three scouts, then spawn
+    // twice. Coordinated attacks are attacks; an obelisk ability counts as
+    // its element's mechanic (fire attack, earth evolve, air move, water
+    // spawn). null = no limit.
+    maxActionTypesPerContingent: 2,
+    // Cap on the NUMBER of actions per contingent per turn (null = none).
+    // The older rule was 2 actions of any mechanics: set this to 2 and
+    // maxActionTypesPerContingent to null.
+    maxActionsPerContingent: null,
     // Cost of an evolve action: 'smaller' | 'larger' | 'result' constituent value.
     evolveCost: 'smaller',
     // Per attack, how many scouts may retreat into EMPTY territories.
@@ -161,8 +170,10 @@ function baseRules() {
     // contingents on turn 1 (their engine chooses which). null = no handicap.
     firstTurnContingents: 1,
     // First-turn handicap: each acting contingent takes at most this many
-    // actions on turn 1. null = no cap beyond maxActionsPerContingent.
-    firstTurnActions: 2,
+    // actions on turn 1. null = a normal turn (the mechanic limit and the
+    // budget still apply). Under the two-mechanic rule a cap of 2 handed
+    // seat B ~60-70% of decided search-engine games; null is the most even.
+    firstTurnActions: null,
     // (Layout-supplied: obelisks — see LAYOUTS.)
     // Controlled obelisks also grant an active ability, once per obelisk per
     // turn (no budget cost — the piece spent is the price). The fuel is
@@ -559,24 +570,65 @@ export function evolveCostOf(config, a, b) {
   return lo; // 'smaller'
 }
 
-// All legal actions for `cont` given the remaining fib budget and actions taken.
+// The mechanic an action spends, for the per-contingent limits: coordinated
+// attacks are attacks, and an obelisk ability counts as its element's
+// mechanic (fire attack, earth evolve, air move, water spawn).
+export function mechanicOf(action) {
+  if (action.type === 'coordAttack') return 'attack';
+  if (action.type === 'ability') return ELEMENT_ACTIONS[action.element];
+  return action.type;
+}
+
+// This turn's per-contingent limits: how many actions, and how many distinct
+// mechanics (Infinity = unlimited). Turn 1 applies the first-turn handicap.
+export function turnLimits(state) {
+  const { config } = state;
+  const maxActions = config.maxActionsPerContingent ?? Infinity;
+  const maxTypes = config.maxActionTypesPerContingent ?? Infinity;
+  if (state.turn !== 1) return { maxActions, maxTypes };
+  return { maxActions: Math.min(maxActions, config.firstTurnActions ?? Infinity), maxTypes };
+}
+
+// A contingent's turn ledger: budget left, actions taken, mechanics used.
+export function newLedger(cont) {
+  return { cont, remaining: cont.strength, taken: 0, types: new Set() };
+}
+
+// May the contingent take a `mechanic` action within its normal limits?
+// Past them, only obelisk-funded extra actions remain (see legalActions).
+export function withinLimits(ledger, mechanic, limits) {
+  return ledger.taken < limits.maxActions &&
+    (ledger.types.has(mechanic) || ledger.types.size < limits.maxTypes);
+}
+
+// Record an action on a ledger. Obelisk-funded extras (beyond the limits)
+// count as actions but don't claim a mechanic.
+export function recordAction(ledger, mechanic, within) {
+  ledger.taken++;
+  if (within) ledger.types.add(mechanic);
+}
+
+// All legal actions for the contingent `cont`, given its turn ledger
+// ({ remaining, taken, types }: budget left, actions taken, mechanics used).
 // Actions carry their cost. Contingent membership (cont.terrs) may have been
 // extended mid-turn by moves/attacks — callers keep cont.terrs updated.
 // bonusPool holds obelisk bonus budget by action type ({ attack: 1, ... }).
-// Within the action cap, an action is affordable from budget + type bonus.
-// BEYOND the cap, obelisk bonuses grant extra actions: an action is legal
-// only if its full cost is covered by its type's bonus pool.
-// allies: [{cont, remaining, taken}] for OTHER contingents still able to act —
-// enables cross-contingent coordinated attacks where each side pays its share.
-export function legalActions(state, cont, remainingBudget, actionsTaken, bonusPool = {},
-                             actionCap = state.config.maxActionsPerContingent, allies = null) {
+// Within the limits (turnLimits: action count and distinct mechanics), an
+// action is affordable from budget + its type's bonus. BEYOND them, obelisk
+// bonuses grant extra actions: an action is legal only if its full cost is
+// covered by its type's bonus pool (abilities never are).
+// allies: [{cont, remaining, taken, types}] for OTHER contingents still able to
+// attack — enables cross-contingent coordinated attacks where each side pays
+// its share.
+export function legalActions(state, cont, ledger, bonusPool = {}, allies = null) {
   const acts = [];
   const { config } = state;
   const army = cont.army;
-  const beyondCap = actionsTaken >= actionCap;
-  const afford = (type, cost) => beyondCap
-    ? cost <= (bonusPool[type] || 0)
-    : cost <= remainingBudget + (bonusPool[type] || 0);
+  const limits = turnLimits(state);
+  const remainingBudget = ledger.remaining;
+  const afford = (type, cost) => withinLimits(ledger, type, limits)
+    ? cost <= remainingBudget + (bonusPool[type] || 0)
+    : cost <= (bonusPool[type] || 0);
   // Earth power: attacking the earth-holder's territories costs extra.
   const earthTax = obeliskElementBonus(state, other(army), 'earth');
 
@@ -703,8 +755,10 @@ export function legalActions(state, cont, remainingBudget, actionsTaken, bonusPo
 
   // Obelisk abilities: once per controlled obelisk per player-turn,
   // budget-free (the spent scout is the price), fueled from this contingent.
-  // Not available as bonus-funded extra actions — they respect the cap.
-  if (!beyondCap) acts.push(...abilityActions(state, army, cont.terrs));
+  // Not available as bonus-funded extra actions — they respect the limits.
+  for (const a of abilityActions(state, army, cont.terrs)) {
+    if (withinLimits(ledger, mechanicOf(a), limits)) acts.push(a);
+  }
   return acts;
 }
 
@@ -1378,7 +1432,8 @@ export function offerReactions(state, reactor, engines, rng) {
 }
 
 // Plays one full turn for state.toMove: every contingent (snapshotted at turn
-// start) takes up to maxActionsPerContingent actions within its fib budget.
+// start) acts within its fib budget and its limits (turnLimits: distinct
+// mechanics, and the action count where one is set).
 export function playTurn(state, engines, rng) {
   if (state.phase !== 'play') return state;
   const army = state.toMove;
@@ -1394,7 +1449,7 @@ export function playTurn(state, engines, rng) {
   const bonusPool = obeliskBonuses(state, army);
 
   // Loss by immobilization: no contingent has any legal action.
-  const anyLegal = conts.some((c) => legalActions(state, c, c.strength, 0, bonusPool).length > 0);
+  const anyLegal = conts.some((c) => legalActions(state, c, newLedger(c), bonusPool).length > 0);
   if (!anyLegal) {
     state.phase = 'over';
     state.winner = other(army);
@@ -1414,7 +1469,7 @@ export function playTurn(state, engines, rng) {
     if (Array.isArray(chosen)) chosen = chosen.filter((c) => conts.includes(c)).slice(0, limit);
     if (!Array.isArray(chosen) || chosen.length === 0) {
       // Fallback: strongest contingents that can actually do something.
-      const usable = conts.filter((c) => legalActions(state, c, c.strength, 0).length > 0);
+      const usable = conts.filter((c) => legalActions(state, c, newLedger(c)).length > 0);
       chosen = (usable.length ? usable : conts)
         .slice()
         .sort((x, y) => y.strength - x.strength)
@@ -1424,25 +1479,24 @@ export function playTurn(state, engines, rng) {
     pushLog(state, `${army} first-turn handicap: ${acting.length} of ${conts.length} contingents may act`);
   }
 
-  // First-turn handicap: cap actions per contingent on turn 1.
-  const maxActions = state.turn === 1
-    ? Math.min(config.maxActionsPerContingent, config.firstTurnActions ?? Infinity)
-    : config.maxActionsPerContingent;
+  // Per-contingent limits (the first-turn handicap caps turn-1 actions).
+  const limits = turnLimits(state);
 
   // Shared ledger: cross-contingent coordinated attacks charge every
   // participating contingent its share of budget and one of its actions.
-  const slots = acting.map((c) => ({ cont: c, remaining: c.strength, taken: 0 }));
+  const slots = acting.map(newLedger);
   for (const slot of slots) {
-    // Loop past maxActions: obelisk bonuses fund extra actions beyond the cap
+    // Loop past the limits: obelisk bonuses fund extra actions beyond them
     // (legalActions only offers fully-bonus-funded actions there), so a
-    // contingent can e.g. spawn, evolve, then attack on the fire kicker.
+    // contingent can e.g. spawn and evolve, then attack on the fire kicker.
     while (state.phase === 'play') {
-      const allies = slots.filter((s) => s !== slot && s.taken < maxActions && s.remaining > 0);
-      const acts = legalActions(state, slot.cont, slot.remaining, slot.taken, bonusPool, maxActions, allies);
+      const allies = slots.filter((s) => s !== slot && withinLimits(s, 'attack', limits) && s.remaining > 0);
+      const acts = legalActions(state, slot.cont, slot, bonusPool, allies);
       if (acts.length === 0) break;
       const choice = engines[army].chooseAction(
         state,
-        { army, contingent: slot.cont, remainingBudget: slot.remaining, actionsTaken: slot.taken, bonusPool },
+        { army, contingent: slot.cont, remainingBudget: slot.remaining, actionsTaken: slot.taken,
+          typesUsed: slot.types, bonusPool },
         acts,
         rng
       );
@@ -1450,7 +1504,8 @@ export function playTurn(state, engines, rng) {
       // Only accept an action from the legal list.
       const match = acts.find((a) => JSON.stringify(a) === JSON.stringify(choice));
       if (!match) break;
-      const beyondCap = slot.taken >= maxActions;
+      const mech = mechanicOf(match);
+      const beyondCap = !withinLimits(slot, mech, limits);
       state.eventSeq = (state.eventSeq ?? 0) + 1;
       const res = applyAction(state, army, match, engines, rng);
       if (res.capturedTerritory !== undefined) slot.cont.terrs.add(res.capturedTerritory);
@@ -1458,7 +1513,7 @@ export function playTurn(state, engines, rng) {
       // Payment. Coordinated attacks split the bill: every participating
       // contingent pays its own strikers' share and spends an action.
       // Bonus pools (attack pool for coordAttacks) top up the acting
-      // contingent; beyond the cap its whole share is bonus-funded.
+      // contingent; beyond its limits its whole share is bonus-funded.
       const poolKey = match.type === 'coordAttack' ? 'attack' : match.type;
       if (match.type === 'coordAttack') {
         const tax = obeliskElementBonus(state, other(army), 'earth');
@@ -1478,10 +1533,10 @@ export function playTurn(state, engines, rng) {
             s.remaining -= share - drawn;
           } else {
             s.remaining = Math.max(0, s.remaining - share);
-            s.taken++;
+            recordAction(s, 'attack', true);
           }
         }
-        slot.taken++;
+        recordAction(slot, mech, !beyondCap);
       } else {
         const drawn = beyondCap ? match.cost : Math.max(0, match.cost - slot.remaining);
         if (drawn > 0) {
@@ -1489,7 +1544,7 @@ export function playTurn(state, engines, rng) {
           pushLog(state, `${army} draws ${drawn} obelisk ${poolKey} budget${beyondCap ? ' (extra action)' : ''}`);
         }
         slot.remaining -= match.cost - drawn;
-        slot.taken++;
+        recordAction(slot, mech, !beyondCap);
       }
       if (checkElimination(state)) return state;
       // The other army may respond with obelisk abilities.

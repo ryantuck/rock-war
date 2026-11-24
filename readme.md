@@ -44,8 +44,9 @@ frontend's layout menu or with `--layout`.
 - **Territories** hold at most 2 pieces, which must be fibonacci-adjacent:
   (1,1) (1,2) (2,3) (3,5) (5,8).
 - **Contingents**: contiguous groups of one army's territories act as units.
-  Each takes up to 2 actions per turn, with fibonacci-valued costs summing
-  to at most the contingent's strength.
+  Each turn one spends its strength as budget on fibonacci-valued actions
+  of at most **two mechanics**, as many as the budget pays for (strength 5:
+  move three scouts, then spawn twice).
 - **Actions**: *spawn* a scout (1) · *move* (cost = value difference, scouts
   always 1) · *evolve* a pair into its fibonacci sum (1+2→3, 2+3→5, 3+5→8)
   · *attack* an adjacent enemy territory (cost = attacker's value; scouts
@@ -62,7 +63,7 @@ frontend's layout menu or with `--layout`.
 - **Obelisks**: four elemental obelisks on corner intersections (fire→attack,
   earth→evolve, air→move, water→spawn). Occupying ≥2 adjacent territories
   with the greatest adjacent value ≥3 grants bonus budget for that mechanic
-  (fibonacci-scaled, can fund extra actions past the cap) and a once-per-turn
+  (fibonacci-scaled, can fund extra actions of a third mechanic) and a once-per-turn
   active ability — castable on either player's turn, fueled by an
   obelisk-adjacent scout.
 - **Winning**: eliminate the enemy's board pieces, leave them unable to
