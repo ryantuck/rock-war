@@ -208,8 +208,9 @@ function baseRules() {
     // Controlling this many obelisks simultaneously wins the game on the
     // spot. Control means holding the strictly greatest adjacent value of at
     // least 3 across at least 2 of an obelisk's adjacent territories.
+    // null = ALL of the board's obelisks (the default); the older rule was 3.
     obeliskVictory: true,
-    obeliskVictoryCount: 3,
+    obeliskVictoryCount: null,
     // Control requires occupying >= 2 of the obelisk's adjacent territories
     // with the strictly greatest total adjacent piece value, which must reach
     // the first tier. Bonuses scale fibonacci with the tier reached:

@@ -71,7 +71,7 @@ frontend's layout menu or with `--layout`.
   active ability — castable on either player's turn, fueled by an
   obelisk-adjacent scout.
 - **Winning**: eliminate the enemy's board pieces, leave them unable to
-  act, or control any three obelisks simultaneously. At the turn limit,
+  act, or control every obelisk simultaneously. At the turn limit,
   most board strength wins (obelisks break ties).
 
 Full rules, every tunable knob, engine internals, and simulation findings:
