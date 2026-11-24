@@ -778,6 +778,67 @@ extras could pass 2. Seat A = A's share of decided games.
   242 → 373 ms per game).
 - The layout tables at the top were measured under the old rule.
 
+## Rank costs (`rankCosts`, `evolveCost: 'larger'`)
+
+*[AI - Claude]: Rank costs — simulation findings*
+
+Moving into an empty territory, attacking and evolving now cost one
+fibonacci step below the piece involved (for evolve, the piece made):
+soldier 1, chieftain 2, warlord 3, behemoth 5. Before, a move into empty
+ground or an attack cost the piece's full value, and an evolve cost the
+smaller constituent. Net effect: moves into empty ground and attacks get
+cheaper, and evolves get dearer (1+2→3 was 1, now 2; 2+3→5 was 2, now 3;
+3+5→8 was 3, now 5). Moving onto your own piece (the value difference) and
+scouts (1) are unchanged.
+
+Old → new costs, same seeds, seats swapped, both under the two-mechanic
+rule; 400 games per greedy and lookahead mirror, 150 per planner-obelisk
+mirror. Attacks are from the lookahead mirror.
+
+| Mirror | Layout | Mean turns | Seat A | Obelisk wins | Draws |
+|---|---|---|---|---|---|
+| greedy | 4x4-partition | 49.8 → 48.7 | 49.0 → 50.8% | 0 → 0.5% | 12.3 → 10.5% |
+| lookahead | 4x4-partition | 18.0 → 16.6 | 51.1 → 55.8% | 19.5 → 18.3% | 1.8 → 2.8% |
+| planner-obelisk | 4x4-partition | 17.6 → 16.5 | 56.8 → 58.8% | 27.3 → 28.7% | 1.3 → 1.3% |
+| greedy | hex13 | 47.7 → 49.3 | 39.9 → 43.7% | 0.3 → 0% | 5.5 → 4.5% |
+| lookahead | hex13 | 16.9 → 14.1 | 53.1 → 47.6% | 9.8 → 13.8% | 3.5 → 5.0% |
+| planner-obelisk | hex13 | 12.1 → 13.4 | 49.0 → 53.8% | 21.3 → 12.7% | 0.7 → 3.3% |
+| greedy | 5x5-classic | 49.1 → 39.7 | 53.1 → 50.3% | 0 → 0% | 5.8 → 5.5% |
+| lookahead | 5x5-classic | 35.4 → 26.7 | 51.2 → 50.0% | 13.8 → 16.8% | 3.8 → 3.5% |
+| planner-obelisk | 5x5-classic | 29.0 → 18.7 | 43.8 → 43.6% | 35.3 → 32.7% | 2.7 → 0.7% |
+
+| Lookahead mirror | 4x4-partition | hex13 | 5x5-classic |
+|---|---|---|---|
+| Attacks per turn | 0.18 → 0.25 | 0.22 → 0.29 | 0.10 → 0.15 |
+| Exact-tie trades (share of attacks) | 41 → 36% | 37 → 35% | 42 → 35% |
+| Moves (share of actions) | 35 → 36% | 33 → 28% | 61 → 52% |
+| Evolves (share of actions) | 19 → 17% | 20 → 20% | 12 → 14% |
+
+- **More fighting, sooner.** Attacks per turn rise 30–50% for lookahead,
+  and fewer of them are even trades (exact ties). Greedy's attack share
+  rises too (4×4 13 → 18% of actions, hex13 21 → 28%), and its evolve
+  share falls (14 → 10%, 12 → 9%).
+- **The big board shrinks most.** Cheap moves into open ground matter most
+  where there is open ground: 5×5 games shorten by a quarter to a third
+  (lookahead 35 → 27 turns, planner-obelisk 29 → 19, greedy 49 → 40),
+  and lookahead moves less there. On 4×4 and hex13 game lengths move by
+  1–3 turns.
+- **Seat balance holds** within ~2 SE everywhere. The lookahead mirror on
+  4×4 tips slightly to A (55.8%, ~2 SE). The first-turn setting
+  (`firstTurnActions` null) still fits.
+- **Obelisk wins** move both ways (planner-obelisk on hex13 21 → 13%, on
+  4×4 27 → 29%), inside noise except hex13.
+- **Skill separates slightly more.** Lookahead vs greedy (200 games): 4×4
+  90.0 → 90.0%, hex13 90.0 → 92.5%, 5×5 90.5 → 92.5%.
+- **Round robin on 4x4-partition (40 games per pairing), against the
+  two-mechanic run:** planner-obelisk 80.2 → 78.1%, planner
+  70.9 → 76.3%, lookahead-obelisk 66.9 → 68.8%, lookahead 58.6 → 56.6%,
+  turtle 54.4 → 56.4%, tempo 58.4 → 52.8%, aggro 43.4 → 41.9%, greedy
+  15.8 → 19.1%, random 1.4 → 0.2%. Draws 2.2 → 2.1%. The economy
+  archetype (tempo) loses most as evolves get dearer. Aggression gains
+  nothing from cheaper attacks: the attack-hungry preset stays last among
+  the lookaheads.
+
 ## Current observations (300-game matchups, seats swapped, 5×5, devolve combat)
 
 These observations predate the five-scout change (two scouts per army).
