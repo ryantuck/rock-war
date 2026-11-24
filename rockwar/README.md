@@ -840,6 +840,45 @@ mirror. Attacks are from the lookahead mirror.
   nothing from cheaper attacks: the attack-hungry preset stays last among
   the lookaheads.
 
+## All-obelisk victory (`obeliskVictoryCount` 3 → all)
+
+*[AI - Claude]: All-obelisk victory — simulation findings*
+
+The instant obelisk win now needs every obelisk at once (four) instead of
+any three. Same seeds, seats swapped, current rules otherwise; 400 games
+per greedy and lookahead mirror, 150 per planner-obelisk mirror.
+
+| Mirror | Layout | Obelisk wins | Eliminations | Mean turns | Seat A |
+|---|---|---|---|---|---|
+| lookahead | 4x4-partition | 18.3 → 0.8% | 75.0 → 92.0% | 16.6 → 18.3 | 55.8 → 57.1% |
+| planner-obelisk | 4x4-partition | 28.7 → 0.7% | 66.7 → 92.7% | 16.5 → 19.8 | 58.8 → 56.8% |
+| lookahead | hex13 | 13.8 → 0.5% | 78.5 → 86.5% | 14.1 → 24.9 | 47.6 → 52.4% |
+| planner-obelisk | hex13 | 12.7 → 0% | 82.7 → 98.7% | 13.4 → 11.2 | 53.8 → 53.0% |
+| lookahead | 5x5-classic | 16.8 → 0.8% | 72.3 → 85.0% | 26.7 → 34.0 | 50.0 → 52.7% |
+| planner-obelisk | 5x5-classic | 32.7 → 5.3% | 62.0 → 84.7% | 18.7 → 32.1 | 43.6 → 46.3% |
+| lookahead | 4x4-diamond | 32.0 → 14.8% | 64.8 → 80.0% | 10.4 → 11.3 | 37.5 → 34.7% |
+| planner-obelisk | 4x4-diamond | 56.7 → 24.7% | 41.3 → 72.0% | 9.3 → 11.3 | 56.4 → 44.9% |
+
+- **Obelisk wins all but disappear on the three main boards** (0–5% of
+  search-engine games, was 13–33%). Holding all four means holding the
+  enemy's side of the board too; an army strong enough for that likely
+  eliminates the enemy first. Only the experimental 4x4-diamond, whose
+  obelisks ring the center, keeps a real obelisk race (15–25%).
+- **Elimination becomes the ending** (85–99% of search-engine games).
+  Most search-engine games run longer (lookahead on hex13 14 → 25 turns,
+  planner-obelisk on 5×5 19 → 32). Greedy mirrors don't change (they almost never won on
+  obelisks).
+- **Obelisks still matter.** Bonus budget, abilities and auras are
+  untouched, and the round robin barely moves (4×4, 40 games per pairing,
+  against the rank-cost run): planner-obelisk 78.1 → 78.6%, planner
+  76.3 → 75.2%, lookahead-obelisk 68.8 → 66.7%, tempo 52.8 → 57.2%,
+  turtle 56.4 → 56.1%, lookahead 56.6 → 55.9%, aggro 41.9 → 41.4%, greedy
+  19.1 → 18.8%, random 0.2 → 0.2%. Draws 2.1 → 1.9%. The map-control
+  presets still lead.
+- **Seat balance mostly holds.** The 4×4 search mirrors sit at ~57% for
+  A (lookahead was already 56% before this change). On 4x4-diamond the lookahead mirror favors B (35% A).
+- **Skill:** lookahead vs greedy (200 games) stays at 89.5–92%.
+
 ## Current observations (300-game matchups, seats swapped, 5×5, devolve combat)
 
 These observations predate the five-scout change (two scouts per army).
